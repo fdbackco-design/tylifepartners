@@ -3,8 +3,8 @@
 import { useState, useCallback } from "react";
 
 /* [바꿔야 하는 곳 - 이미지] public/assets/hero.jpg 추가. 없으면 hero.svg 플레이스홀더 표시 */
-const HERO_IMAGE = "/assets/hero.jpeg";
-const HERO_FALLBACK = "/assets/hero.jpeg";
+const HERO_IMAGE = "/assets/hero.jpg";
+const HERO_FALLBACK = "/assets/hero.jpg";
 
 function formatPhone(value: string): string {
   const digits = value.replace(/\D/g, "");
@@ -117,7 +117,7 @@ export default function LandingPage() {
           background: "#e9ecef",
         }}
       >
-        {/* [이미지 변경] public/assets/hero.jpeg 파일을 추가한 뒤 이 경로 사용 */}
+        {/* [이미지 변경] public/assets/hero.jpg 파일을 추가한 뒤 이 경로 사용 */}
         <img
           src={imgError ? HERO_FALLBACK : HERO_IMAGE}
           alt=""
