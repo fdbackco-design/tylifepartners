@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 const PAGE_SIZE = 20;
 
@@ -13,71 +13,83 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
+type LeadRow = {
+  id: string;
+  name: string;
+  phone: string;
+  created_at: string;
+  status: string;
+  memo: string;
+};
+
 export default function AdminPage() {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+
+  // login
   const [id, setId] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
-  const [leads, setLeads] = useState<
-    { id: string; name: string; phone: string; created_at: string; status: string; memo: string }[]
-  >([]);
+
+  // data
+  const [leads, setLeads] = useState<LeadRow[]>([]);
   const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebounce(searchInput, 400);
+
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
+
   const [loading, setLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+
+  // save
   const [savingId, setSavingId] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<{ id: string; msg: string; error?: boolean } | null>(null);
 
-  const debouncedSearch = useDebounce(searchInput, 400);
+  const updateLeadLocal = useCallback((id: string, updates: { status?: string; memo?: string }) => {
+    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updates } : l)));
+  }, []);
 
-  const updateLeadLocal = useCallback(
-    (id: string, updates: { status?: string; memo?: string }) => {
-      setLeads((prev) =>
-        prev.map((l) => (l.id === id ? { ...l, ...updates } : l))
-      );
-    },
-    []
-  );
+  const handleSaveLead = useCallback(async (lead: { id: string; status: string; memo: string }) => {
+    setSavingId(lead.id);
+    setSaveMsg(null);
+    try {
+      const res = await fetch(`/api/admin/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: lead.status, memo: lead.memo }),
+      });
 
-  const handleSaveLead = useCallback(
-    async (lead: { id: string; status: string; memo: string }) => {
-      setSavingId(lead.id);
-      setSaveMsg(null);
-      try {
-        const res = await fetch(`/api/admin/leads/${lead.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: lead.status, memo: lead.memo }),
-        });
-        const data = await res.json();
-        if (data.ok) {
-          setSaveMsg({ id: lead.id, msg: "저장됨" });
-          setTimeout(() => setSaveMsg(null), 2000);
-        } else {
-          setSaveMsg({ id: lead.id, msg: data.message ?? "저장 실패", error: true });
-        }
-      } catch {
-        setSaveMsg({ id: lead.id, msg: "네트워크 오류", error: true });
-      } finally {
-        setSavingId(null);
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.ok) {
+        setSaveMsg({ id: lead.id, msg: "저장됨" });
+        setTimeout(() => setSaveMsg(null), 2000);
+      } else {
+        setSaveMsg({ id: lead.id, msg: data.message ?? "저장 실패", error: true });
       }
-    },
-    []
-  );
+    } catch {
+      setSaveMsg({ id: lead.id, msg: "네트워크 오류", error: true });
+    } finally {
+      setSavingId(null);
+    }
+  }, []);
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/admin/leads?search=${encodeURIComponent(debouncedSearch)}&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`
+        `/api/admin/leads?search=${encodeURIComponent(debouncedSearch)}&limit=${PAGE_SIZE}&offset=${
+          page * PAGE_SIZE
+        }`
       );
-      const data = await res.json();
+
       if (res.status === 401) {
         setLoggedIn(false);
         return;
       }
+
+      const data = await res.json().catch(() => ({}));
       if (data.ok) {
         setLeads(data.items ?? []);
         setTotal(data.total ?? data.items?.length ?? 0);
@@ -111,7 +123,8 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, password }),
       });
-      const data = await res.json();
+
+      const data = await res.json().catch(() => ({}));
       if (data.ok) {
         setLoggedIn(true);
         setPage(0);
@@ -146,10 +159,14 @@ export default function AdminPage() {
     );
   }
 
+  // ---------------------------
+  // LOGIN PAGE (maxWidth 유지)
+  // ---------------------------
   if (!loggedIn) {
     return (
       <main style={{ maxWidth: 400, margin: "0 auto", padding: 24 }}>
         <h1 style={{ marginBottom: 24, fontSize: 20, fontWeight: 600 }}>관리자 로그인</h1>
+
         <form onSubmit={handleLogin}>
           <div style={{ marginBottom: 16 }}>
             <label
@@ -174,6 +191,7 @@ export default function AdminPage() {
               }}
             />
           </div>
+
           <div style={{ marginBottom: 20 }}>
             <label
               htmlFor="admin-pw"
@@ -197,9 +215,9 @@ export default function AdminPage() {
               }}
             />
           </div>
-          {loginError && (
-            <p style={{ margin: "0 0 16px", fontSize: 14, color: "#e03131" }}>{loginError}</p>
-          )}
+
+          {loginError && <p style={{ margin: "0 0 16px", fontSize: 14, color: "#e03131" }}>{loginError}</p>}
+
           <button
             type="submit"
             disabled={loginLoading}
@@ -222,11 +240,26 @@ export default function AdminPage() {
     );
   }
 
+  // ---------------------------
+  // ADMIN TABLE PAGE (수정 반영)
+  // - maxWidth 제거 (풀폭)
+  // - 데스크톱에서 넓게 보이도록 width:100%
+  // - 테이블 overflowX + minWidth로 안정
+  // ---------------------------
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: 16, paddingBottom: 40 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+    <main style={{ width: "100%", padding: 24, paddingBottom: 40 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 20,
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>상담 신청 리드</h1>
         <button
           type="button"
@@ -262,6 +295,7 @@ export default function AdminPage() {
             borderRadius: 8,
             fontSize: 15,
             outline: "none",
+            maxWidth: 720, // 데스크톱에서 검색창만 너무 길지 않게
           }}
         />
       </div>
@@ -269,9 +303,7 @@ export default function AdminPage() {
       {loading ? (
         <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>로딩 중...</div>
       ) : leads.length === 0 ? (
-        <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>
-          신청 내역이 없습니다.
-        </div>
+        <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>신청 내역이 없습니다.</div>
       ) : (
         <>
           <div
@@ -282,101 +314,124 @@ export default function AdminPage() {
               overflow: "hidden",
             }}
           >
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-              <thead>
-                <tr style={{ background: "#f8f9fa", borderBottom: "1px solid var(--border)" }}>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>신청시간</th>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>이름</th>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>연락처</th>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>상담상태</th>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>메모</th>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {leads.map((row) => (
-                  <tr key={row.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                    <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>{row.created_at}</td>
-                    <td style={{ padding: "12px 10px" }}>{row.name}</td>
-                    <td style={{ padding: "12px 10px" }}>{row.phone}</td>
-                    <td style={{ padding: "12px 10px" }}>
-                      <select
-                        value={row.status}
-                        onChange={(e) => updateLeadLocal(row.id, { status: e.target.value })}
-                        style={{
-                          padding: "6px 10px",
-                          border: "1px solid var(--border)",
-                          borderRadius: 6,
-                          fontSize: 14,
-                          minWidth: 100,
-                        }}
-                      >
-                        <option value="대기">대기</option>
-                        <option value="상담 완료">상담 완료</option>
-                      </select>
-                    </td>
-                    <td style={{ padding: "12px 10px" }}>
-                      <textarea
-                        value={row.memo}
-                        onChange={(e) => updateLeadLocal(row.id, { memo: e.target.value })}
-                        placeholder="메모 입력..."
-                        rows={2}
-                        style={{
-                          width: "100%",
-                          minWidth: 120,
-                          padding: "6px 10px",
-                          border: "1px solid var(--border)",
-                          borderRadius: 6,
-                          fontSize: 14,
-                          resize: "vertical",
-                          fontFamily: "inherit",
-                        }}
-                      />
-                    </td>
-                    <td style={{ padding: "12px 10px" }}>
-                      <button
-                        type="button"
-                        onClick={() => handleSaveLead(row)}
-                        disabled={savingId === row.id}
-                        style={{
-                          padding: "6px 12px",
-                          background: savingId === row.id ? "#adb5bd" : "var(--cta-bg)",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 6,
-                          fontSize: 13,
-                          cursor: savingId === row.id ? "default" : "pointer",
-                        }}
-                      >
-                        {savingId === row.id ? "저장중" : "저장"}
-                      </button>
-                      {saveMsg?.id === row.id && (
-                        <span
+            {/* ✅ 데스크톱/모바일 모두 안전하게: 테이블 가로 스크롤 컨테이너 */}
+            <div style={{ overflowX: "auto" }}>
+              <table
+                style={{
+                  width: "100%",
+                  minWidth: 1100, // ✅ 데스크톱에서 컬럼이 눌리지 않게
+                  borderCollapse: "collapse",
+                  fontSize: 14,
+                }}
+              >
+                <thead>
+                  <tr style={{ background: "#f8f9fa", borderBottom: "1px solid var(--border)" }}>
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>
+                      신청시간
+                    </th>
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>
+                      이름
+                    </th>
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>
+                      연락처
+                    </th>
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>
+                      상담상태
+                    </th>
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>
+                      메모
+                    </th>
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }} />
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {leads.map((row) => (
+                    <tr key={row.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                        {row.created_at}
+                      </td>
+                      <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{row.name}</td>
+                      <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{row.phone}</td>
+
+                      <td style={{ padding: "12px 10px" }}>
+                        <select
+                          value={row.status}
+                          onChange={(e) => updateLeadLocal(row.id, { status: e.target.value })}
                           style={{
-                            marginLeft: 8,
-                            fontSize: 12,
-                            color: saveMsg.error ? "#e03131" : "#37b24d",
+                            padding: "6px 10px",
+                            border: "1px solid var(--border)",
+                            borderRadius: 6,
+                            fontSize: 14,
+                            minWidth: 110,
+                            background: "#fff",
                           }}
                         >
-                          {saveMsg.msg}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                          <option value="대기">대기</option>
+                          <option value="상담 완료">상담 완료</option>
+                        </select>
+                      </td>
+
+                      <td style={{ padding: "12px 10px" }}>
+                        <textarea
+                          value={row.memo}
+                          onChange={(e) => updateLeadLocal(row.id, { memo: e.target.value })}
+                          placeholder="메모 입력..."
+                          rows={2}
+                          style={{
+                            width: 420, // ✅ 데스크톱에서 메모 칸이 “시원하게”
+                            maxWidth: "100%",
+                            minWidth: 260,
+                            padding: "6px 10px",
+                            border: "1px solid var(--border)",
+                            borderRadius: 6,
+                            fontSize: 14,
+                            resize: "vertical",
+                            fontFamily: "inherit",
+                            outline: "none",
+                          }}
+                        />
+                      </td>
+
+                      <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
+                        <button
+                          type="button"
+                          onClick={() => handleSaveLead(row)}
+                          disabled={savingId === row.id}
+                          style={{
+                            padding: "6px 12px",
+                            background: savingId === row.id ? "#adb5bd" : "var(--cta-bg)",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 6,
+                            fontSize: 13,
+                            cursor: savingId === row.id ? "default" : "pointer",
+                          }}
+                        >
+                          {savingId === row.id ? "저장중" : "저장"}
+                        </button>
+
+                        {saveMsg?.id === row.id && (
+                          <span
+                            style={{
+                              marginLeft: 8,
+                              fontSize: 12,
+                              color: saveMsg.error ? "#e03131" : "#37b24d",
+                            }}
+                          >
+                            {saveMsg.msg}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {totalPages > 1 && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: 8,
-                marginTop: 20,
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 20 }}>
               <button
                 type="button"
                 disabled={page === 0}
@@ -392,9 +447,11 @@ export default function AdminPage() {
               >
                 이전
               </button>
+
               <span style={{ padding: "8px 14px", color: "var(--text-secondary)" }}>
                 {page + 1} / {totalPages}
               </span>
+
               <button
                 type="button"
                 disabled={page >= totalPages - 1}
