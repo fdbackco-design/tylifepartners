@@ -19,14 +19,53 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
-  const [leads, setLeads] = useState<{ id: string; name: string; phone: string; created_at: string }[]>([]);
+  const [leads, setLeads] = useState<
+    { id: string; name: string; phone: string; created_at: string; status: string; memo: string }[]
+  >([]);
   const [searchInput, setSearchInput] = useState("");
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [saveMsg, setSaveMsg] = useState<{ id: string; msg: string; error?: boolean } | null>(null);
 
   const debouncedSearch = useDebounce(searchInput, 400);
+
+  const updateLeadLocal = useCallback(
+    (id: string, updates: { status?: string; memo?: string }) => {
+      setLeads((prev) =>
+        prev.map((l) => (l.id === id ? { ...l, ...updates } : l))
+      );
+    },
+    []
+  );
+
+  const handleSaveLead = useCallback(
+    async (lead: { id: string; status: string; memo: string }) => {
+      setSavingId(lead.id);
+      setSaveMsg(null);
+      try {
+        const res = await fetch(`/api/admin/leads/${lead.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: lead.status, memo: lead.memo }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setSaveMsg({ id: lead.id, msg: "저장됨" });
+          setTimeout(() => setSaveMsg(null), 2000);
+        } else {
+          setSaveMsg({ id: lead.id, msg: data.message ?? "저장 실패", error: true });
+        }
+      } catch {
+        setSaveMsg({ id: lead.id, msg: "네트워크 오류", error: true });
+      } finally {
+        setSavingId(null);
+      }
+    },
+    []
+  );
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
@@ -249,6 +288,9 @@ export default function AdminPage() {
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>신청시간</th>
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>이름</th>
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>연락처</th>
+                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>상담상태</th>
+                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>메모</th>
+                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -257,6 +299,69 @@ export default function AdminPage() {
                     <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>{row.created_at}</td>
                     <td style={{ padding: "12px 10px" }}>{row.name}</td>
                     <td style={{ padding: "12px 10px" }}>{row.phone}</td>
+                    <td style={{ padding: "12px 10px" }}>
+                      <select
+                        value={row.status}
+                        onChange={(e) => updateLeadLocal(row.id, { status: e.target.value })}
+                        style={{
+                          padding: "6px 10px",
+                          border: "1px solid var(--border)",
+                          borderRadius: 6,
+                          fontSize: 14,
+                          minWidth: 100,
+                        }}
+                      >
+                        <option value="대기">대기</option>
+                        <option value="상담 완료">상담 완료</option>
+                      </select>
+                    </td>
+                    <td style={{ padding: "12px 10px" }}>
+                      <textarea
+                        value={row.memo}
+                        onChange={(e) => updateLeadLocal(row.id, { memo: e.target.value })}
+                        placeholder="메모 입력..."
+                        rows={2}
+                        style={{
+                          width: "100%",
+                          minWidth: 120,
+                          padding: "6px 10px",
+                          border: "1px solid var(--border)",
+                          borderRadius: 6,
+                          fontSize: 14,
+                          resize: "vertical",
+                          fontFamily: "inherit",
+                        }}
+                      />
+                    </td>
+                    <td style={{ padding: "12px 10px" }}>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveLead(row)}
+                        disabled={savingId === row.id}
+                        style={{
+                          padding: "6px 12px",
+                          background: savingId === row.id ? "#adb5bd" : "var(--cta-bg)",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 6,
+                          fontSize: 13,
+                          cursor: savingId === row.id ? "default" : "pointer",
+                        }}
+                      >
+                        {savingId === row.id ? "저장중" : "저장"}
+                      </button>
+                      {saveMsg?.id === row.id && (
+                        <span
+                          style={{
+                            marginLeft: 8,
+                            fontSize: 12,
+                            color: saveMsg.error ? "#e03131" : "#37b24d",
+                          }}
+                        >
+                          {saveMsg.msg}
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

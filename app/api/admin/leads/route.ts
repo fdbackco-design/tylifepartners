@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseAdmin();
     let query = supabase
       .from("leads")
-      .select("id, name, phone, created_at", { count: "exact" })
+      .select("id, name, phone, created_at, status, memo", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -61,6 +61,8 @@ export async function GET(request: NextRequest) {
             second: "2-digit",
           })
         : "",
+      status: row.status ?? "대기",
+      memo: row.memo ?? "",
     }));
 
     return NextResponse.json({ ok: true, items, total: count ?? items.length });

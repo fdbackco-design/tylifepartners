@@ -9,7 +9,9 @@ CREATE TABLE IF NOT EXISTS public.leads (
   name TEXT NOT NULL,
   phone TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  source TEXT DEFAULT 'daangn'
+  source TEXT DEFAULT 'daangn',
+  status TEXT NOT NULL DEFAULT '대기',
+  memo TEXT
 );
 
 -- created_at desc 정렬용 인덱스

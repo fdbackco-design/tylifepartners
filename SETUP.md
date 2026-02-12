@@ -28,6 +28,13 @@ CREATE INDEX IF NOT EXISTS idx_leads_created_at ON public.leads (created_at DESC
 CREATE INDEX IF NOT EXISTS idx_leads_phone ON public.leads (phone);
 ```
 
+**이미 leads 테이블이 있는 경우** (상담 상태·메모 컬럼 추가):
+
+```sql
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT '대기';
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS memo TEXT;
+```
+
 ---
 
 ## 3. 환경변수 (.env.local / Vercel)
