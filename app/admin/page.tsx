@@ -225,7 +225,7 @@ export default function AdminPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <main style={{ maxWidth: 600, margin: "0 auto", padding: 16, paddingBottom: 40 }}>
+    <main style={{ maxWidth: 900, margin: "0 auto", padding: 16, paddingBottom: 40 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>상담 신청 리드</h1>
         <button
