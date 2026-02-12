@@ -295,7 +295,13 @@ export default function AdminPage() {
               </thead>
               <tbody>
                 {leads.map((row) => (
-                  <tr key={row.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                  <tr
+                    key={row.id}
+                    style={{
+                      borderBottom: "1px solid var(--border)",
+                      background: row.status === "대기" ? "#fffde7" : undefined,
+                    }}
+                  >
                     <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>{row.created_at}</td>
                     <td style={{ padding: "12px 10px" }}>{row.name}</td>
                     <td style={{ padding: "12px 10px" }}>{row.phone}</td>
