@@ -7,6 +7,7 @@ const STATUS_VALUES = ["대기", "상담 완료"] as const;
 /**
  * PATCH /api/admin/leads/[id]
  * 리드의 상담 상태(status), 메모(memo) 업데이트
+ * ?category=b2b → tylife_b2b 테이블, ?category=b2c 또는 생략 → leads 테이블
  */
 export async function PATCH(
   request: NextRequest,
@@ -22,6 +23,9 @@ export async function PATCH(
 
   try {
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const category = searchParams.get("category") === "b2b" ? "b2b" : "b2c";
+    const tableName = category === "b2b" ? "tylife_b2b" : "leads";
     if (!id) {
       return NextResponse.json(
         { ok: false, message: "id가 필요합니다." },
@@ -53,7 +57,7 @@ export async function PATCH(
 
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
-      .from("leads")
+      .from(tableName)
       .update(update)
       .eq("id", id)
       .select("id")

@@ -21,10 +21,12 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search")?.trim() ?? "";
     const limit = Math.min(Math.max(parseInt(searchParams.get("limit") ?? "50", 10), 1), 100);
     const offset = Math.max(parseInt(searchParams.get("offset") ?? "0", 10), 0);
+    const category = searchParams.get("category") === "b2b" ? "b2b" : "b2c";
+    const tableName = category === "b2b" ? "tylife_b2b" : "leads";
 
     const supabase = getSupabaseAdmin();
     let query = supabase
-      .from("leads")
+      .from(tableName)
       .select("id, name, phone, created_at, status, memo", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);

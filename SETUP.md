@@ -35,6 +35,22 @@ ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT '
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS memo TEXT;
 ```
 
+**tylife_b2b 테이블 (B2B 파트너 신청 - /business 페이지용):**
+
+```sql
+CREATE TABLE IF NOT EXISTS public.tylife_b2b (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  source TEXT DEFAULT 'business',
+  status TEXT NOT NULL DEFAULT '대기',
+  memo TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_tylife_b2b_created_at ON public.tylife_b2b (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tylife_b2b_phone ON public.tylife_b2b (phone);
+```
+
 ---
 
 ## 3. 환경변수 (.env.local / Vercel)

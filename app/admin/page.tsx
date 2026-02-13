@@ -29,6 +29,7 @@ export default function AdminPage() {
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<{ id: string; msg: string; error?: boolean } | null>(null);
+  const [category, setCategory] = useState<"b2c" | "b2b">("b2c");
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -42,11 +43,11 @@ export default function AdminPage() {
   );
 
   const handleSaveLead = useCallback(
-    async (lead: { id: string; status: string; memo: string }) => {
+    async (lead: { id: string; status: string; memo: string }, cat: "b2c" | "b2b") => {
       setSavingId(lead.id);
       setSaveMsg(null);
       try {
-        const res = await fetch(`/api/admin/leads/${lead.id}`, {
+        const res = await fetch(`/api/admin/leads/${lead.id}?category=${cat}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: lead.status, memo: lead.memo }),
@@ -71,7 +72,7 @@ export default function AdminPage() {
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/admin/leads?search=${encodeURIComponent(debouncedSearch)}&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`
+        `/api/admin/leads?category=${category}&search=${encodeURIComponent(debouncedSearch)}&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`
       );
       const data = await res.json();
       if (res.status === 401) {
@@ -85,7 +86,7 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, page]);
+  }, [category, debouncedSearch, page]);
 
   // 세션 체크: leads API로 확인
   useEffect(() => {
@@ -133,6 +134,7 @@ export default function AdminPage() {
       setLeads([]);
       setSearchInput("");
       setPage(0);
+      setCategory("b2c");
     } finally {
       setLogoutLoading(false);
     }
@@ -225,9 +227,69 @@ export default function AdminPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: 16, paddingBottom: 40 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>상담 신청 리드</h1>
+    <div style={{ display: "flex", minHeight: "100vh" }}>
+      {/* 왼쪽 카테고리 선택 */}
+      <aside
+        style={{
+          width: 180,
+          flexShrink: 0,
+          borderRight: "1px solid var(--border)",
+          background: "var(--bg-card)",
+          padding: "20px 0",
+        }}
+      >
+        <h3 style={{ margin: "0 16px 16px", fontSize: 14, color: "var(--text-secondary)", fontWeight: 500 }}>
+          카테고리
+        </h3>
+        <button
+          type="button"
+          onClick={() => {
+            setCategory("b2c");
+            setPage(0);
+          }}
+          style={{
+            display: "block",
+            width: "100%",
+            padding: "12px 20px",
+            border: "none",
+            borderLeft: category === "b2c" ? "3px solid var(--cta-bg)" : "3px solid transparent",
+            background: category === "b2c" ? "rgba(0,0,0,0.04)" : "transparent",
+            textAlign: "left",
+            fontSize: 15,
+            fontWeight: category === "b2c" ? 600 : 400,
+            cursor: "pointer",
+          }}
+        >
+          B2C 고객
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setCategory("b2b");
+            setPage(0);
+          }}
+          style={{
+            display: "block",
+            width: "100%",
+            padding: "12px 20px",
+            border: "none",
+            borderLeft: category === "b2b" ? "3px solid var(--cta-bg)" : "3px solid transparent",
+            background: category === "b2b" ? "rgba(0,0,0,0.04)" : "transparent",
+            textAlign: "left",
+            fontSize: 15,
+            fontWeight: category === "b2b" ? 600 : 400,
+            cursor: "pointer",
+          }}
+        >
+          B2B 고객
+        </button>
+      </aside>
+
+      <main style={{ flex: 1, maxWidth: 900, margin: 0, padding: 16, paddingBottom: 40 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
+            {category === "b2b" ? "파트너 신청 리드 (B2B)" : "상담 신청 리드 (B2C)"}
+          </h1>
         <button
           type="button"
           onClick={handleLogout}
@@ -342,7 +404,7 @@ export default function AdminPage() {
                     <td style={{ padding: "12px 10px" }}>
                       <button
                         type="button"
-                        onClick={() => handleSaveLead(row)}
+                        onClick={() => handleSaveLead(row, category)}
                         disabled={savingId === row.id}
                         style={{
                           padding: "6px 12px",
@@ -420,6 +482,7 @@ export default function AdminPage() {
           )}
         </>
       )}
-    </main>
+      </main>
+    </div>
   );
 }
