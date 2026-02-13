@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
-const HERO_IMAGE = "/assets/hero12.jpeg";
-const HERO_FALLBACK = "/assets/hero12.jpeg";
+const HERO_IMAGE = "/assets/hero_b.jpeg";
+const HERO_FALLBACK = "/assets/hero_b.jpeg";
 
 type KarrotPixel = {
   track: (event: string, params?: Record<string, unknown>) => void;
@@ -24,6 +24,14 @@ export default function BusinessLandingPage() {
   const [phone, setPhone] = useState("");
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [imgError, setImgError] = useState(false);
+
+  // ✅ 비즈니스용 방문 분리 태깅 (예시코드 패턴)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const kp = (window as Window & { karrotPixel?: KarrotPixel }).karrotPixel;
+      kp?.track("ViewContent", { page: "business" });
+    }
+  }, []);
 
   const showToast = useCallback((msg: string, error?: boolean) => {
     setToast({ msg, error });
@@ -68,9 +76,10 @@ export default function BusinessLandingPage() {
         setSheetOpen(false);
         showToast("접수 완료되었습니다.");
 
+        // ✅ 비즈니스용 상담 전환 분리 태깅 (예시코드 패턴)
         if (typeof window !== "undefined") {
           const kp = (window as Window & { karrotPixel?: KarrotPixel }).karrotPixel;
-          kp?.track("Lead");
+          kp?.track("Lead", { page: "business" });
         }
       } else {
         showToast(data.message || "제출에 실패했습니다.", true);
