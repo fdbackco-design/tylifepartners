@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 /* [바꿔야 하는 곳 - 이미지] public/assets/hero.jpg 추가. 없으면 hero.svg 플레이스홀더 표시 */
 const HERO_IMAGE = "/assets/hero.jpg";
 const HERO_FALLBACK = "/assets/hero.jpg";
+
+type KarrotPixel = {
+  track: (event: string, params?: Record<string, any>) => void;
+};
 
 function formatPhone(value: string): string {
   const digits = value.replace(/\D/g, "");
@@ -22,6 +26,14 @@ export default function LandingPage() {
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [imgError, setImgError] = useState(false);
 
+  // ✅ 부모용 방문 분리 태깅
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const kp = (window as Window & { karrotPixel?: KarrotPixel }).karrotPixel;
+      kp?.track("ViewContent", { page: "parent" });
+    }
+  }, []);
+
   const showToast = useCallback((msg: string, error?: boolean) => {
     setToast({ msg, error });
     setTimeout(() => setToast(null), 2500);
@@ -35,6 +47,7 @@ export default function LandingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitted || loading) return;
+
     const rawPhone = phone.replace(/\D/g, "");
     if (!name.trim()) {
       showToast("이름을 입력해주세요.", true);
@@ -44,6 +57,7 @@ export default function LandingPage() {
       showToast("연락처를 확인해주세요. (숫자 10~11자리)", true);
       return;
     }
+
     setLoading(true);
     try {
       const res = await fetch("/api/lead", {
@@ -55,11 +69,19 @@ export default function LandingPage() {
           source: "daangn",
         }),
       });
+
       const data = await res.json();
+
       if (data.ok) {
         setSubmitted(true);
         setSheetOpen(false);
         showToast("접수 완료되었습니다.");
+
+        // ✅ 부모용 상담 전환 분리 태깅
+        if (typeof window !== "undefined") {
+          const kp = (window as Window & { karrotPixel?: KarrotPixel }).karrotPixel;
+          kp?.track("Lead", { page: "parent" });
+        }
       } else {
         showToast(data.message || "제출에 실패했습니다.", true);
       }
@@ -79,7 +101,6 @@ export default function LandingPage() {
 
   return (
     <main>
-      {/* 상단 바 - 당근 앱 느낌 */}
       <header
         style={{
           position: "sticky",
@@ -93,7 +114,6 @@ export default function LandingPage() {
           borderBottom: "1px solid var(--border)",
         }}
       >
-        {/* 뒤로가기 여백(자리만) */}
         <div style={{ width: 24, height: 24 }} aria-hidden />
         <h1
           style={{
@@ -109,29 +129,15 @@ export default function LandingPage() {
         <div style={{ width: 24 }} aria-hidden />
       </header>
 
-      {/* 히어로 이미지 - 가로 100%, 세로는 이미지 비율대로 (스크롤 가능) */}
-      <section
-        style={{
-          margin: 0,
-          lineHeight: 0,
-          background: "#e9ecef",
-        }}
-      >
-        {/* [이미지 변경] public/assets/hero.jpg 파일을 추가한 뒤 이 경로 사용 */}
+      <section style={{ margin: 0, lineHeight: 0, background: "#e9ecef" }}>
         <img
           src={imgError ? HERO_FALLBACK : HERO_IMAGE}
           alt=""
-          style={{
-            width: "100%",
-            height: "auto",
-            display: "block",
-            verticalAlign: "bottom",
-          }}
+          style={{ width: "100%", height: "auto", display: "block", verticalAlign: "bottom" }}
           onError={() => setImgError(true)}
         />
       </section>
 
-      {/* 하단 고정 CTA - 안전영역 포함 */}
       <div
         style={{
           position: "fixed",
@@ -173,7 +179,6 @@ export default function LandingPage() {
         </button>
       </div>
 
-      {/* Bottom Sheet - 폼 */}
       {sheetOpen && (
         <>
           <div
@@ -207,19 +212,12 @@ export default function LandingPage() {
               animation: "slideUp 0.3s ease",
             }}
           >
-            <h2 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>
-              상담 신청
-            </h2>
+            <h2 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>상담 신청</h2>
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: 16 }}>
                 <label
                   htmlFor="lead-name"
-                  style={{
-                    display: "block",
-                    marginBottom: 6,
-                    fontSize: 14,
-                    color: "var(--text-secondary)",
-                  }}
+                  style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}
                 >
                   이름 (한글 2~10자)
                 </label>
@@ -241,15 +239,11 @@ export default function LandingPage() {
                   }}
                 />
               </div>
+
               <div style={{ marginBottom: 16 }}>
                 <label
                   htmlFor="lead-phone"
-                  style={{
-                    display: "block",
-                    marginBottom: 6,
-                    fontSize: 14,
-                    color: "var(--text-secondary)",
-                  }}
+                  style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}
                 >
                   연락처 (010-0000-0000)
                 </label>
@@ -272,15 +266,11 @@ export default function LandingPage() {
                   }}
                 />
               </div>
-              <p
-                style={{
-                  margin: "0 0 20px",
-                  fontSize: 12,
-                  color: "var(--text-secondary)",
-                }}
-              >
+
+              <p style={{ margin: "0 0 20px", fontSize: 12, color: "var(--text-secondary)" }}>
                 제출 시 상담 안내를 위해 연락드려요.
               </p>
+
               <button
                 type="submit"
                 disabled={loading}
@@ -303,12 +293,8 @@ export default function LandingPage() {
         </>
       )}
 
-      {/* 토스트 */}
       {toast && (
-        <div
-          className={`toast ${toast.error ? "error" : ""} show`}
-          role="status"
-        >
+        <div className={`toast ${toast.error ? "error" : ""} show`} role="status">
           {toast.msg}
         </div>
       )}
