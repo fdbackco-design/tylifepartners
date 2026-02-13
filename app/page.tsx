@@ -3,8 +3,8 @@
 import { useState, useCallback, useEffect } from "react";
 
 /* [바꿔야 하는 곳 - 이미지] public/assets/hero.jpg 추가. 없으면 hero.svg 플레이스홀더 표시 */
-const HERO_IMAGE = "/assets/hero.jpg";
-const HERO_FALLBACK = "/assets/hero.jpg";
+const HERO_IMAGE = "/assets/hero12.jpeg";
+const HERO_FALLBACK = "/assets/hero12.jpeg";
 
 type KarrotPixel = {
   track: (event: string, params?: Record<string, any>) => void;
