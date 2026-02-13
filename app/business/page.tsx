@@ -2,8 +2,8 @@
 
 import { useState, useCallback, useEffect } from "react";
 
-const HERO_IMAGE = "/assets/hero_b.jpeg";
-const HERO_FALLBACK = "/assets/hero_b.jpeg";
+const HERO_IMAGE = "/assets/hero_b.jpg";
+const HERO_FALLBACK = "/assets/hero_b.jpg";
 
 type KarrotPixel = {
   track: (event: string, params?: Record<string, unknown>) => void;
@@ -174,7 +174,7 @@ export default function BusinessLandingPage() {
             if (!submitted) e.currentTarget.style.background = "var(--cta-bg)";
           }}
         >
-          {submitted ? "접수 완료" : "파트너 신청하기"}
+          {submitted ? "접수 완료" : "파트너 상담하기"}
         </button>
       </div>
 
@@ -211,7 +211,7 @@ export default function BusinessLandingPage() {
               animation: "slideUp 0.3s ease",
             }}
           >
-            <h2 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>파트너 신청</h2>
+            <h2 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>파트너 상담</h2>
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: 16 }}>
                 <label
