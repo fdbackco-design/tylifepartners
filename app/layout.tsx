@@ -13,6 +13,19 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
+      <head>
+        {/* Danggeun Market Code */}
+        <script src="https://karrot-pixel.business.daangn.com/karrot-pixel.js" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.karrotPixel.init('1770948465060765001');
+              window.karrotPixel.track('ViewPage');
+            `,
+          }}
+        />
+        {/* End Danggeun Market Code */}
+      </head>
       <body>{children}</body>
     </html>
   );
