@@ -144,7 +144,7 @@ export default function BusinessLandingPage() {
           maxWidth: 480,
           margin: "0 auto",
           fontSize: 11,
-          background: "#000",
+          background: "#0b0a0e",
           color: "#b0b0b0",
           lineHeight: 1.2,
         }}
