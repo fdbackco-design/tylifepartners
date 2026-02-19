@@ -140,7 +140,7 @@ export default function BusinessLandingPage() {
       <footer
         style={{
           padding: "10px 16px 6px",
-          paddingBottom: "calc(20px + var(--safe-bottom, 0px))",
+          paddingBottom: "calc(10px + var(--safe-bottom, 0px))",
           maxWidth: 480,
           margin: "0 auto",
           fontSize: 11,
