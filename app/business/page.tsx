@@ -139,18 +139,18 @@ export default function BusinessLandingPage() {
 
       <footer
         style={{
-          padding: "24px 16px",
-          paddingBottom: "calc(80px + var(--safe-bottom, 0px))",
+          padding: "12px 16px",
+          paddingBottom: "calc(52px + var(--safe-bottom, 0px))",
           maxWidth: 480,
           margin: "0 auto",
-          fontSize: 12,
+          fontSize: 11,
           color: "var(--text-secondary)",
-          lineHeight: 1.6,
+          lineHeight: 1.3,
         }}
       >
         <p style={{ margin: 0 }}>사업자명: 태양라이프 파트너스</p>
-        <p style={{ margin: "4px 0 0" }}>사업자등록번호: 826-24-01028</p>
-        <p style={{ margin: "4px 0 0" }}>소재지 정보: 경기도 군포시 대야2로 54</p>
+        <p style={{ margin: "2px 0 0" }}>사업자등록번호: 826-24-01028</p>
+        <p style={{ margin: "2px 0 0" }}>소재지 정보: 경기도 군포시 대야2로 54</p>
       </footer>
 
       <div
