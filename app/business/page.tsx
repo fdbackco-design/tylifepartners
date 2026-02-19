@@ -160,7 +160,7 @@ export default function BusinessLandingPage() {
           bottom: 0,
           left: 0,
           right: 0,
-          padding: "0 16px",
+          padding: "12px 16px",
           paddingBottom: `calc(12px + var(--safe-bottom))`,
           background: "var(--bg-page)",
           maxWidth: 480,
@@ -174,7 +174,6 @@ export default function BusinessLandingPage() {
           disabled={submitted}
           style={{
             width: "100%",
-            marginTop: 0,
             padding: "14px 20px",
             background: submitted ? "#adb5bd" : "var(--cta-bg)",
             color: "#fff",
