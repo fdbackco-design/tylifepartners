@@ -12,6 +12,9 @@ export async function POST(request: NextRequest) {
     const name = String(body.name ?? "").trim();
     const phone = String(body.phone ?? "").replace(/\D/g, "");
     const source = String(body.source ?? "daangn").trim() || "daangn";
+    const desiredDate = body.desired_date != null ? String(body.desired_date).trim() : null;
+    const desiredTime = body.desired_time != null ? String(body.desired_time).trim() : null;
+    const location = body.location != null ? String(body.location).trim() : null;
 
     // validation
     if (!name) {
@@ -38,6 +41,9 @@ export async function POST(request: NextRequest) {
       name,
       phone,
       source,
+      desired_date: desiredDate || null,
+      desired_time: desiredTime || null,
+      location: location || null,
     });
 
     if (error) {

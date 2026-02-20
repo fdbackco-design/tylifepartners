@@ -35,6 +35,14 @@ ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT '
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS memo TEXT;
 ```
 
+**leads 테이블 - 희망 상담일/시간/위치 컬럼 추가:**
+
+```sql
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS desired_date TEXT;
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS desired_time TEXT;
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS location TEXT;
+```
+
 **tylife_b2b 테이블 (B2B 파트너 신청 - /business 페이지용):**
 
 ```sql

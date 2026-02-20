@@ -25,9 +25,13 @@ export async function GET(request: NextRequest) {
     const tableName = category === "b2b" ? "tylife_b2b" : "leads";
 
     const supabase = getSupabaseAdmin();
+    const selectCols =
+      tableName === "leads"
+        ? "id, name, phone, created_at, status, memo, desired_date, desired_time, location"
+        : "id, name, phone, created_at, status, memo";
     let query = supabase
       .from(tableName)
-      .select("id, name, phone, created_at, status, memo", { count: "exact" })
+      .select(selectCols, { count: "exact" })
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -65,6 +69,9 @@ export async function GET(request: NextRequest) {
         : "",
       status: row.status ?? "대기",
       memo: row.memo ?? "",
+      desired_date: (row as { desired_date?: string }).desired_date ?? "",
+      desired_time: (row as { desired_time?: string }).desired_time ?? "",
+      location: (row as { location?: string }).location ?? "",
     }));
 
     return NextResponse.json({ ok: true, items, total: count ?? items.length });

@@ -11,7 +11,10 @@ CREATE TABLE IF NOT EXISTS public.leads (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   source TEXT DEFAULT 'daangn',
   status TEXT NOT NULL DEFAULT '대기',
-  memo TEXT
+  memo TEXT,
+  desired_date TEXT,
+  desired_time TEXT,
+  location TEXT
 );
 
 -- created_at desc 정렬용 인덱스

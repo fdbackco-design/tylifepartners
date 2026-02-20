@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { DESIRED_TIME_OPTIONS, LOCATION_OPTIONS, getDesiredDateOptions } from "@/lib/formOptions";
 
 /* [바꿔야 하는 곳 - 이미지] public/assets/hero.jpg 추가. 없으면 hero.svg 플레이스홀더 표시 */
 const HERO_IMAGE = "/assets/hero12.jpeg";
@@ -23,8 +24,13 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [desiredDate, setDesiredDate] = useState("");
+  const [desiredTime, setDesiredTime] = useState("");
+  const [location, setLocation] = useState("");
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [imgError, setImgError] = useState(false);
+
+  const desiredDateOptions = useMemo(() => getDesiredDateOptions(), [sheetOpen]);
 
   // ✅ 부모용 방문 분리 태깅
   useEffect(() => {
@@ -67,6 +73,9 @@ export default function LandingPage() {
           name: name.trim(),
           phone: rawPhone,
           source: "daangn",
+          desired_date: desiredDate || null,
+          desired_time: desiredTime || null,
+          location: location || null,
         }),
       });
 
@@ -175,7 +184,7 @@ export default function LandingPage() {
             if (!submitted) e.currentTarget.style.background = "var(--cta-bg)";
           }}
         >
-          {submitted ? "접수 완료" : "상담 신청하기"}
+          {submitted ? "접수 완료" : "무료 상담 받아보기"}
         </button>
       </div>
 
@@ -202,22 +211,32 @@ export default function LandingPage() {
               left: 0,
               right: 0,
               maxWidth: 480,
+              maxHeight: "85vh",
               margin: "0 auto",
               background: "var(--bg-card)",
               borderRadius: "16px 16px 0 0",
-              padding: "24px 20px",
-              paddingBottom: `calc(24px + var(--safe-bottom))`,
               boxShadow: "0 -4px 20px rgba(0,0,0,0.1)",
               zIndex: 51,
               animation: "slideUp 0.3s ease",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
             }}
           >
-            <h2 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>상담 신청</h2>
+            <div
+              style={{
+                padding: "24px 20px",
+                paddingBottom: `calc(24px + var(--safe-bottom))`,
+                overflowY: "auto",
+                flex: 1,
+              }}
+            >
+            <h2 style={{ margin: "0 0 20px", fontSize: 22, fontWeight: 600 }}>상담 신청</h2>
             <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 20 }}>
                 <label
                   htmlFor="lead-name"
-                  style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}
+                  style={{ display: "block", marginBottom: 8, fontSize: 18, color: "var(--text-secondary)", fontWeight: 500 }}
                 >
                   이름 (한글 2~10자)
                 </label>
@@ -231,19 +250,19 @@ export default function LandingPage() {
                   disabled={loading}
                   style={{
                     width: "100%",
-                    padding: "12px 14px",
+                    padding: "14px 16px",
                     border: "1px solid var(--border)",
                     borderRadius: 8,
-                    fontSize: 16,
+                    fontSize: 18,
                     outline: "none",
                   }}
                 />
               </div>
 
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 20 }}>
                 <label
                   htmlFor="lead-phone"
-                  style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}
+                  style={{ display: "block", marginBottom: 8, fontSize: 18, color: "var(--text-secondary)", fontWeight: 500 }}
                 >
                   연락처 (010-0000-0000)
                 </label>
@@ -258,16 +277,103 @@ export default function LandingPage() {
                   disabled={loading}
                   style={{
                     width: "100%",
-                    padding: "12px 14px",
+                    padding: "14px 16px",
                     border: "1px solid var(--border)",
                     borderRadius: 8,
-                    fontSize: 16,
+                    fontSize: 18,
                     outline: "none",
                   }}
                 />
               </div>
 
-              <p style={{ margin: "0 0 20px", fontSize: 12, color: "var(--text-secondary)" }}>
+              <div style={{ marginBottom: 20 }}>
+                <label
+                  htmlFor="lead-desired-date"
+                  style={{ display: "block", marginBottom: 8, fontSize: 18, color: "var(--text-secondary)", fontWeight: 500 }}
+                >
+                  희망 상담일
+                </label>
+                <select
+                  id="lead-desired-date"
+                  value={desiredDate}
+                  onChange={(e) => setDesiredDate(e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: "100%",
+                    padding: "14px 16px",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    fontSize: 18,
+                    outline: "none",
+                  }}
+                >
+                  {desiredDateOptions.map((o) => (
+                    <option key={o.value || "empty"} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label
+                  htmlFor="lead-desired-time"
+                  style={{ display: "block", marginBottom: 8, fontSize: 18, color: "var(--text-secondary)", fontWeight: 500 }}
+                >
+                  희망 상담시간
+                </label>
+                <select
+                  id="lead-desired-time"
+                  value={desiredTime}
+                  onChange={(e) => setDesiredTime(e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: "100%",
+                    padding: "14px 16px",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    fontSize: 18,
+                    outline: "none",
+                  }}
+                >
+                  {DESIRED_TIME_OPTIONS.map((o) => (
+                    <option key={o.value || "empty"} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label
+                  htmlFor="lead-location"
+                  style={{ display: "block", marginBottom: 8, fontSize: 18, color: "var(--text-secondary)", fontWeight: 500 }}
+                >
+                  사는 위치
+                </label>
+                <select
+                  id="lead-location"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: "100%",
+                    padding: "14px 16px",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    fontSize: 18,
+                    outline: "none",
+                  }}
+                >
+                  {LOCATION_OPTIONS.map((o) => (
+                    <option key={o.value || "empty"} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <p style={{ margin: "0 0 20px", fontSize: 16, color: "var(--text-secondary)" }}>
                 제출 시 상담 안내를 위해 연락드려요.
               </p>
 
@@ -276,12 +382,12 @@ export default function LandingPage() {
                 disabled={loading}
                 style={{
                   width: "100%",
-                  padding: "14px",
+                  padding: "16px",
                   background: loading ? "#adb5bd" : "var(--cta-bg)",
                   color: "#fff",
                   border: "none",
                   borderRadius: 8,
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: 600,
                   cursor: loading ? "default" : "pointer",
                 }}
@@ -289,6 +395,7 @@ export default function LandingPage() {
                 {loading ? "제출 중..." : "제출하기"}
               </button>
             </form>
+            </div>
           </div>
         </>
       )}

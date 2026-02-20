@@ -20,7 +20,17 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [leads, setLeads] = useState<
-    { id: string; name: string; phone: string; created_at: string; status: string; memo: string }[]
+    {
+      id: string;
+      name: string;
+      phone: string;
+      created_at: string;
+      status: string;
+      memo: string;
+      desired_date: string;
+      desired_time: string;
+      location: string;
+    }[]
   >([]);
   const [searchInput, setSearchInput] = useState("");
   const [total, setTotal] = useState(0);
@@ -350,6 +360,13 @@ export default function AdminPage() {
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>신청시간</th>
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>이름</th>
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>연락처</th>
+                  {category === "b2c" && (
+                    <>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>희망 상담일</th>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>희망 상담시간</th>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>사는 위치</th>
+                    </>
+                  )}
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>상담상태</th>
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>메모</th>
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}></th>
@@ -367,6 +384,19 @@ export default function AdminPage() {
                     <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>{row.created_at}</td>
                     <td style={{ padding: "12px 10px" }}>{row.name}</td>
                     <td style={{ padding: "12px 10px" }}>{row.phone}</td>
+                    {category === "b2c" && (
+                      <>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>
+                          {row.desired_date || "-"}
+                        </td>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>
+                          {row.desired_time || "-"}
+                        </td>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>
+                          {row.location || "-"}
+                        </td>
+                      </>
+                    )}
                     <td style={{ padding: "12px 10px" }}>
                       <select
                         value={row.status}
