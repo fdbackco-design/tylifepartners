@@ -295,7 +295,7 @@ export default function AdminPage() {
         </button>
       </aside>
 
-      <main style={{ flex: 1, maxWidth: 900, margin: 0, padding: 16, paddingBottom: 40 }}>
+      <main style={{ flex: 1, maxWidth: 1400, minWidth: 0, margin: 0, padding: 16, paddingBottom: 40 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
             {category === "b2b" ? "파트너 신청 리드 (B2B)" : "상담 신청 리드 (B2C)"}
@@ -351,24 +351,24 @@ export default function AdminPage() {
               background: "var(--bg-card)",
               borderRadius: "var(--radius)",
               boxShadow: "var(--shadow)",
-              overflow: "hidden",
+              overflow: "auto",
             }}
           >
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+            <table style={{ width: "100%", minWidth: 1100, borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
                 <tr style={{ background: "#f8f9fa", borderBottom: "1px solid var(--border)" }}>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>신청시간</th>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>이름</th>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>연락처</th>
+                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>신청시간</th>
+                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>이름</th>
+                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>연락처</th>
                   {category === "b2c" && (
                     <>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>희망 상담일</th>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>희망 상담시간</th>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>사는 위치</th>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>희망 상담일</th>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>희망 상담시간</th>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>사는 위치</th>
                     </>
                   )}
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>상담상태</th>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}>메모</th>
+                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담상태</th>
+                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>메모</th>
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}></th>
                 </tr>
               </thead>
@@ -381,23 +381,23 @@ export default function AdminPage() {
                       background: row.status === "대기" ? "#fffde7" : undefined,
                     }}
                   >
-                    <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>{row.created_at}</td>
-                    <td style={{ padding: "12px 10px" }}>{row.name}</td>
-                    <td style={{ padding: "12px 10px" }}>{row.phone}</td>
+                    <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{row.created_at}</td>
+                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{row.name}</td>
+                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{row.phone}</td>
                     {category === "b2c" && (
                       <>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                           {row.desired_date || "-"}
                         </td>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                           {row.desired_time || "-"}
                         </td>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                           {row.location || "-"}
                         </td>
                       </>
                     )}
-                    <td style={{ padding: "12px 10px" }}>
+                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
                       <select
                         value={row.status}
                         onChange={(e) => updateLeadLocal(row.id, { status: e.target.value })}
@@ -431,7 +431,7 @@ export default function AdminPage() {
                         }}
                       />
                     </td>
-                    <td style={{ padding: "12px 10px" }}>
+                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
                       <button
                         type="button"
                         onClick={() => handleSaveLead(row, category)}
