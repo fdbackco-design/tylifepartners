@@ -51,8 +51,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // created_at을 KST 문자열로 변환
-    const items = (data ?? []).map((row) => ({
+    type LeadRow = {
+      id: string;
+      name: string;
+      phone: string;
+      created_at: string | null;
+      status?: string;
+      memo?: string | null;
+      desired_date?: string | null;
+      desired_time?: string | null;
+      location?: string | null;
+    };
+    const rows = (data ?? []) as unknown as LeadRow[];
+    const items = rows.map((row) => ({
       id: row.id,
       name: row.name,
       phone: row.phone,
@@ -69,9 +80,9 @@ export async function GET(request: NextRequest) {
         : "",
       status: row.status ?? "대기",
       memo: row.memo ?? "",
-      desired_date: (row as { desired_date?: string }).desired_date ?? "",
-      desired_time: (row as { desired_time?: string }).desired_time ?? "",
-      location: (row as { location?: string }).location ?? "",
+      desired_date: row.desired_date ?? "",
+      desired_time: row.desired_time ?? "",
+      location: row.location ?? "",
     }));
 
     return NextResponse.json({ ok: true, items, total: count ?? items.length });
