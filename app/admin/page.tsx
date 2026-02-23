@@ -44,7 +44,7 @@ export default function AdminPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<{ id: string; msg: string; error?: boolean } | null>(null);
   const [category, setCategory] = useState<"b2c" | "b2b" | "utm">("b2c");
-  const [utmBaseUrl, setUtmBaseUrl] = useState("");
+  const [utmBaseUrl, setUtmBaseUrl] = useState("https://www.tylifepartners.com");
   const [utmPath, setUtmPath] = useState("/");
   const [utmCampaign, setUtmCampaign] = useState("");
 
