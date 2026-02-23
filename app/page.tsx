@@ -4,8 +4,8 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { DESIRED_TIME_OPTIONS, LOCATION_OPTIONS, getDesiredDateOptions } from "@/lib/formOptions";
 
 /* [바꿔야 하는 곳 - 이미지] public/assets/hero.jpg 추가. 없으면 hero.svg 플레이스홀더 표시 */
-const HERO_IMAGE = "/assets/hero12.jpeg";
-const HERO_FALLBACK = "/assets/hero12.jpeg";
+const HERO_IMAGE = "/assets/hero12.jpg";
+const HERO_FALLBACK = "/assets/hero12.jpg";
 
 type KarrotPixel = {
   track: (event: string, params?: Record<string, any>) => void;

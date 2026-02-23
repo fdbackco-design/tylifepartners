@@ -2,8 +2,8 @@
 
 import { useState, useCallback, useEffect } from "react";
 
-const HERO_IMAGE = "/assets/hero_bbb.jpg";
-const HERO_FALLBACK = "/assets/hero_bbb.jpg";
+const HERO_IMAGE = "/assets/hero_bbdb.jpg";
+const HERO_FALLBACK = "/assets/hero_bbbd.jpg";
 
 type KarrotPixel = {
   track: (event: string, params?: Record<string, unknown>) => void;
