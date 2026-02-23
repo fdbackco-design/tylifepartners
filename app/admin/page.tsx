@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { buildAllPlatformLinks } from "@/lib/utm";
 
 const PAGE_SIZE = 20;
 
@@ -30,6 +31,9 @@ export default function AdminPage() {
       desired_date: string;
       desired_time: string;
       location: string;
+      utm_source: string;
+      utm_medium: string;
+      utm_campaign: string;
     }[]
   >([]);
   const [searchInput, setSearchInput] = useState("");
@@ -39,7 +43,10 @@ export default function AdminPage() {
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<{ id: string; msg: string; error?: boolean } | null>(null);
-  const [category, setCategory] = useState<"b2c" | "b2b">("b2c");
+  const [category, setCategory] = useState<"b2c" | "b2b" | "utm">("b2c");
+  const [utmBaseUrl, setUtmBaseUrl] = useState("");
+  const [utmPath, setUtmPath] = useState("/");
+  const [utmCampaign, setUtmCampaign] = useState("");
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -109,8 +116,8 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (loggedIn === true) fetchLeads();
-  }, [loggedIn, debouncedSearch, page, fetchLeads]);
+    if (loggedIn === true && category !== "utm") fetchLeads();
+  }, [loggedIn, category, debouncedSearch, page, fetchLeads]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -293,12 +300,34 @@ export default function AdminPage() {
         >
           B2B 고객
         </button>
+        <button
+          type="button"
+          onClick={() => setCategory("utm")}
+          style={{
+            display: "block",
+            width: "100%",
+            padding: "12px 20px",
+            border: "none",
+            borderLeft: category === "utm" ? "3px solid var(--cta-bg)" : "3px solid transparent",
+            background: category === "utm" ? "rgba(0,0,0,0.04)" : "transparent",
+            textAlign: "left",
+            fontSize: 15,
+            fontWeight: category === "utm" ? 600 : 400,
+            cursor: "pointer",
+          }}
+        >
+          UTM 링크
+        </button>
       </aside>
 
       <main style={{ flex: 1, maxWidth: 1400, minWidth: 0, margin: 0, padding: 16, paddingBottom: 40 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
-            {category === "b2b" ? "파트너 신청 리드 (B2B)" : "상담 신청 리드 (B2C)"}
+            {category === "utm"
+              ? "UTM 링크 생성"
+              : category === "b2b"
+                ? "파트너 신청 리드 (B2B)"
+                : "상담 신청 리드 (B2C)"}
           </h1>
         <button
           type="button"
@@ -318,6 +347,113 @@ export default function AdminPage() {
         </button>
       </div>
 
+      {category === "utm" ? (
+        <div style={{ maxWidth: 700 }}>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: "block", marginBottom: 6, fontSize: 14, fontWeight: 500 }}>사이트 URL</label>
+            <input
+              type="url"
+              value={utmBaseUrl}
+              onChange={(e) => setUtmBaseUrl(e.target.value)}
+              placeholder="https://www.tylifepartners.com"
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                fontSize: 15,
+              }}
+            />
+          </div>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: "block", marginBottom: 6, fontSize: 14, fontWeight: 500 }}>경로</label>
+            <select
+              value={utmPath}
+              onChange={(e) => setUtmPath(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                fontSize: 15,
+              }}
+            >
+              <option value="/">/ (메인)</option>
+              <option value="/me">/me</option>
+              <option value="/business">/business</option>
+            </select>
+          </div>
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: "block", marginBottom: 6, fontSize: 14, fontWeight: 500 }}>캠페인명 (선택)</label>
+            <input
+              type="text"
+              value={utmCampaign}
+              onChange={(e) => setUtmCampaign(e.target.value)}
+              placeholder="예: 2026_상담_캠페인"
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                fontSize: 15,
+              }}
+            />
+          </div>
+          <div style={{ background: "var(--bg-card)", borderRadius: 8, padding: 20, border: "1px solid var(--border)" }}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>플랫폼별 UTM 링크</h3>
+            {utmBaseUrl
+              ? buildAllPlatformLinks(utmBaseUrl.replace(/\/$/, ""), utmPath, utmCampaign || undefined).map((item) => (
+                  <div key={item.platform} style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: "var(--text-secondary)" }}>
+                      {item.label}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <input
+                        type="text"
+                        readOnly
+                        value={item.url}
+                        style={{
+                          flex: 1,
+                          minWidth: 200,
+                          padding: "8px 12px",
+                          fontSize: 13,
+                          border: "1px solid var(--border)",
+                          borderRadius: 6,
+                          background: "#f8f9fa",
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(item.url);
+                        }}
+                        style={{
+                          padding: "8px 12px",
+                          background: "var(--cta-bg)",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 6,
+                          fontSize: 13,
+                          cursor: "pointer",
+                        }}
+                      >
+                        복사
+                      </button>
+                    </div>
+                  </div>
+                ))
+              : "사이트 URL을 입력해 주세요."}
+          </div>
+        </div>
+      ) : (
+        <>
       <div style={{ marginBottom: 16 }}>
         <input
           type="search"
@@ -365,6 +501,7 @@ export default function AdminPage() {
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>희망 상담일</th>
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>희망 상담시간</th>
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>사는 위치</th>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입경로</th>
                     </>
                   )}
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담상태</th>
@@ -394,6 +531,9 @@ export default function AdminPage() {
                         </td>
                         <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                           {row.location || "-"}
+                        </td>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }} title={`${row.utm_source || "-"} / ${row.utm_medium || "-"} ${row.utm_campaign ? `/ ${row.utm_campaign}` : ""}`}>
+                          {row.utm_source || "-"}
                         </td>
                       </>
                     )}
@@ -510,6 +650,8 @@ export default function AdminPage() {
               </button>
             </div>
           )}
+        </>
+      )}
         </>
       )}
       </main>

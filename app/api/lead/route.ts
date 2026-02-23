@@ -15,6 +15,11 @@ export async function POST(request: NextRequest) {
     const desiredDate = body.desired_date != null ? String(body.desired_date).trim() : null;
     const desiredTime = body.desired_time != null ? String(body.desired_time).trim() : null;
     const location = body.location != null ? String(body.location).trim() : null;
+    const utmSource = body.utm_source != null ? String(body.utm_source).trim() : null;
+    const utmMedium = body.utm_medium != null ? String(body.utm_medium).trim() : null;
+    const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
+    const utmContent = body.utm_content != null ? String(body.utm_content).trim() : null;
+    const utmTerm = body.utm_term != null ? String(body.utm_term).trim() : null;
 
     // validation
     if (!name) {
@@ -40,10 +45,15 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase.from("leads").insert({
       name,
       phone,
-      source,
+      source: utmSource || source,
       desired_date: desiredDate || null,
       desired_time: desiredTime || null,
       location: location || null,
+      utm_source: utmSource || null,
+      utm_medium: utmMedium || null,
+      utm_campaign: utmCampaign || null,
+      utm_content: utmContent || null,
+      utm_term: utmTerm || null,
     });
 
     if (error) {

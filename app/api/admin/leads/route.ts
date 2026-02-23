@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseAdmin();
     const selectCols =
       tableName === "leads"
-        ? "id, name, phone, created_at, status, memo, desired_date, desired_time, location"
+        ? "id, name, phone, created_at, status, memo, desired_date, desired_time, location, utm_source, utm_medium, utm_campaign"
         : "id, name, phone, created_at, status, memo";
     let query = supabase
       .from(tableName)
@@ -61,6 +61,9 @@ export async function GET(request: NextRequest) {
       desired_date?: string | null;
       desired_time?: string | null;
       location?: string | null;
+      utm_source?: string | null;
+      utm_medium?: string | null;
+      utm_campaign?: string | null;
     };
     const rows = (data ?? []) as unknown as LeadRow[];
     const items = rows.map((row) => ({
@@ -83,6 +86,9 @@ export async function GET(request: NextRequest) {
       desired_date: row.desired_date ?? "",
       desired_time: row.desired_time ?? "",
       location: row.location ?? "",
+      utm_source: row.utm_source ?? "",
+      utm_medium: row.utm_medium ?? "",
+      utm_campaign: row.utm_campaign ?? "",
     }));
 
     return NextResponse.json({ ok: true, items, total: count ?? items.length });

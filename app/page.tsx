@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { DESIRED_TIME_OPTIONS, LOCATION_OPTIONS, getDesiredDateOptions } from "@/lib/formOptions";
+import { useUTM } from "@/lib/useUTM";
 
 /* [바꿔야 하는 곳 - 이미지] public/assets/hero.jpg 추가. 없으면 hero.svg 플레이스홀더 표시 */
 const HERO_IMAGE = "/assets/hero12.jpg";
@@ -29,6 +30,7 @@ export default function LandingPage() {
   const [location, setLocation] = useState("");
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [imgError, setImgError] = useState(false);
+  const utm = useUTM();
 
   const desiredDateOptions = useMemo(() => getDesiredDateOptions(), [sheetOpen]);
 
@@ -72,10 +74,15 @@ export default function LandingPage() {
         body: JSON.stringify({
           name: name.trim(),
           phone: rawPhone,
-          source: "daangn",
+          source: utm.utm_source || "daangn",
           desired_date: desiredDate || null,
           desired_time: desiredTime || null,
           location: location || null,
+          utm_source: utm.utm_source || null,
+          utm_medium: utm.utm_medium || null,
+          utm_campaign: utm.utm_campaign || null,
+          utm_content: utm.utm_content || null,
+          utm_term: utm.utm_term || null,
         }),
       });
 
