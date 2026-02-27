@@ -4,8 +4,8 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { DESIRED_TIME_OPTIONS, LOCATION_OPTIONS, getDesiredDateOptions } from "@/lib/formOptions";
 import { useUTM } from "@/lib/useUTM";
 
-const HERO_IMAGE = "/assets/hero.jpg";
-const HERO_FALLBACK = "/assets/hero.jpg";
+const HERO_IMAGE = "/assets/hero_c.jpg";
+const HERO_FALLBACK = "/assets/hero_c.jpg";
 
 type KarrotPixel = {
   track: (event: string, params?: Record<string, any>) => void;
