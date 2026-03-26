@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 
 const HERO_IMAGE = "/assets/hero_b.png";
 const HERO_FALLBACK = "/assets/hero_b.png";
@@ -22,6 +23,7 @@ export default function BusinessLandingPage() {
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [consentChecked, setConsentChecked] = useState(false);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [imgError, setImgError] = useState(false);
 
@@ -54,6 +56,11 @@ export default function BusinessLandingPage() {
     }
     if (rawPhone.length < 10 || rawPhone.length > 11) {
       showToast("연락처를 확인해주세요. (숫자 10~11자리)", true);
+      return;
+    }
+
+    if (!consentChecked) {
+      showToast("개인정보 수집 및 이용에 동의해 주세요. (필수)", true);
       return;
     }
 
@@ -272,19 +279,25 @@ export default function BusinessLandingPage() {
                 제출 시 상담 안내를 위해 연락드려요.
               </p>
 
+              <PrivacyConsentSection
+                checked={consentChecked}
+                onCheckedChange={setConsentChecked}
+                compact
+              />
+
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !consentChecked}
                 style={{
                   width: "100%",
                   padding: "14px",
-                  background: loading ? "#adb5bd" : "var(--cta-bg)",
+                  background: loading || !consentChecked ? "#adb5bd" : "var(--cta-bg)",
                   color: "#fff",
                   border: "none",
                   borderRadius: 8,
                   fontSize: 16,
                   fontWeight: 600,
-                  cursor: loading ? "default" : "pointer",
+                  cursor: loading || !consentChecked ? "default" : "pointer",
                 }}
               >
                 {loading ? "제출 중..." : "제출하기"}
