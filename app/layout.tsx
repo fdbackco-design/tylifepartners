@@ -14,6 +14,18 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <head>
+        {/* Google tag (gtag.js) */}
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-QG36NWBQWE" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-QG36NWBQWE');
+            `,
+          }}
+        />
         {/* Danggeun Market Code */}
         <script src="https://karrot-pixel.business.daangn.com/karrot-pixel.js" />
         <script
