@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
+import { useRouter } from "next/navigation";
 
 const HERO_IMAGE = "/assets/hero_b.png";
 const HERO_FALLBACK = "/assets/hero_b.png";
@@ -18,6 +19,7 @@ function formatPhone(value: string): string {
 }
 
 export default function BusinessLandingPage() {
+  const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -81,7 +83,10 @@ export default function BusinessLandingPage() {
       if (data.ok) {
         setSubmitted(true);
         setSheetOpen(false);
-        showToast("접수 완료되었습니다.");
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("consultation_submitted", "1");
+        }
+        router.push("/complete");
 
         // ✅ 비즈니스용 상담 전환 분리 태깅 (예시코드 패턴)
         if (typeof window !== "undefined") {

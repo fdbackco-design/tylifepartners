@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { DESIRED_TIME_OPTIONS, LOCATION_OPTIONS, getDesiredDateOptions } from "@/lib/formOptions";
 import { useUTM } from "@/lib/useUTM";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
+import { useRouter } from "next/navigation";
 
 const HERO_IMAGE = "/assets/hero_cc.png";
 const HERO_FALLBACK = "/assets/hero_cc.png";
@@ -20,6 +21,7 @@ function formatPhone(value: string): string {
 }
 
 export default function MeLandingPage() {
+  const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -96,7 +98,10 @@ export default function MeLandingPage() {
       if (data.ok) {
         setSubmitted(true);
         setSheetOpen(false);
-        showToast("접수 완료되었습니다.");
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("consultation_submitted", "1");
+        }
+        router.push("/complete");
 
         // ✅ self(/me) 상담 전환 분리 태깅
         if (typeof window !== "undefined") {
