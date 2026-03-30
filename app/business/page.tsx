@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { useRouter } from "next/navigation";
+import { useUTM } from "@/lib/useUTM";
 
 const HERO_IMAGE = "/assets/hero_b.png";
 const HERO_FALLBACK = "/assets/hero_b.png";
@@ -28,6 +29,7 @@ export default function BusinessLandingPage() {
   const [consentChecked, setConsentChecked] = useState(false);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [imgError, setImgError] = useState(false);
+  const utm = useUTM();
 
   // ✅ 비즈니스용 방문 분리 태깅 (예시코드 패턴)
   useEffect(() => {
@@ -74,7 +76,10 @@ export default function BusinessLandingPage() {
         body: JSON.stringify({
           name: name.trim(),
           phone: rawPhone,
-          source: "business",
+          source: utm.utm_source || "business",
+          utm_source: utm.utm_source || null,
+          utm_medium: utm.utm_medium || null,
+          utm_campaign: utm.utm_campaign || null,
         }),
       });
 

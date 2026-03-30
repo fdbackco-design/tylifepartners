@@ -12,6 +12,9 @@ export async function POST(request: NextRequest) {
     const name = String(body.name ?? "").trim();
     const phone = String(body.phone ?? "").replace(/\D/g, "");
     const source = String(body.source ?? "business").trim() || "business";
+    const utmSource = body.utm_source != null ? String(body.utm_source).trim() : null;
+    const utmMedium = body.utm_medium != null ? String(body.utm_medium).trim() : null;
+    const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
 
     if (!name) {
       return NextResponse.json(
@@ -36,7 +39,10 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase.from("tylife_b2b").insert({
       name,
       phone,
-      source,
+      source: utmSource || source,
+      utm_source: utmSource || null,
+      utm_medium: utmMedium || null,
+      utm_campaign: utmCampaign || null,
     });
 
     if (error) {

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const selectCols =
       tableName === "leads"
         ? "id, name, phone, created_at, status, memo, desired_date, desired_time, location, utm_source, utm_medium, utm_campaign"
-        : "id, name, phone, created_at, status, memo";
+        : "id, name, phone, created_at, status, memo, utm_source, utm_medium, utm_campaign";
     let query = supabase
       .from(tableName)
       .select(selectCols, { count: "exact" })

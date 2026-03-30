@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
   const selectCols =
     category === "b2b"
-      ? "id, name, phone, created_at, status, memo"
+      ? "id, name, phone, created_at, status, memo, utm_source, utm_medium, utm_campaign"
       : "id, name, phone, created_at, status, memo, desired_date, desired_time, location, utm_source, utm_medium, utm_campaign";
 
   try {
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
 
     const headers =
       category === "b2b"
-        ? ["created_at", "name", "phone", "status", "memo"]
+        ? ["created_at", "name", "phone", "utm_source", "utm_medium", "utm_campaign", "status", "memo"]
         : [
             "created_at",
             "name",
@@ -90,6 +90,9 @@ export async function GET(request: NextRequest) {
             toKstString(r.created_at),
             r.name ?? "",
             r.phone ?? "",
+            r.utm_source ?? "",
+            r.utm_medium ?? "",
+            r.utm_campaign ?? "",
             r.status ?? "대기",
             r.memo ?? "",
           ]

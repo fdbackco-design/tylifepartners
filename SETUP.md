@@ -64,10 +64,23 @@ CREATE TABLE IF NOT EXISTS public.tylife_b2b (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   source TEXT DEFAULT 'business',
   status TEXT NOT NULL DEFAULT '대기',
-  memo TEXT
+  memo TEXT,
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tylife_b2b_created_at ON public.tylife_b2b (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tylife_b2b_phone ON public.tylife_b2b (phone);
+CREATE INDEX IF NOT EXISTS idx_tylife_b2b_utm_source ON public.tylife_b2b (utm_source);
+```
+
+**이미 tylife_b2b 테이블이 있는 경우** (UTM 컬럼 추가):
+
+```sql
+ALTER TABLE public.tylife_b2b ADD COLUMN IF NOT EXISTS utm_source TEXT;
+ALTER TABLE public.tylife_b2b ADD COLUMN IF NOT EXISTS utm_medium TEXT;
+ALTER TABLE public.tylife_b2b ADD COLUMN IF NOT EXISTS utm_campaign TEXT;
+CREATE INDEX IF NOT EXISTS idx_tylife_b2b_utm_source ON public.tylife_b2b (utm_source);
 ```
 
 ---
