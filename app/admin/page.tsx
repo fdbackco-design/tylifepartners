@@ -43,6 +43,7 @@ export default function AdminPage() {
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<{ id: string; msg: string; error?: boolean } | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
   const [category, setCategory] = useState<"b2c" | "b2b" | "utm">("b2c");
   const [utmBaseUrl, setUtmBaseUrl] = useState("https://www.tylifepartners.com");
   const [utmPath, setUtmPath] = useState("/");
@@ -156,6 +157,35 @@ export default function AdminPage() {
       setLogoutLoading(false);
     }
   };
+
+  const handleExportCsv = useCallback(async () => {
+    if (category !== "b2c" && category !== "b2b") return;
+    setExportLoading(true);
+    try {
+      const res = await fetch(
+        `/api/admin/leads/export?category=${category}&search=${encodeURIComponent(debouncedSearch)}`
+      );
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || "CSV 다운로드 실패");
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `tylife_${category}_leads_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      alert("CSV 다운로드에 실패했습니다.");
+    } finally {
+      setExportLoading(false);
+    }
+  }, [category, debouncedSearch]);
 
   if (loggedIn === null) {
     return (
@@ -454,6 +484,29 @@ export default function AdminPage() {
         </div>
       ) : (
         <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12 }}>
+        <div style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>
+          총 {total.toLocaleString()}건
+        </div>
+        <button
+          type="button"
+          onClick={handleExportCsv}
+          disabled={exportLoading || loading}
+          style={{
+            padding: "10px 14px",
+            background: exportLoading || loading ? "#adb5bd" : "var(--cta-bg)",
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: exportLoading || loading ? "default" : "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {category === "b2b" ? "B2B 고객 CSV 다운로드" : "B2C 고객 CSV 다운로드"}
+        </button>
+      </div>
       <div style={{ marginBottom: 16 }}>
         <input
           type="search"
