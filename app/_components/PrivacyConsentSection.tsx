@@ -179,7 +179,7 @@ export default function PrivacyConsentSection({
 
               <div style={{ marginTop: 10, fontWeight: 700 }}>3. 제공받는 자</div>
               <div style={{ marginTop: 4 }}>- 태양라이프 주식회사</div>
-              <div style={{ marginTop: 2 }}>- 상품 공급사, 고객 데이터 관리</div>
+              <div style={{ marginTop: 2 }}>: 상품 공급사, 고객 데이터 관리</div>
 
               <div style={{ marginTop: 16, fontWeight: 800, color: "var(--text-secondary)" }}>
                 &lt;마케팅 활용을 위한 개인정보 제공 동의&gt;
