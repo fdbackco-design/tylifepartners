@@ -20,6 +20,8 @@ export async function POST(request: NextRequest) {
     const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
     const utmContent = body.utm_content != null ? String(body.utm_content).trim() : null;
     const utmTerm = body.utm_term != null ? String(body.utm_term).trim() : null;
+    const marketingConsent =
+      body.marketing_consent === 1 || body.marketing_consent === "1" ? 1 : null;
 
     // validation
     if (!name) {
@@ -54,6 +56,7 @@ export async function POST(request: NextRequest) {
       utm_campaign: utmCampaign || null,
       utm_content: utmContent || null,
       utm_term: utmTerm || null,
+      marketing_consent: marketingConsent,
     });
 
     if (error) {

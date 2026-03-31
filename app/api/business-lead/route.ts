@@ -15,6 +15,8 @@ export async function POST(request: NextRequest) {
     const utmSource = body.utm_source != null ? String(body.utm_source).trim() : null;
     const utmMedium = body.utm_medium != null ? String(body.utm_medium).trim() : null;
     const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
+    const marketingConsent =
+      body.marketing_consent === 1 || body.marketing_consent === "1" ? 1 : null;
 
     if (!name) {
       return NextResponse.json(
@@ -43,6 +45,7 @@ export async function POST(request: NextRequest) {
       utm_source: utmSource || null,
       utm_medium: utmMedium || null,
       utm_campaign: utmCampaign || null,
+      marketing_consent: marketingConsent,
     });
 
     if (error) {

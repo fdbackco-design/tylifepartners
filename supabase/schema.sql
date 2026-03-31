@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS public.leads (
   utm_medium TEXT,
   utm_campaign TEXT,
   utm_content TEXT,
-  utm_term TEXT
+  utm_term TEXT,
+  marketing_consent SMALLINT
 );
 
 -- created_at desc 정렬용 인덱스
@@ -28,6 +29,7 @@ CREATE INDEX IF NOT EXISTS idx_leads_created_at ON public.leads (created_at DESC
 -- 이름/연락처 검색용 인덱스 (선택)
 CREATE INDEX IF NOT EXISTS idx_leads_phone ON public.leads (phone);
 CREATE INDEX IF NOT EXISTS idx_leads_utm_source ON public.leads (utm_source);
+CREATE INDEX IF NOT EXISTS idx_leads_marketing_consent ON public.leads (marketing_consent);
 
 -- tylife_b2b 테이블 (B2B 파트너 신청 - /business 페이지용)
 CREATE TABLE IF NOT EXISTS public.tylife_b2b (
@@ -40,8 +42,10 @@ CREATE TABLE IF NOT EXISTS public.tylife_b2b (
   memo TEXT,
   utm_source TEXT,
   utm_medium TEXT,
-  utm_campaign TEXT
+  utm_campaign TEXT,
+  marketing_consent SMALLINT
 );
 CREATE INDEX IF NOT EXISTS idx_tylife_b2b_created_at ON public.tylife_b2b (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tylife_b2b_phone ON public.tylife_b2b (phone);
 CREATE INDEX IF NOT EXISTS idx_tylife_b2b_utm_source ON public.tylife_b2b (utm_source);
+CREATE INDEX IF NOT EXISTS idx_tylife_b2b_marketing_consent ON public.tylife_b2b (marketing_consent);

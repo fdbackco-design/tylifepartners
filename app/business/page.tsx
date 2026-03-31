@@ -81,6 +81,7 @@ export default function BusinessLandingPage() {
           utm_source: utm.utm_source || null,
           utm_medium: utm.utm_medium || null,
           utm_campaign: utm.utm_campaign || null,
+          marketing_consent: marketingChecked ? 1 : null,
         }),
       });
 
