@@ -26,7 +26,8 @@ export default function BusinessLandingPage() {
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [consentChecked, setConsentChecked] = useState(false);
+  const [privacyRequiredChecked, setPrivacyRequiredChecked] = useState(false);
+  const [marketingChecked, setMarketingChecked] = useState(false);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [imgError, setImgError] = useState(false);
   const utm = useUTM();
@@ -63,8 +64,8 @@ export default function BusinessLandingPage() {
       return;
     }
 
-    if (!consentChecked) {
-      showToast("개인정보 수집 및 이용에 동의해 주세요. (필수)", true);
+    if (!privacyRequiredChecked) {
+      showToast("개인정보제공 동의서에 동의해 주세요. (필수)", true);
       return;
     }
 
@@ -290,24 +291,26 @@ export default function BusinessLandingPage() {
               </p>
 
               <PrivacyConsentSection
-                checked={consentChecked}
-                onCheckedChange={setConsentChecked}
+                requiredChecked={privacyRequiredChecked}
+                marketingChecked={marketingChecked}
+                onRequiredCheckedChange={setPrivacyRequiredChecked}
+                onMarketingCheckedChange={setMarketingChecked}
                 compact
               />
 
               <button
                 type="submit"
-                disabled={loading || !consentChecked}
+                disabled={loading || !privacyRequiredChecked}
                 style={{
                   width: "100%",
                   padding: "14px",
-                  background: loading || !consentChecked ? "#adb5bd" : "var(--cta-bg)",
+                  background: loading || !privacyRequiredChecked ? "#adb5bd" : "var(--cta-bg)",
                   color: "#fff",
                   border: "none",
                   borderRadius: 8,
                   fontSize: 16,
                   fontWeight: 600,
-                  cursor: loading || !consentChecked ? "default" : "pointer",
+                  cursor: loading || !privacyRequiredChecked ? "default" : "pointer",
                 }}
               >
                 {loading ? "제출 중..." : "제출하기"}
