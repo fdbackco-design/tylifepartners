@@ -17,6 +17,10 @@ export async function POST(request: NextRequest) {
     const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
     const marketingConsent =
       body.marketing_consent === 1 || body.marketing_consent === "1" ? 1 : null;
+    const region = body.region != null ? String(body.region).trim() : "";
+    const availableTime = body.available_time != null ? String(body.available_time).trim() : "";
+    const ageGroup = body.age_group != null ? String(body.age_group).trim() : "";
+    const job = body.job != null ? String(body.job).trim() : "";
 
     if (!name) {
       return NextResponse.json(
@@ -36,6 +40,24 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (!region) {
+      return NextResponse.json(
+        { ok: false, message: "지역을 선택해주세요." },
+        { status: 400 }
+      );
+    }
+    if (!availableTime) {
+      return NextResponse.json(
+        { ok: false, message: "상담가능시간을 선택해주세요." },
+        { status: 400 }
+      );
+    }
+    if (!ageGroup) {
+      return NextResponse.json(
+        { ok: false, message: "연령대를 선택해주세요." },
+        { status: 400 }
+      );
+    }
 
     const supabase = getSupabaseAdmin();
     const { error } = await supabase.from("tylife_b2b").insert({
@@ -46,6 +68,10 @@ export async function POST(request: NextRequest) {
       utm_medium: utmMedium || null,
       utm_campaign: utmCampaign || null,
       marketing_consent: marketingConsent,
+      region,
+      available_time: availableTime,
+      age_group: ageGroup,
+      job: job || null,
     });
 
     if (error) {

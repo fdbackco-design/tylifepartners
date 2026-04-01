@@ -43,7 +43,11 @@ CREATE TABLE IF NOT EXISTS public.tylife_b2b (
   utm_source TEXT,
   utm_medium TEXT,
   utm_campaign TEXT,
-  marketing_consent SMALLINT
+  marketing_consent SMALLINT,
+  region TEXT,
+  available_time TEXT,
+  age_group TEXT,
+  job TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tylife_b2b_created_at ON public.tylife_b2b (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tylife_b2b_phone ON public.tylife_b2b (phone);

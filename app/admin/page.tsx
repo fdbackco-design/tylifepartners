@@ -34,6 +34,10 @@ export default function AdminPage() {
       utm_source: string;
       utm_medium: string;
       utm_campaign: string;
+      region: string;
+      available_time: string;
+      age_group: string;
+      job: string;
     }[]
   >([]);
   const [searchInput, setSearchInput] = useState("");
@@ -557,6 +561,14 @@ export default function AdminPage() {
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입경로</th>
                     </>
                   )}
+                  {category === "b2b" && (
+                    <>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>지역</th>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담가능시간</th>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>연령대</th>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>직업</th>
+                    </>
+                  )}
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담상태</th>
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>메모</th>
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}></th>
@@ -587,6 +599,22 @@ export default function AdminPage() {
                         </td>
                         <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }} title={`${row.utm_source || "-"} / ${row.utm_medium || "-"} ${row.utm_campaign ? `/ ${row.utm_campaign}` : ""}`}>
                           {row.utm_source || "-"}
+                        </td>
+                      </>
+                    )}
+                    {category === "b2b" && (
+                      <>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                          {row.region || "-"}
+                        </td>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                          {row.available_time || "-"}
+                        </td>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                          {row.age_group || "-"}
+                        </td>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                          {row.job || "-"}
                         </td>
                       </>
                     )}
