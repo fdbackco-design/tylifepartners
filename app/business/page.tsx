@@ -242,16 +242,28 @@ export default function BusinessLandingPage() {
               left: 0,
               right: 0,
               maxWidth: 480,
+              maxHeight: "85vh",
               margin: "0 auto",
               background: "var(--bg-card)",
               borderRadius: "16px 16px 0 0",
-              padding: "24px 20px",
-              paddingBottom: `calc(24px + var(--safe-bottom))`,
               boxShadow: "0 -4px 20px rgba(0,0,0,0.1)",
               zIndex: 51,
               animation: "slideUp 0.3s ease",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
             }}
           >
+            <div
+              style={{
+                padding: "24px 20px",
+                paddingBottom: `calc(24px + var(--safe-bottom))`,
+                overflowY: "auto",
+                flex: 1,
+                minHeight: 0,
+                WebkitOverflowScrolling: "touch",
+              }}
+            >
             <h2 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>파트너 상담</h2>
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: 16 }}>
@@ -460,6 +472,7 @@ export default function BusinessLandingPage() {
                 {loading ? "제출 중..." : "제출하기"}
               </button>
             </form>
+            </div>
           </div>
         </>
       )}
