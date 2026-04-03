@@ -5,8 +5,8 @@ import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { useRouter } from "next/navigation";
 import { useUTM } from "@/lib/useUTM";
 
-const HERO_IMAGE = "/assets/hero_b.png";
-const HERO_FALLBACK = "/assets/hero_b.png";
+const HERO_IMAGE = "/assets/hero_b2b.jpg";
+const HERO_FALLBACK = "/assets/hero_b2b.jpg";
 
 type KarrotPixel = {
   track: (event: string, params?: Record<string, unknown>) => void;
