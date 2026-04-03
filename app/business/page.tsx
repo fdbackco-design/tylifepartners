@@ -5,8 +5,10 @@ import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { useRouter } from "next/navigation";
 import { useUTM } from "@/lib/useUTM";
 
-const HERO_IMAGE = "/assets/hero_b2b.jpg";
-const HERO_FALLBACK = "/assets/hero_b2b.jpg";
+const HERO_B2B_1 = "/assets/hero_b2b1.jpg";
+const HERO_B2B_2 = "/assets/hero_b2b2.jpg";
+const HERO_B2B_FALLBACK = "/assets/hero_b2b.jpg";
+const BOOK_PDF = "/assets/book.pdf";
 
 type KarrotPixel = {
   track: (event: string, params?: Record<string, unknown>) => void;
@@ -33,7 +35,8 @@ export default function BusinessLandingPage() {
   const [privacyRequiredChecked, setPrivacyRequiredChecked] = useState(false);
   const [marketingChecked, setMarketingChecked] = useState(false);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
-  const [imgError, setImgError] = useState(false);
+  const [img1Error, setImg1Error] = useState(false);
+  const [img2Error, setImg2Error] = useState(false);
   const utm = useUTM();
 
   // ✅ 비즈니스용 방문 분리 태깅 (예시코드 패턴)
@@ -170,10 +173,71 @@ export default function BusinessLandingPage() {
 
       <section style={{ margin: 0, lineHeight: 0, background: "#e9ecef" }}>
         <img
-          src={imgError ? HERO_FALLBACK : HERO_IMAGE}
+          src={img1Error ? HERO_B2B_FALLBACK : HERO_B2B_1}
           alt=""
           style={{ width: "100%", height: "auto", display: "block", verticalAlign: "bottom" }}
-          onError={() => setImgError(true)}
+          onError={() => setImg1Error(true)}
+        />
+      </section>
+
+      <div
+        style={{
+          maxWidth: 480,
+          margin: "0 auto",
+          padding: "24px 20px",
+          background: "#fff",
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        <a
+          href={BOOK_PDF}
+          download="TY-Life-Partners-회사소개서.pdf"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            padding: "14px 22px",
+            width: "100%",
+            maxWidth: 400,
+            boxSizing: "border-box",
+            background: "#fff",
+            color: "var(--cta-bg)",
+            border: "2px solid var(--cta-bg)",
+            borderRadius: 9999,
+            fontSize: 15,
+            fontWeight: 700,
+            textDecoration: "none",
+            WebkitTapHighlightColor: "transparent",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+          }}
+        >
+          회사 소개서 다운로드 (PDF)
+          <svg
+            width={22}
+            height={22}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M12 4v10" />
+            <path d="M8 11l4 4 4-4" />
+            <path d="M5 20h14" />
+          </svg>
+        </a>
+      </div>
+
+      <section style={{ margin: 0, lineHeight: 0, background: "#e9ecef" }}>
+        <img
+          src={img2Error ? HERO_B2B_FALLBACK : HERO_B2B_2}
+          alt=""
+          style={{ width: "100%", height: "auto", display: "block", verticalAlign: "bottom" }}
+          onError={() => setImg2Error(true)}
         />
       </section>
 
