@@ -213,7 +213,7 @@ export default function BusinessLandingPage() {
             boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
           }}
         >
-          회사 소개서 다운로드 (PDF)
+          상품 소개서 다운로드 (PDF)
           <svg
             width={22}
             height={22}
