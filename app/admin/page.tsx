@@ -572,7 +572,7 @@ export default function AdminPage() {
               overflow: "auto",
             }}
           >
-            <table style={{ width: "100%", minWidth: 1280, borderCollapse: "collapse", fontSize: 14 }}>
+            <table style={{ width: "100%", minWidth: 1100, borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
                 <tr style={{ background: "#f8f9fa", borderBottom: "1px solid var(--border)" }}>
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>신청시간</th>
@@ -584,7 +584,6 @@ export default function AdminPage() {
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>희망 상담시간</th>
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>사는 위치</th>
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입경로</th>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>utm_content</th>
                     </>
                   )}
                   {category === "b2b" && (
@@ -594,7 +593,6 @@ export default function AdminPage() {
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>연령대</th>
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>직업</th>
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입경로</th>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>utm_content</th>
                     </>
                   )}
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담상태</th>
@@ -631,9 +629,6 @@ export default function AdminPage() {
                         >
                           {row.utm_source || "-"}
                         </td>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                          {row.utm_content || "-"}
-                        </td>
                       </>
                     )}
                     {category === "b2b" && (
@@ -652,12 +647,9 @@ export default function AdminPage() {
                         </td>
                         <td
                           style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}
-                          title={`${row.utm_source || "-"} / ${row.utm_medium || "-"}${row.utm_campaign ? ` / ${row.utm_campaign}` : ""}`}
+                          title={`${row.utm_source || "-"} / ${row.utm_medium || "-"}${row.utm_campaign ? ` / ${row.utm_campaign}` : ""}${row.utm_content ? ` / ${row.utm_content}` : ""}`}
                         >
                           {row.utm_source || "-"}
-                        </td>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                          {row.utm_content || "-"}
                         </td>
                       </>
                     )}
