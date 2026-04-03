@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS public.tylife_b2b (
   utm_source TEXT,
   utm_medium TEXT,
   utm_campaign TEXT,
+  utm_content TEXT,
   marketing_consent SMALLINT,
   region TEXT,
   available_time TEXT,

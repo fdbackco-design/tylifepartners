@@ -34,6 +34,7 @@ export default function AdminPage() {
       utm_source: string;
       utm_medium: string;
       utm_campaign: string;
+      utm_content: string;
       region: string;
       available_time: string;
       age_group: string;
@@ -52,6 +53,7 @@ export default function AdminPage() {
   const [utmBaseUrl, setUtmBaseUrl] = useState("https://www.tylifepartners.com");
   const [utmPath, setUtmPath] = useState("/");
   const [utmCampaign, setUtmCampaign] = useState("");
+  const [utmContent, setUtmContent] = useState("");
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -417,7 +419,7 @@ export default function AdminPage() {
               <option value="/business">/business</option>
             </select>
           </div>
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 20 }}>
             <label style={{ display: "block", marginBottom: 6, fontSize: 14, fontWeight: 500 }}>캠페인명 (선택)</label>
             <input
               type="text"
@@ -433,10 +435,33 @@ export default function AdminPage() {
               }}
             />
           </div>
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: "block", marginBottom: 6, fontSize: 14, fontWeight: 500 }}>
+              utm_content (선택)
+            </label>
+            <input
+              type="text"
+              value={utmContent}
+              onChange={(e) => setUtmContent(e.target.value)}
+              placeholder="예: hero_banner, reel_01"
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                fontSize: 15,
+              }}
+            />
+          </div>
           <div style={{ background: "var(--bg-card)", borderRadius: 8, padding: 20, border: "1px solid var(--border)" }}>
             <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>플랫폼별 UTM 링크</h3>
             {utmBaseUrl
-              ? buildAllPlatformLinks(utmBaseUrl.replace(/\/$/, ""), utmPath, utmCampaign || undefined).map((item) => (
+              ? buildAllPlatformLinks(
+                  utmBaseUrl.replace(/\/$/, ""),
+                  utmPath,
+                  utmCampaign || undefined,
+                  utmContent || undefined
+                ).map((item) => (
                   <div key={item.platform} style={{ marginBottom: 12 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: "var(--text-secondary)" }}>
                       {item.label}
@@ -547,7 +572,7 @@ export default function AdminPage() {
               overflow: "auto",
             }}
           >
-            <table style={{ width: "100%", minWidth: 1100, borderCollapse: "collapse", fontSize: 14 }}>
+            <table style={{ width: "100%", minWidth: 1280, borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
                 <tr style={{ background: "#f8f9fa", borderBottom: "1px solid var(--border)" }}>
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>신청시간</th>
@@ -559,6 +584,7 @@ export default function AdminPage() {
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>희망 상담시간</th>
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>사는 위치</th>
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입경로</th>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>utm_content</th>
                     </>
                   )}
                   {category === "b2b" && (
@@ -567,6 +593,8 @@ export default function AdminPage() {
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담가능시간</th>
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>연령대</th>
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>직업</th>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입경로</th>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>utm_content</th>
                     </>
                   )}
                   <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담상태</th>
@@ -597,8 +625,14 @@ export default function AdminPage() {
                         <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                           {row.location || "-"}
                         </td>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }} title={`${row.utm_source || "-"} / ${row.utm_medium || "-"} ${row.utm_campaign ? `/ ${row.utm_campaign}` : ""}`}>
+                        <td
+                          style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}
+                          title={`${row.utm_source || "-"} / ${row.utm_medium || "-"}${row.utm_campaign ? ` / ${row.utm_campaign}` : ""}${row.utm_content ? ` / ${row.utm_content}` : ""}`}
+                        >
                           {row.utm_source || "-"}
+                        </td>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                          {row.utm_content || "-"}
                         </td>
                       </>
                     )}
@@ -615,6 +649,15 @@ export default function AdminPage() {
                         </td>
                         <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                           {row.job || "-"}
+                        </td>
+                        <td
+                          style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}
+                          title={`${row.utm_source || "-"} / ${row.utm_medium || "-"}${row.utm_campaign ? ` / ${row.utm_campaign}` : ""}`}
+                        >
+                          {row.utm_source || "-"}
+                        </td>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                          {row.utm_content || "-"}
                         </td>
                       </>
                     )}

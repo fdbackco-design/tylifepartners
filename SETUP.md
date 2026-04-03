@@ -77,7 +77,8 @@ CREATE TABLE IF NOT EXISTS public.tylife_b2b (
   memo TEXT,
   utm_source TEXT,
   utm_medium TEXT,
-  utm_campaign TEXT
+  utm_campaign TEXT,
+  utm_content TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tylife_b2b_created_at ON public.tylife_b2b (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tylife_b2b_phone ON public.tylife_b2b (phone);
@@ -90,7 +91,16 @@ CREATE INDEX IF NOT EXISTS idx_tylife_b2b_utm_source ON public.tylife_b2b (utm_s
 ALTER TABLE public.tylife_b2b ADD COLUMN IF NOT EXISTS utm_source TEXT;
 ALTER TABLE public.tylife_b2b ADD COLUMN IF NOT EXISTS utm_medium TEXT;
 ALTER TABLE public.tylife_b2b ADD COLUMN IF NOT EXISTS utm_campaign TEXT;
+ALTER TABLE public.tylife_b2b ADD COLUMN IF NOT EXISTS utm_content TEXT;
 CREATE INDEX IF NOT EXISTS idx_tylife_b2b_utm_source ON public.tylife_b2b (utm_source);
+```
+
+**이미 tylife_b2b에 UTM만 있고 `utm_content`가 없는 경우:**
+
+`supabase/migrations/008_tylife_b2b_utm_content.sql` 실행 또는:
+
+```sql
+ALTER TABLE public.tylife_b2b ADD COLUMN IF NOT EXISTS utm_content TEXT;
 ```
 
 ---

@@ -88,11 +88,12 @@ export function buildUTMLink(
 export function buildAllPlatformLinks(
   baseUrl: string,
   path: string = "/",
-  campaign?: string
+  campaign?: string,
+  content?: string
 ): { platform: UTMPlatform; label: string; url: string }[] {
   return (Object.keys(UTM_PLATFORMS) as UTMPlatform[]).map((platform) => ({
     platform,
     label: UTM_PLATFORMS[platform].label,
-    url: buildUTMLink(baseUrl, path, platform, campaign),
+    url: buildUTMLink(baseUrl, path, platform, campaign, content),
   }));
 }

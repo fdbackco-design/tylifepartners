@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
     const utmSource = body.utm_source != null ? String(body.utm_source).trim() : null;
     const utmMedium = body.utm_medium != null ? String(body.utm_medium).trim() : null;
     const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
+    const utmContent = body.utm_content != null ? String(body.utm_content).trim() : null;
     const marketingConsent =
       body.marketing_consent === 1 || body.marketing_consent === "1" ? 1 : null;
     const region = body.region != null ? String(body.region).trim() : "";
@@ -67,6 +68,7 @@ export async function POST(request: NextRequest) {
       utm_source: utmSource || null,
       utm_medium: utmMedium || null,
       utm_campaign: utmCampaign || null,
+      utm_content: utmContent || null,
       marketing_consent: marketingConsent,
       region,
       available_time: availableTime,
