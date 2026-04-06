@@ -407,6 +407,7 @@ export default function BusinessLandingPage() {
                   }}
                 >
                   <option value="">선택하세요</option>
+                  <option value="서울">서울</option>
                   <option value="경기">경기</option>
                   <option value="인천">인천</option>
                   <option value="강원">강원</option>
@@ -501,6 +502,7 @@ export default function BusinessLandingPage() {
                 >
                   <option value="">선택하세요</option>
                   <option value="직장인">직장인</option>
+                  <option value="보험설계사">보험설계사</option>
                   <option value="자영업">자영업</option>
                   <option value="개인사업자">개인사업자</option>
                   <option value="기타">기타</option>
