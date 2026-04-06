@@ -96,6 +96,7 @@ export default function BusinessLandingPage() {
         body: JSON.stringify({
           name: name.trim(),
           phone: rawPhone,
+          entry_page: "business",
           source: utm.utm_source || "business",
           utm_source: utm.utm_source || null,
           utm_medium: utm.utm_medium || null,

@@ -35,6 +35,7 @@ export default function AdminPage() {
       utm_medium: string;
       utm_campaign: string;
       utm_content: string;
+      entry_page: string;
       region: string;
       available_time: string;
       age_group: string;
@@ -588,6 +589,7 @@ export default function AdminPage() {
                   )}
                   {category === "b2b" && (
                     <>
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입페이지</th>
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>지역</th>
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담가능시간</th>
                       <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>연령대</th>
@@ -633,6 +635,9 @@ export default function AdminPage() {
                     )}
                     {category === "b2b" && (
                       <>
+                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                          {row.entry_page || "-"}
+                        </td>
                         <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                           {row.region || "-"}
                         </td>

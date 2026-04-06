@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const selectCols =
       tableName === "leads"
         ? "id, name, phone, created_at, status, memo, desired_date, desired_time, location, utm_source, utm_medium, utm_campaign, utm_content"
-        : "id, name, phone, created_at, status, memo, utm_source, utm_medium, utm_campaign, utm_content, region, available_time, age_group, job";
+        : "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, region, available_time, age_group, job";
     let query = supabase
       .from(tableName)
       .select(selectCols, { count: "exact" })
@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
       utm_medium?: string | null;
       utm_campaign?: string | null;
       utm_content?: string | null;
+      entry_page?: string | null;
       region?: string | null;
       available_time?: string | null;
       age_group?: string | null;
@@ -95,6 +96,7 @@ export async function GET(request: NextRequest) {
       utm_medium: row.utm_medium ?? "",
       utm_campaign: row.utm_campaign ?? "",
       utm_content: row.utm_content ?? "",
+      entry_page: row.entry_page ?? "",
       region: row.region ?? "",
       available_time: row.available_time ?? "",
       age_group: row.age_group ?? "",

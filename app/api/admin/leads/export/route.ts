@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
   const selectCols =
     category === "b2b"
-      ? "id, name, phone, created_at, status, memo, utm_source, utm_medium, utm_campaign, utm_content, marketing_consent, region, available_time, age_group, job"
+      ? "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, marketing_consent, region, available_time, age_group, job"
       : "id, name, phone, created_at, status, memo, desired_date, desired_time, location, utm_source, utm_medium, utm_campaign, utm_content, marketing_consent";
 
   try {
@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
             "created_at",
             "name",
             "phone",
+            "entry_page",
             "region",
             "available_time",
             "age_group",
@@ -107,6 +108,7 @@ export async function GET(request: NextRequest) {
             toKstString(r.created_at),
             r.name ?? "",
             r.phone ?? "",
+            r.entry_page ?? "",
             r.region ?? "",
             r.available_time ?? "",
             r.age_group ?? "",

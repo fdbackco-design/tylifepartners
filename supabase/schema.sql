@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS public.tylife_b2b (
   phone TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   source TEXT DEFAULT 'business',
+  entry_page TEXT,
   status TEXT NOT NULL DEFAULT '대기',
   memo TEXT,
   utm_source TEXT,
