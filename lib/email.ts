@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { formatPhoneKorean } from "@/lib/phone";
 
 type LeadKind = "b2c" | "b2b";
 
@@ -58,10 +59,14 @@ function buildText(p: EmailLeadPayload): string {
   lines.push(`[TY Life Partners] 신규 상담 신청 (${p.kind.toUpperCase()})`);
   lines.push("");
   lines.push(`이름: ${p.name}`);
-  lines.push(`연락처: ${p.phone}`);
+  lines.push(`연락처: ${formatPhoneKorean(p.phone)}`);
   if (p.createdAtIso) {
     const kst = formatKstYmdHm(p.createdAtIso);
     lines.push(`접수시간: ${kst ?? p.createdAtIso}`);
+  }
+
+  if (p.utm_source) {
+    lines.push(`유입경로: ${p.utm_source}`);
   }
 
   if (p.kind === "b2c") {

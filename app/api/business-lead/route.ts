@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendLeadEmailNotification } from "@/lib/email";
 import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
+import { formatPhoneKorean } from "@/lib/phone";
 
 function formatKstYmd(date: Date): string {
   const parts = new Intl.DateTimeFormat("sv-SE", {
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    const phonePretty = formatPhoneKorean(phone);
     if (!region) {
       return NextResponse.json(
         { ok: false, message: "지역을 선택해주세요." },
@@ -113,7 +115,7 @@ export async function POST(request: NextRequest) {
         medium,
         kind: "B2B",
         name,
-        phone,
+        phone: phonePretty,
       });
       if (!sheetResult.ok && !sheetResult.skipped) {
         console.error("Google Sheets append failed:", sheetResult.error);
