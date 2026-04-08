@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendLeadEmailNotification } from "@/lib/email";
+import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
+
+function formatKstYmd(date: Date): string {
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${map.year}-${map.month}-${map.day}`;
+}
 
 /**
  * POST /api/business-lead
@@ -91,6 +103,21 @@ export async function POST(request: NextRequest) {
             ? `저장 실패: ${error.message}`
             : "저장 중 오류가 발생했습니다.";
       return NextResponse.json({ ok: false, message: msg }, { status: 500 });
+    }
+
+    // 구글 시트 기록 (실패해도 제출 성공은 유지)
+    {
+      const medium = utmSource || source || "";
+      const sheetResult = await appendLeadRowToGoogleSheet({
+        dateKstYmd: formatKstYmd(new Date()),
+        medium,
+        kind: "B2B",
+        name,
+        phone,
+      });
+      if (!sheetResult.ok && !sheetResult.skipped) {
+        console.error("Google Sheets append failed:", sheetResult.error);
+      }
     }
 
     // 이메일 알림 (실패해도 제출 성공은 유지)
