@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { sendLeadEmailNotification } from "@/lib/email";
 
 /**
  * POST /api/lead
@@ -72,6 +73,25 @@ export async function POST(request: NextRequest) {
             ? `저장 실패: ${error.message}`
             : "저장 중 오류가 발생했습니다.";
       return NextResponse.json({ ok: false, message: msg }, { status: 500 });
+    }
+
+    // 이메일 알림 (실패해도 제출 성공은 유지)
+    const emailResult = await sendLeadEmailNotification({
+      kind: "b2c",
+      name,
+      phone,
+      createdAtIso: new Date().toISOString(),
+      adminUrl: "https://www.tylifepartners.com/admin",
+      desired_date: desiredDate || null,
+      desired_time: desiredTime || null,
+      location: location || null,
+      utm_source: utmSource || null,
+      utm_medium: utmMedium || null,
+      utm_campaign: utmCampaign || null,
+      utm_content: utmContent || null,
+    });
+    if (!emailResult.ok && !emailResult.skipped) {
+      console.error("Lead email notify failed:", emailResult.error);
     }
 
     return NextResponse.json({ ok: true });
