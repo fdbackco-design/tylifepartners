@@ -36,13 +36,33 @@ function canSend(): boolean {
   return Boolean(env("SMTP_HOST") && env("SMTP_PORT") && env("SMTP_USER") && env("SMTP_PASS") && env("MAIL_FROM"));
 }
 
+function formatKstYmdHm(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(d);
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  if (!map.year || !map.month || !map.day || !map.hour || !map.minute) return null;
+  return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}`;
+}
+
 function buildText(p: EmailLeadPayload): string {
   const lines: string[] = [];
   lines.push(`[TY Life Partners] 신규 상담 신청 (${p.kind.toUpperCase()})`);
   lines.push("");
   lines.push(`이름: ${p.name}`);
   lines.push(`연락처: ${p.phone}`);
-  if (p.createdAtIso) lines.push(`접수시간(ISO): ${p.createdAtIso}`);
+  if (p.createdAtIso) {
+    const kst = formatKstYmdHm(p.createdAtIso);
+    lines.push(`접수시간: ${kst ?? p.createdAtIso}`);
+  }
 
   if (p.kind === "b2c") {
     if (p.desired_date) lines.push(`희망 상담일: ${p.desired_date}`);
@@ -54,17 +74,6 @@ function buildText(p: EmailLeadPayload): string {
     if (p.available_time) lines.push(`상담가능시간: ${p.available_time}`);
     if (p.age_group) lines.push(`연령대: ${p.age_group}`);
     if (p.job) lines.push(`직업: ${p.job}`);
-  }
-
-  const utmParts = [
-    p.utm_source ? `utm_source=${p.utm_source}` : null,
-    p.utm_medium ? `utm_medium=${p.utm_medium}` : null,
-    p.utm_campaign ? `utm_campaign=${p.utm_campaign}` : null,
-    p.utm_content ? `utm_content=${p.utm_content}` : null,
-  ].filter(Boolean);
-  if (utmParts.length) {
-    lines.push("");
-    lines.push(`UTM: ${utmParts.join(", ")}`);
   }
 
   lines.push("");
