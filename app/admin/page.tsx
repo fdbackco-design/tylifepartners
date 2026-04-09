@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { buildAllPlatformLinks } from "@/lib/utm";
+import { formatPhoneKorean } from "@/lib/phone";
 
 const PAGE_SIZE = 20;
 
@@ -55,8 +56,30 @@ export default function AdminPage() {
   const [utmPath, setUtmPath] = useState("/");
   const [utmCampaign, setUtmCampaign] = useState("");
   const [utmContent, setUtmContent] = useState("");
+  const [navOpen, setNavOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const debouncedSearch = useDebounce(searchInput, 400);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const apply = () => {
+      setIsMobile(mq.matches);
+      if (!mq.matches) setNavOpen(false);
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navOpen]);
 
   const updateLeadLocal = useCallback(
     (id: string, updates: { status?: string; memo?: string }) => {
@@ -280,16 +303,58 @@ export default function AdminPage() {
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
+  const pickCategory = (cat: "b2c" | "b2b" | "utm") => {
+    setCategory(cat);
+    setPage(0);
+    if (isMobile) setNavOpen(false);
+  };
+
+  const pageTitle =
+    category === "utm"
+      ? "UTM 링크 생성"
+      : category === "b2b"
+        ? "파트너 신청 리드 (B2B)"
+        : "상담 신청 리드 (B2C)";
+
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      {/* 왼쪽 카테고리 선택 */}
+    <div style={{ display: "flex", minHeight: "100vh", position: "relative" }}>
+      {isMobile && navOpen && (
+        <button
+          type="button"
+          aria-label="메뉴 닫기"
+          onClick={() => setNavOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 199,
+            border: "none",
+            padding: 0,
+            margin: 0,
+            background: "rgba(0,0,0,0.45)",
+            cursor: "pointer",
+          }}
+        />
+      )}
+      {/* 왼쪽 카테고리 선택 (모바일: 햄버거로 열리는 드로어) */}
       <aside
         style={{
-          width: 180,
+          width: isMobile ? 264 : 180,
           flexShrink: 0,
-          borderRight: "1px solid var(--border)",
+          borderRight: isMobile ? "none" : "1px solid var(--border)",
           background: "var(--bg-card)",
           padding: "20px 0",
+          ...(isMobile
+            ? {
+                position: "fixed",
+                top: 0,
+                left: 0,
+                height: "100vh",
+                zIndex: 200,
+                transform: navOpen ? "translateX(0)" : "translateX(-100%)",
+                transition: "transform 0.22s ease",
+                boxShadow: navOpen ? "4px 0 20px rgba(0,0,0,0.12)" : "none",
+              }
+            : {}),
         }}
       >
         <h3 style={{ margin: "0 16px 16px", fontSize: 14, color: "var(--text-secondary)", fontWeight: 500 }}>
@@ -298,8 +363,7 @@ export default function AdminPage() {
         <button
           type="button"
           onClick={() => {
-            setCategory("b2c");
-            setPage(0);
+            pickCategory("b2c");
           }}
           style={{
             display: "block",
@@ -319,8 +383,7 @@ export default function AdminPage() {
         <button
           type="button"
           onClick={() => {
-            setCategory("b2b");
-            setPage(0);
+            pickCategory("b2b");
           }}
           style={{
             display: "block",
@@ -339,7 +402,7 @@ export default function AdminPage() {
         </button>
         <button
           type="button"
-          onClick={() => setCategory("utm")}
+          onClick={() => pickCategory("utm")}
           style={{
             display: "block",
             width: "100%",
@@ -357,32 +420,98 @@ export default function AdminPage() {
         </button>
       </aside>
 
-      <main style={{ flex: 1, maxWidth: 1400, minWidth: 0, margin: 0, padding: 16, paddingBottom: 40 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
-            {category === "utm"
-              ? "UTM 링크 생성"
-              : category === "b2b"
-                ? "파트너 신청 리드 (B2B)"
-                : "상담 신청 리드 (B2C)"}
-          </h1>
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={logoutLoading}
-          style={{
-            padding: "8px 14px",
-            background: "#868e96",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            fontSize: 14,
-            cursor: logoutLoading ? "default" : "pointer",
-          }}
-        >
-          {logoutLoading ? "..." : "로그아웃"}
-        </button>
-      </div>
+      <main style={{ flex: 1, maxWidth: 1400, minWidth: 0, margin: 0, padding: 16, paddingBottom: 40, width: "100%" }}>
+        {isMobile ? (
+          <div
+            style={{
+              position: "sticky",
+              top: 0,
+              zIndex: 50,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              margin: "-16px -16px 16px -16px",
+              padding: "12px 14px",
+              background: "var(--bg-page)",
+              borderBottom: "1px solid var(--border)",
+            }}
+          >
+            <button
+              type="button"
+              aria-label="카테고리 메뉴 열기"
+              aria-expanded={navOpen}
+              onClick={() => setNavOpen(true)}
+              style={{
+                width: 44,
+                height: 44,
+                flexShrink: 0,
+                display: "grid",
+                placeItems: "center",
+                border: "1px solid var(--border)",
+                borderRadius: 10,
+                background: "var(--bg-card)",
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+              </svg>
+            </button>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: 17,
+                fontWeight: 600,
+                flex: 1,
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {pageTitle}
+            </h1>
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={logoutLoading}
+              style={{
+                flexShrink: 0,
+                padding: "8px 10px",
+                background: "#868e96",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: logoutLoading ? "default" : "pointer",
+              }}
+            >
+              {logoutLoading ? "..." : "로그아웃"}
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>{pageTitle}</h1>
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={logoutLoading}
+              style={{
+                padding: "8px 14px",
+                background: "#868e96",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                fontSize: 14,
+                cursor: logoutLoading ? "default" : "pointer",
+              }}
+            >
+              {logoutLoading ? "..." : "로그아웃"}
+            </button>
+          </div>
+        )}
 
       {category === "utm" ? (
         <div style={{ maxWidth: 700 }}>
@@ -565,167 +694,287 @@ export default function AdminPage() {
         </div>
       ) : (
         <>
-          <div
-            style={{
-              background: "var(--bg-card)",
-              borderRadius: "var(--radius)",
-              boxShadow: "var(--shadow)",
-              overflow: "auto",
-            }}
-          >
-            <table style={{ width: "100%", minWidth: 1100, borderCollapse: "collapse", fontSize: 14 }}>
-              <thead>
-                <tr style={{ background: "#f8f9fa", borderBottom: "1px solid var(--border)" }}>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>신청시간</th>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>이름</th>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>연락처</th>
-                  {category === "b2c" && (
-                    <>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>희망 상담일</th>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>희망 상담시간</th>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>사는 위치</th>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입경로</th>
-                    </>
-                  )}
-                  {category === "b2b" && (
-                    <>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입페이지</th>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>지역</th>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담가능시간</th>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>연령대</th>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>직업</th>
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입경로</th>
-                    </>
-                  )}
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담상태</th>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>메모</th>
-                  <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {leads.map((row) => (
-                  <tr
-                    key={row.id}
+          {isMobile ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {leads.map((row) => (
+                <div
+                  key={row.id}
+                  style={{
+                    background: "var(--bg-card)",
+                    borderRadius: "var(--radius)",
+                    boxShadow: "var(--shadow)",
+                    border: "1px solid var(--border)",
+                    padding: 14,
+                    borderLeft: row.status === "대기" ? "4px solid #ffe066" : undefined,
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>신청시간</div>
+                  <div style={{ fontSize: 15, color: "var(--text-secondary)", marginTop: 4, lineHeight: 1.4, wordBreak: "break-word" }}>
+                    {row.created_at}
+                  </div>
+                  <div style={{ marginTop: 14, fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>이름</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>{row.name}</div>
+                  <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>연락처</div>
+                  <div style={{ fontSize: 17, marginTop: 4, letterSpacing: "-0.02em" }}>{formatPhoneKorean(row.phone)}</div>
+                  <div style={{ marginTop: 14, fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>상담상태</div>
+                  <select
+                    value={row.status}
+                    onChange={(e) => updateLeadLocal(row.id, { status: e.target.value })}
                     style={{
-                      borderBottom: "1px solid var(--border)",
-                      background: row.status === "대기" ? "#fffde7" : undefined,
+                      width: "100%",
+                      marginTop: 6,
+                      padding: "12px 12px",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 16,
+                      background: "#fff",
                     }}
                   >
-                    <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{row.created_at}</td>
-                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{row.name}</td>
-                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{row.phone}</td>
+                    <option value="대기">대기</option>
+                    <option value="상담 완료">상담 완료</option>
+                  </select>
+                  {category === "b2c" && (
+                    <div
+                      style={{
+                        marginTop: 14,
+                        paddingTop: 12,
+                        borderTop: "1px solid var(--border)",
+                        fontSize: 14,
+                        color: "var(--text-secondary)",
+                        lineHeight: 1.55,
+                      }}
+                    >
+                      <div>희망 상담일: {row.desired_date || "-"}</div>
+                      <div>희망 상담시간: {row.desired_time || "-"}</div>
+                      <div>사는 위치: {row.location || "-"}</div>
+                      <div>유입경로: {row.utm_source || "-"}</div>
+                    </div>
+                  )}
+                  {category === "b2b" && (
+                    <div
+                      style={{
+                        marginTop: 14,
+                        paddingTop: 12,
+                        borderTop: "1px solid var(--border)",
+                        fontSize: 14,
+                        color: "var(--text-secondary)",
+                        lineHeight: 1.55,
+                      }}
+                    >
+                      <div>유입페이지: {row.entry_page || "-"}</div>
+                      <div>지역: {row.region || "-"}</div>
+                      <div>상담가능시간: {row.available_time || "-"}</div>
+                      <div>연령대: {row.age_group || "-"}</div>
+                      <div>직업: {row.job || "-"}</div>
+                      <div>유입경로: {row.utm_source || "-"}</div>
+                    </div>
+                  )}
+                  <div style={{ marginTop: 14, fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>메모</div>
+                  <textarea
+                    value={row.memo}
+                    onChange={(e) => updateLeadLocal(row.id, { memo: e.target.value })}
+                    placeholder="메모 입력..."
+                    rows={3}
+                    style={{
+                      width: "100%",
+                      marginTop: 6,
+                      padding: "10px 12px",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 15,
+                      resize: "vertical",
+                      fontFamily: "inherit",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveLead(row, category)}
+                      disabled={savingId === row.id}
+                      style={{
+                        padding: "10px 16px",
+                        background: savingId === row.id ? "#adb5bd" : "var(--cta-bg)",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 8,
+                        fontSize: 15,
+                        fontWeight: 600,
+                        cursor: savingId === row.id ? "default" : "pointer",
+                      }}
+                    >
+                      {savingId === row.id ? "저장중" : "저장"}
+                    </button>
+                    {saveMsg?.id === row.id && (
+                      <span style={{ fontSize: 13, color: saveMsg.error ? "#e03131" : "#37b24d" }}>{saveMsg.msg}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div
+              style={{
+                background: "var(--bg-card)",
+                borderRadius: "var(--radius)",
+                boxShadow: "var(--shadow)",
+                overflow: "auto",
+              }}
+            >
+              <table style={{ width: "100%", minWidth: 1100, borderCollapse: "collapse", fontSize: 14 }}>
+                <thead>
+                  <tr style={{ background: "#f8f9fa", borderBottom: "1px solid var(--border)" }}>
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>신청시간</th>
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>이름</th>
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>연락처</th>
                     {category === "b2c" && (
                       <>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                          {row.desired_date || "-"}
-                        </td>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                          {row.desired_time || "-"}
-                        </td>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                          {row.location || "-"}
-                        </td>
-                        <td
-                          style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}
-                          title={`${row.utm_source || "-"} / ${row.utm_medium || "-"}${row.utm_campaign ? ` / ${row.utm_campaign}` : ""}${row.utm_content ? ` / ${row.utm_content}` : ""}`}
-                        >
-                          {row.utm_source || "-"}
-                        </td>
+                        <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>희망 상담일</th>
+                        <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>희망 상담시간</th>
+                        <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>사는 위치</th>
+                        <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입경로</th>
                       </>
                     )}
                     {category === "b2b" && (
                       <>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                          {row.entry_page || "-"}
-                        </td>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                          {row.region || "-"}
-                        </td>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                          {row.available_time || "-"}
-                        </td>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                          {row.age_group || "-"}
-                        </td>
-                        <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                          {row.job || "-"}
-                        </td>
-                        <td
-                          style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}
-                          title={`${row.utm_source || "-"} / ${row.utm_medium || "-"}${row.utm_campaign ? ` / ${row.utm_campaign}` : ""}${row.utm_content ? ` / ${row.utm_content}` : ""}`}
-                        >
-                          {row.utm_source || "-"}
-                        </td>
+                        <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입페이지</th>
+                        <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>지역</th>
+                        <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담가능시간</th>
+                        <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>연령대</th>
+                        <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>직업</th>
+                        <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입경로</th>
                       </>
                     )}
-                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
-                      <select
-                        value={row.status}
-                        onChange={(e) => updateLeadLocal(row.id, { status: e.target.value })}
-                        style={{
-                          padding: "6px 10px",
-                          border: "1px solid var(--border)",
-                          borderRadius: 6,
-                          fontSize: 14,
-                          minWidth: 100,
-                        }}
-                      >
-                        <option value="대기">대기</option>
-                        <option value="상담 완료">상담 완료</option>
-                      </select>
-                    </td>
-                    <td style={{ padding: "12px 10px" }}>
-                      <textarea
-                        value={row.memo}
-                        onChange={(e) => updateLeadLocal(row.id, { memo: e.target.value })}
-                        placeholder="메모 입력..."
-                        rows={2}
-                        style={{
-                          width: "100%",
-                          minWidth: 120,
-                          padding: "6px 10px",
-                          border: "1px solid var(--border)",
-                          borderRadius: 6,
-                          fontSize: 14,
-                          resize: "vertical",
-                          fontFamily: "inherit",
-                        }}
-                      />
-                    </td>
-                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
-                      <button
-                        type="button"
-                        onClick={() => handleSaveLead(row, category)}
-                        disabled={savingId === row.id}
-                        style={{
-                          padding: "6px 12px",
-                          background: savingId === row.id ? "#adb5bd" : "var(--cta-bg)",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 6,
-                          fontSize: 13,
-                          cursor: savingId === row.id ? "default" : "pointer",
-                        }}
-                      >
-                        {savingId === row.id ? "저장중" : "저장"}
-                      </button>
-                      {saveMsg?.id === row.id && (
-                        <span
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담상태</th>
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>메모</th>
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leads.map((row) => (
+                    <tr
+                      key={row.id}
+                      style={{
+                        borderBottom: "1px solid var(--border)",
+                        background: row.status === "대기" ? "#fffde7" : undefined,
+                      }}
+                    >
+                      <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{row.created_at}</td>
+                      <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{row.name}</td>
+                      <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{formatPhoneKorean(row.phone)}</td>
+                      {category === "b2c" && (
+                        <>
+                          <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                            {row.desired_date || "-"}
+                          </td>
+                          <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                            {row.desired_time || "-"}
+                          </td>
+                          <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                            {row.location || "-"}
+                          </td>
+                          <td
+                            style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}
+                            title={`${row.utm_source || "-"} / ${row.utm_medium || "-"}${row.utm_campaign ? ` / ${row.utm_campaign}` : ""}${row.utm_content ? ` / ${row.utm_content}` : ""}`}
+                          >
+                            {row.utm_source || "-"}
+                          </td>
+                        </>
+                      )}
+                      {category === "b2b" && (
+                        <>
+                          <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                            {row.entry_page || "-"}
+                          </td>
+                          <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                            {row.region || "-"}
+                          </td>
+                          <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                            {row.available_time || "-"}
+                          </td>
+                          <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                            {row.age_group || "-"}
+                          </td>
+                          <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                            {row.job || "-"}
+                          </td>
+                          <td
+                            style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}
+                            title={`${row.utm_source || "-"} / ${row.utm_medium || "-"}${row.utm_campaign ? ` / ${row.utm_campaign}` : ""}${row.utm_content ? ` / ${row.utm_content}` : ""}`}
+                          >
+                            {row.utm_source || "-"}
+                          </td>
+                        </>
+                      )}
+                      <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
+                        <select
+                          value={row.status}
+                          onChange={(e) => updateLeadLocal(row.id, { status: e.target.value })}
                           style={{
-                            marginLeft: 8,
-                            fontSize: 12,
-                            color: saveMsg.error ? "#e03131" : "#37b24d",
+                            padding: "6px 10px",
+                            border: "1px solid var(--border)",
+                            borderRadius: 6,
+                            fontSize: 14,
+                            minWidth: 100,
                           }}
                         >
-                          {saveMsg.msg}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          <option value="대기">대기</option>
+                          <option value="상담 완료">상담 완료</option>
+                        </select>
+                      </td>
+                      <td style={{ padding: "12px 10px" }}>
+                        <textarea
+                          value={row.memo}
+                          onChange={(e) => updateLeadLocal(row.id, { memo: e.target.value })}
+                          placeholder="메모 입력..."
+                          rows={2}
+                          style={{
+                            width: "100%",
+                            minWidth: 120,
+                            padding: "6px 10px",
+                            border: "1px solid var(--border)",
+                            borderRadius: 6,
+                            fontSize: 14,
+                            resize: "vertical",
+                            fontFamily: "inherit",
+                          }}
+                        />
+                      </td>
+                      <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
+                        <button
+                          type="button"
+                          onClick={() => handleSaveLead(row, category)}
+                          disabled={savingId === row.id}
+                          style={{
+                            padding: "6px 12px",
+                            background: savingId === row.id ? "#adb5bd" : "var(--cta-bg)",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 6,
+                            fontSize: 13,
+                            cursor: savingId === row.id ? "default" : "pointer",
+                          }}
+                        >
+                          {savingId === row.id ? "저장중" : "저장"}
+                        </button>
+                        {saveMsg?.id === row.id && (
+                          <span
+                            style={{
+                              marginLeft: 8,
+                              fontSize: 12,
+                              color: saveMsg.error ? "#e03131" : "#37b24d",
+                            }}
+                          >
+                            {saveMsg.msg}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {totalPages > 1 && (
             <div
