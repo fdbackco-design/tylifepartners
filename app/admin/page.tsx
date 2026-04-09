@@ -45,6 +45,7 @@ export default function AdminPage() {
   >([]);
   const [searchInput, setSearchInput] = useState("");
   const [total, setTotal] = useState(0);
+  const [pendingTotal, setPendingTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -130,6 +131,7 @@ export default function AdminPage() {
       if (data.ok) {
         setLeads(data.items ?? []);
         setTotal(data.total ?? data.items?.length ?? 0);
+        setPendingTotal(typeof data.pending_total === "number" ? data.pending_total : 0);
       }
     } finally {
       setLoading(false);
@@ -644,8 +646,9 @@ export default function AdminPage() {
       ) : (
         <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12 }}>
-        <div style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>
-          총 {total.toLocaleString()}건
+        <div style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: 500, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 14px" }}>
+          <span>총 {total.toLocaleString()}건</span>
+          <span style={{ color: "var(--cta-bg)", fontWeight: 700 }}>신규 {pendingTotal.toLocaleString()}건</span>
         </div>
         <button
           type="button"

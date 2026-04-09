@@ -35,13 +35,24 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
+    let pendingQuery = supabase
+      .from(tableName)
+      .select("id", { count: "exact", head: true })
+      .eq("status", "대기");
+
     if (search) {
       const safe = search.replace(/,/g, "");
       const term = `%${safe}%`;
       query = query.or(`name.ilike.${term},phone.ilike.${term}`);
+      pendingQuery = pendingQuery.or(`name.ilike.${term},phone.ilike.${term}`);
     }
 
-    const { data, error, count } = await query;
+    const [{ data, error, count }, pendingRes] = await Promise.all([query, pendingQuery]);
+
+    const pendingTotal = pendingRes.error ? 0 : pendingRes.count ?? 0;
+    if (pendingRes.error) {
+      console.error("Supabase pending count error:", pendingRes.error);
+    }
 
     if (error) {
       console.error("Supabase leads fetch error:", error);
@@ -103,7 +114,12 @@ export async function GET(request: NextRequest) {
       job: row.job ?? "",
     }));
 
-    return NextResponse.json({ ok: true, items, total: count ?? items.length });
+    return NextResponse.json({
+      ok: true,
+      items,
+      total: count ?? items.length,
+      pending_total: pendingTotal,
+    });
   } catch (e) {
     console.error("GET /api/admin/leads error:", e);
     return NextResponse.json(
