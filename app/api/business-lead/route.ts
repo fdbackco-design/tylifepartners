@@ -116,6 +116,11 @@ export async function POST(request: NextRequest) {
         kind: "B2B",
         name,
         phone: phonePretty,
+        entry_page: entryPage,
+        region: region || null,
+        available_time: availableTime || null,
+        age_group: ageGroup || null,
+        job: job || null,
       });
       if (!sheetResult.ok && !sheetResult.skipped) {
         console.error("Google Sheets append failed:", sheetResult.error);

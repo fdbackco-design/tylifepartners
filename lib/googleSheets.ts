@@ -6,7 +6,35 @@ type AppendLeadRowArgs = {
   kind: "B2C" | "B2B"; // 광고구분
   name: string;
   phone: string;
+  entry_page?: string | null;
+  region?: string | null;
+  available_time?: string | null;
+  age_group?: string | null;
+  job?: string | null;
 };
+
+function sheetCell(v: string | null | undefined): string {
+  if (v == null) return "";
+  const t = String(v).trim();
+  return t;
+}
+
+/** B열(인덱스 1)이 비었거나 행이 없으면 true */
+function rowBEmpty(row: unknown[] | undefined): boolean {
+  if (!row || row.length === 0) return true;
+  const b = row[1];
+  return b == null || String(b).trim() === "";
+}
+
+function nextSerialA(values: unknown[][], targetRow: number): number {
+  const prevSheetRow = targetRow - 1;
+  if (prevSheetRow < 2) return 1;
+  const prevIdx = prevSheetRow - 2;
+  const prevRow = values[prevIdx] as unknown[] | undefined;
+  const raw = prevRow?.[0];
+  const n = parseInt(String(raw ?? "").trim(), 10);
+  return Number.isFinite(n) ? n + 1 : 1;
+}
 
 function env(name: string): string | null {
   const v = process.env[name];
@@ -58,15 +86,45 @@ export async function appendLeadRowToGoogleSheet(args: AppendLeadRowArgs): Promi
     });
     const sheets = google.sheets({ version: "v4", auth });
 
-    // A열부터 E열까지 한 줄 추가
-    const range = `${sheetName}!A:E`;
-    await sheets.spreadsheets.values.append({
+    const readRange = `${sheetName}!A2:B50000`;
+    const existing = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range,
+      range: readRange,
+    });
+    const values = (existing.data.values ?? []) as unknown[][];
+
+    let insertIdx = -1;
+    for (let i = 0; i < values.length; i++) {
+      if (rowBEmpty(values[i] as unknown[])) {
+        insertIdx = i;
+        break;
+      }
+    }
+    const targetRow = insertIdx >= 0 ? 2 + insertIdx : 2 + values.length;
+    const serialA = nextSerialA(values, targetRow);
+
+    const row: string[] = [
+      String(serialA), // A: 직전 행 번호 + 1
+      args.dateKstYmd, // B
+      args.medium, // C
+      args.kind, // D
+      args.name, // E
+      args.phone, // F
+      "", "", "", "", "", "", "", // G~M
+      sheetCell(args.entry_page), // N
+      sheetCell(args.region), // O
+      sheetCell(args.available_time), // P
+      sheetCell(args.age_group), // Q
+      sheetCell(args.job), // R
+    ];
+
+    const writeRange = `${sheetName}!A${targetRow}:R${targetRow}`;
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: writeRange,
       valueInputOption: "USER_ENTERED",
-      insertDataOption: "INSERT_ROWS",
       requestBody: {
-        values: [[args.dateKstYmd, args.medium, args.kind, args.name, args.phone]],
+        values: [row],
       },
     });
 

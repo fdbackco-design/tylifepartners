@@ -34,6 +34,11 @@ export async function POST(request: NextRequest) {
     const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
     const utmContent = body.utm_content != null ? String(body.utm_content).trim() : null;
     const utmTerm = body.utm_term != null ? String(body.utm_term).trim() : null;
+    const entryPage = body.entry_page != null ? String(body.entry_page).trim() : null;
+    const region = body.region != null ? String(body.region).trim() : null;
+    const availableTime = body.available_time != null ? String(body.available_time).trim() : null;
+    const ageGroup = body.age_group != null ? String(body.age_group).trim() : null;
+    const job = body.job != null ? String(body.job).trim() : null;
     const marketingConsent =
       body.marketing_consent === 1 || body.marketing_consent === "1" ? 1 : null;
 
@@ -98,6 +103,11 @@ export async function POST(request: NextRequest) {
         kind: "B2C",
         name,
         phone: phonePretty,
+        entry_page: entryPage,
+        region: region || null,
+        available_time: availableTime || null,
+        age_group: ageGroup || null,
+        job: job || null,
       });
       if (!sheetResult.ok && !sheetResult.skipped) {
         console.error("Google Sheets append failed:", sheetResult.error);
