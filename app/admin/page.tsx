@@ -549,6 +549,7 @@ export default function AdminPage() {
               <option value="/">/ (메인)</option>
               <option value="/me">/me</option>
               <option value="/business">/business</option>
+              <option value="/sidejob">/sidejob</option>
             </select>
           </div>
           <div style={{ marginBottom: 20 }}>
