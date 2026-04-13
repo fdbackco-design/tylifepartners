@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
 
   const selectCols =
     category === "b2b"
-      ? "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, marketing_consent, region, available_time, age_group, job"
-      : "id, name, phone, created_at, status, memo, desired_date, desired_time, location, utm_source, utm_medium, utm_campaign, utm_content, marketing_consent";
+      ? "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent, region, available_time, age_group, job"
+      : "id, name, phone, created_at, status, memo, desired_date, desired_time, location, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent";
 
   try {
     let query = supabase
@@ -80,6 +80,7 @@ export async function GET(request: NextRequest) {
             "utm_medium",
             "utm_campaign",
             "utm_content",
+            "utm_term",
             "marketing_consent",
             "status",
             "memo",
@@ -95,6 +96,7 @@ export async function GET(request: NextRequest) {
             "utm_medium",
             "utm_campaign",
             "utm_content",
+            "utm_term",
             "marketing_consent",
             "status",
             "memo",
@@ -117,6 +119,7 @@ export async function GET(request: NextRequest) {
             r.utm_medium ?? "",
             r.utm_campaign ?? "",
             r.utm_content ?? "",
+            r.utm_term ?? "",
             r.marketing_consent ?? "",
             r.status ?? "대기",
             r.memo ?? "",
@@ -136,6 +139,7 @@ export async function GET(request: NextRequest) {
           r.utm_medium ?? "",
           r.utm_campaign ?? "",
           r.utm_content ?? "",
+          r.utm_term ?? "",
           r.marketing_consent ?? "",
           r.status ?? "대기",
           r.memo ?? "",

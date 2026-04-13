@@ -102,6 +102,7 @@ export default function BusinessLandingPage() {
           utm_medium: utm.utm_medium || null,
           utm_campaign: utm.utm_campaign || null,
           utm_content: utm.utm_content || null,
+          utm_term: utm.utm_term || null,
           marketing_consent: marketingChecked ? 1 : null,
           region,
           available_time: availableTime,
