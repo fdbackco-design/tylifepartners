@@ -415,6 +415,7 @@ export default function BusinessLandingPage() {
                   <option value="강원">강원</option>
                   <option value="충청">충청</option>
                   <option value="경상">경상</option>
+                  <option value="전라">전라</option>
                   <option value="대구">대구</option>
                   <option value="울산">울산</option>
                   <option value="제주">제주</option>
