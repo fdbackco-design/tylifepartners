@@ -751,6 +751,7 @@ export default function AdminPage() {
                       <div>희망 상담일: {row.desired_date || "-"}</div>
                       <div>희망 상담시간: {row.desired_time || "-"}</div>
                       <div>사는 위치: {row.location || "-"}</div>
+                      <div>유입페이지: {row.entry_page || "-"}</div>
                       <div>유입경로: {row.utm_source || "-"}</div>
                     </div>
                   )}
@@ -825,7 +826,7 @@ export default function AdminPage() {
                 overflow: "auto",
               }}
             >
-              <table style={{ width: "100%", minWidth: 1100, borderCollapse: "collapse", fontSize: 14 }}>
+              <table style={{ width: "100%", minWidth: 1200, borderCollapse: "collapse", fontSize: 14 }}>
                 <thead>
                   <tr style={{ background: "#f8f9fa", borderBottom: "1px solid var(--border)" }}>
                     <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>신청시간</th>
@@ -836,6 +837,7 @@ export default function AdminPage() {
                         <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>희망 상담일</th>
                         <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>희망 상담시간</th>
                         <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>사는 위치</th>
+                        <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입페이지</th>
                         <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입경로</th>
                       </>
                     )}
@@ -876,6 +878,9 @@ export default function AdminPage() {
                           </td>
                           <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                             {row.location || "-"}
+                          </td>
+                          <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                            {row.entry_page || "-"}
                           </td>
                           <td
                             style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}

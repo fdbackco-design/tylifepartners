@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS public.leads (
   utm_campaign TEXT,
   utm_content TEXT,
   utm_term TEXT,
-  marketing_consent SMALLINT
+  marketing_consent SMALLINT,
+  entry_page TEXT
 );
 
 -- created_at desc 정렬용 인덱스

@@ -37,27 +37,28 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(Math.max(parseInt(searchParams.get("limit") ?? "5000", 10), 1), 5000);
 
   const supabase = getSupabaseAdmin();
-  const tableName = category === "b2b" ? "tylife_b2b" : "leads";
 
-  const selectCols =
-    category === "b2b"
-      ? "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent, region, available_time, age_group, job"
-      : "id, name, phone, created_at, status, memo, desired_date, desired_time, location, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent";
+  const B2B_SELECT =
+    "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent, region, available_time, age_group, job";
+  const B2C_SELECT =
+    "id, name, phone, created_at, status, memo, desired_date, desired_time, location, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent";
 
   try {
-    let query = supabase
-      .from(tableName)
-      .select(selectCols)
-      .order("created_at", { ascending: false })
-      .range(0, limit - 1);
-
-    if (search) {
+    const applySearch = <T extends { or: (filter: string) => T }>(q: T): T => {
+      if (!search) return q;
       const safe = search.replace(/,/g, "");
       const term = `%${safe}%`;
-      query = query.or(`name.ilike.${term},phone.ilike.${term}`);
-    }
+      return q.or(`name.ilike.${term},phone.ilike.${term}`);
+    };
 
-    const { data, error } = await query;
+    const { data, error } =
+      category === "b2b"
+        ? await applySearch(
+            supabase.from("tylife_b2b").select(B2B_SELECT).order("created_at", { ascending: false }).range(0, limit - 1)
+          )
+        : await applySearch(
+            supabase.from("leads").select(B2C_SELECT).order("created_at", { ascending: false }).range(0, limit - 1)
+          );
     if (error) {
       console.error("CSV export query error:", error);
       return NextResponse.json({ ok: false, message: "CSV 생성 중 오류가 발생했습니다." }, { status: 500 });
@@ -89,6 +90,7 @@ export async function GET(request: NextRequest) {
             "created_at",
             "name",
             "phone",
+            "entry_page",
             "desired_date",
             "desired_time",
             "location",
@@ -132,6 +134,7 @@ export async function GET(request: NextRequest) {
           toKstString(r.created_at),
           r.name ?? "",
           r.phone ?? "",
+          r.entry_page ?? "",
           r.desired_date ?? "",
           r.desired_time ?? "",
           r.location ?? "",

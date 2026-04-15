@@ -25,9 +25,11 @@ export type ParentLandingPageProps = {
   hero2: string;
   /** Karrot 픽셀 `page` 파라미터 (랜딩 변형 구분) */
   karrotPage: string;
+  /** DB·관리자 유입 경로 (예: "/", "/v2") */
+  entryPage: string;
 };
 
-export default function ParentLandingPage({ hero1, hero2, karrotPage }: ParentLandingPageProps) {
+export default function ParentLandingPage({ hero1, hero2, karrotPage, entryPage }: ParentLandingPageProps) {
   const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -99,6 +101,7 @@ export default function ParentLandingPage({ hero1, hero2, karrotPage }: ParentLa
           utm_content: utm.utm_content || null,
           utm_term: utm.utm_term || null,
           marketing_consent: marketingChecked ? 1 : null,
+          entry_page: entryPage,
         }),
       });
 

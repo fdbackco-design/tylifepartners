@@ -70,6 +70,7 @@ function buildText(p: EmailLeadPayload): string {
   }
 
   if (p.kind === "b2c") {
+    if (p.entry_page) lines.push(`유입페이지: ${p.entry_page}`);
     if (p.desired_date) lines.push(`희망 상담일: ${p.desired_date}`);
     if (p.desired_time) lines.push(`희망 상담시간: ${p.desired_time}`);
     if (p.location) lines.push(`사는 위치: ${p.location}`);

@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseAdmin();
     const selectCols =
       tableName === "leads"
-        ? "id, name, phone, created_at, status, memo, desired_date, desired_time, location, utm_source, utm_medium, utm_campaign, utm_content"
+        ? "id, name, phone, created_at, status, memo, desired_date, desired_time, location, entry_page, utm_source, utm_medium, utm_campaign, utm_content"
         : "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, region, available_time, age_group, job";
     let query = supabase
       .from(tableName)

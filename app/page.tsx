@@ -6,6 +6,7 @@ export default function LandingPage() {
       hero1="/assets/hero_b2c_01.jpg"
       hero2="/assets/hero_b2c_02.jpg"
       karrotPage="parent"
+      entryPage="/"
     />
   );
 }

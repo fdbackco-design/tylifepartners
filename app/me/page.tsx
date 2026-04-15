@@ -95,6 +95,7 @@ export default function MeLandingPage() {
           utm_content: utm.utm_content || null,
           utm_term: utm.utm_term || null,
           marketing_consent: marketingChecked ? 1 : null,
+          entry_page: "/me",
         }),
       });
 

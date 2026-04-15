@@ -4,6 +4,15 @@ import { sendLeadEmailNotification } from "@/lib/email";
 import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
 import { formatPhoneKorean } from "@/lib/phone";
 
+/** 클라이언트에서 보낸 유입 경로 (예: /, /v2, /me). 잘못된 값은 무시 */
+function normalizeEntryPage(raw: unknown): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s || s.length > 128) return null;
+  if (!/^\/[\w\-./]*$/.test(s)) return null;
+  return s;
+}
+
 function formatKstYmd(date: Date): string {
   const parts = new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Asia/Seoul",
@@ -34,7 +43,7 @@ export async function POST(request: NextRequest) {
     const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
     const utmContent = body.utm_content != null ? String(body.utm_content).trim() : null;
     const utmTerm = body.utm_term != null ? String(body.utm_term).trim() : null;
-    const entryPage = body.entry_page != null ? String(body.entry_page).trim() : null;
+    const entryPage = normalizeEntryPage(body.entry_page);
     const region = body.region != null ? String(body.region).trim() : null;
     const availableTime = body.available_time != null ? String(body.available_time).trim() : null;
     const ageGroup = body.age_group != null ? String(body.age_group).trim() : null;
@@ -77,6 +86,7 @@ export async function POST(request: NextRequest) {
       utm_content: utmContent || null,
       utm_term: utmTerm || null,
       marketing_consent: marketingConsent,
+      entry_page: entryPage,
     });
 
     if (error) {
@@ -121,6 +131,7 @@ export async function POST(request: NextRequest) {
       phone,
       createdAtIso: new Date().toISOString(),
       adminUrl: "https://www.tylifepartners.com/admin",
+      entry_page: entryPage,
       desired_date: desiredDate || null,
       desired_time: desiredTime || null,
       location: location || null,
