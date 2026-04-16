@@ -1,0 +1,12 @@
+import ParentLandingPage from "@/app/_components/ParentLandingPage";
+
+export default function LandingPageV1() {
+  return (
+    <ParentLandingPage
+      hero1="/assets/hero_b2c_01.jpg"
+      hero2="/assets/hero_b2c_02.jpg"
+      karrotPage="parent_v1"
+      entryPage="/v1"
+    />
+  );
+}
