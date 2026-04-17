@@ -114,8 +114,9 @@ export async function POST(request: NextRequest) {
         name,
         phone: phonePretty,
         entry_page: entryPage,
-        region: region || null,
-        available_time: availableTime || null,
+        // B2C 랜딩(/, /v1, /v2, /v3)은 "사는 위치/희망 상담시간"을 O,P 컬럼에 기록
+        region: location || null,
+        available_time: desiredTime || null,
         age_group: ageGroup || null,
         job: job || null,
       });
