@@ -21,6 +21,9 @@ function formatPhone(value: string): string {
   return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
 }
 
+const INSURANCE_DESIGNER_JOB = "보험설계사";
+const JOB_RANK_OPTIONS = ["지점장 이상", "팀장 이상", "FC"] as const;
+
 export default function SidejobLandingPage() {
   const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -32,6 +35,7 @@ export default function SidejobLandingPage() {
   const [availableTime, setAvailableTime] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
   const [job, setJob] = useState("");
+  const [jobRank, setJobRank] = useState("");
   const [privacyRequiredChecked, setPrivacyRequiredChecked] = useState(false);
   const [marketingChecked, setMarketingChecked] = useState(false);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
@@ -87,6 +91,10 @@ export default function SidejobLandingPage() {
       showToast("연령대를 선택해주세요.", true);
       return;
     }
+    if (job === INSURANCE_DESIGNER_JOB && !jobRank) {
+      showToast("직급을 선택해주세요.", true);
+      return;
+    }
     if (!privacyRequiredChecked) {
       showToast("개인정보제공 동의서에 동의해 주세요. (필수)", true);
       return;
@@ -112,6 +120,7 @@ export default function SidejobLandingPage() {
           available_time: availableTime,
           age_group: ageGroup,
           job: job || null,
+          job_rank: job === INSURANCE_DESIGNER_JOB ? jobRank : null,
         }),
       });
       const data = await res.json();
@@ -482,7 +491,11 @@ export default function SidejobLandingPage() {
                   <select
                     id="sidejob-lead-job"
                     value={job}
-                    onChange={(e) => setJob(e.target.value)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setJob(v);
+                      if (v !== INSURANCE_DESIGNER_JOB) setJobRank("");
+                    }}
                     disabled={loading}
                     style={{
                       width: "100%",
@@ -500,6 +513,38 @@ export default function SidejobLandingPage() {
                     <option value="자영업">자영업</option>
                     <option value="개인사업자">개인사업자</option>
                     <option value="기타">기타</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label
+                    htmlFor="sidejob-lead-job-rank"
+                    style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}
+                  >
+                    직급 {job === INSURANCE_DESIGNER_JOB ? "(필수)" : ""}
+                  </label>
+                  <select
+                    id="sidejob-lead-job-rank"
+                    value={jobRank}
+                    onChange={(e) => setJobRank(e.target.value)}
+                    disabled={loading || job !== INSURANCE_DESIGNER_JOB}
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 16,
+                      outline: "none",
+                      background: job === INSURANCE_DESIGNER_JOB ? "#fff" : "#f1f3f5",
+                      color: job === INSURANCE_DESIGNER_JOB ? "inherit" : "var(--text-secondary)",
+                    }}
+                  >
+                    <option value="">선택하세요</option>
+                    {JOB_RANK_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

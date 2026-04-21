@@ -4,6 +4,9 @@ import { sendLeadEmailNotification } from "@/lib/email";
 import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
 import { formatPhoneKorean } from "@/lib/phone";
 
+const INSURANCE_DESIGNER_JOB = "보험설계사";
+const ALLOWED_JOB_RANKS = new Set(["지점장 이상", "팀장 이상", "FC"]);
+
 function formatKstYmd(date: Date): string {
   const parts = new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Asia/Seoul",
@@ -38,6 +41,7 @@ export async function POST(request: NextRequest) {
     const availableTime = body.available_time != null ? String(body.available_time).trim() : "";
     const ageGroup = body.age_group != null ? String(body.age_group).trim() : "";
     const job = body.job != null ? String(body.job).trim() : "";
+    const jobRankRaw = body.job_rank != null ? String(body.job_rank).trim() : "";
 
     if (!name) {
       return NextResponse.json(
@@ -77,6 +81,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const jobRankForDb =
+      job === INSURANCE_DESIGNER_JOB && jobRankRaw && ALLOWED_JOB_RANKS.has(jobRankRaw) ? jobRankRaw : null;
+    if (job === INSURANCE_DESIGNER_JOB && !jobRankForDb) {
+      return NextResponse.json(
+        { ok: false, message: "보험설계사인 경우 직급을 선택해주세요." },
+        { status: 400 }
+      );
+    }
+
     const supabase = getSupabaseAdmin();
     const { error } = await supabase.from("tylife_b2b").insert({
       name,
@@ -93,6 +106,7 @@ export async function POST(request: NextRequest) {
       available_time: availableTime,
       age_group: ageGroup,
       job: job || null,
+      job_rank: jobRankForDb,
     });
 
     if (error) {
@@ -123,6 +137,7 @@ export async function POST(request: NextRequest) {
         available_time: availableTime || null,
         age_group: ageGroup || null,
         job: job || null,
+        job_rank: jobRankForDb,
       });
       if (!sheetResult.ok && !sheetResult.skipped) {
         console.error("Google Sheets append failed:", sheetResult.error);
@@ -141,6 +156,7 @@ export async function POST(request: NextRequest) {
       available_time: availableTime || null,
       age_group: ageGroup || null,
       job: job || null,
+      job_rank: jobRankForDb,
       utm_source: utmSource || null,
       utm_medium: utmMedium || null,
       utm_campaign: utmCampaign || null,

@@ -41,6 +41,7 @@ export default function AdminPage() {
       available_time: string;
       age_group: string;
       job: string;
+      job_rank: string;
     }[]
   >([]);
   const [searchInput, setSearchInput] = useState("");
@@ -771,6 +772,7 @@ export default function AdminPage() {
                       <div>상담가능시간: {row.available_time || "-"}</div>
                       <div>연령대: {row.age_group || "-"}</div>
                       <div>직업: {row.job || "-"}</div>
+                      <div>직급: {row.job_rank || "-"}</div>
                       <div>유입경로: {row.utm_source || "-"}</div>
                     </div>
                   )}
@@ -848,6 +850,7 @@ export default function AdminPage() {
                         <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담가능시간</th>
                         <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>연령대</th>
                         <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>직업</th>
+                        <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>직급</th>
                         <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입경로</th>
                       </>
                     )}
@@ -906,6 +909,9 @@ export default function AdminPage() {
                           </td>
                           <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                             {row.job || "-"}
+                          </td>
+                          <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                            {row.job_rank || "-"}
                           </td>
                           <td
                             style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}

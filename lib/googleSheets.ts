@@ -11,6 +11,7 @@ type AppendLeadRowArgs = {
   available_time?: string | null;
   age_group?: string | null;
   job?: string | null;
+  job_rank?: string | null;
 };
 
 function sheetCell(v: string | null | undefined): string {
@@ -116,9 +117,10 @@ export async function appendLeadRowToGoogleSheet(args: AppendLeadRowArgs): Promi
       sheetCell(args.available_time), // P
       sheetCell(args.age_group), // Q
       sheetCell(args.job), // R
+      sheetCell(args.job_rank), // S: 직급
     ];
 
-    const writeRange = `${sheetName}!A${targetRow}:R${targetRow}`;
+    const writeRange = `${sheetName}!A${targetRow}:S${targetRow}`;
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: writeRange,

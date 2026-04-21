@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdmin();
 
   const B2B_SELECT =
-    "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent, region, available_time, age_group, job";
+    "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent, region, available_time, age_group, job, job_rank";
   const B2C_SELECT =
     "id, name, phone, created_at, status, memo, desired_date, desired_time, location, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent";
 
@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
             "available_time",
             "age_group",
             "job",
+            "job_rank",
             "utm_source",
             "utm_medium",
             "utm_campaign",
@@ -117,6 +118,7 @@ export async function GET(request: NextRequest) {
             r.available_time ?? "",
             r.age_group ?? "",
             r.job ?? "",
+            r.job_rank ?? "",
             r.utm_source ?? "",
             r.utm_medium ?? "",
             r.utm_campaign ?? "",

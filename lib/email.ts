@@ -19,6 +19,7 @@ type EmailLeadPayload = {
   available_time?: string | null;
   age_group?: string | null;
   job?: string | null;
+  job_rank?: string | null;
   // utm
   utm_source?: string | null;
   utm_medium?: string | null;
@@ -80,6 +81,7 @@ function buildText(p: EmailLeadPayload): string {
     if (p.available_time) lines.push(`상담가능시간: ${p.available_time}`);
     if (p.age_group) lines.push(`연령대: ${p.age_group}`);
     if (p.job) lines.push(`직업: ${p.job}`);
+    if (p.job_rank) lines.push(`직급: ${p.job_rank}`);
   }
 
   lines.push("");

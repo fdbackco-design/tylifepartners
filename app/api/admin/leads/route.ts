@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const selectCols =
       tableName === "leads"
         ? "id, name, phone, created_at, status, memo, desired_date, desired_time, location, entry_page, utm_source, utm_medium, utm_campaign, utm_content"
-        : "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, region, available_time, age_group, job";
+        : "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, region, available_time, age_group, job, job_rank";
     let query = supabase
       .from(tableName)
       .select(selectCols, { count: "exact" })
@@ -81,6 +81,7 @@ export async function GET(request: NextRequest) {
       available_time?: string | null;
       age_group?: string | null;
       job?: string | null;
+      job_rank?: string | null;
     };
     const rows = (data ?? []) as unknown as LeadRow[];
     const items = rows.map((row) => ({
@@ -112,6 +113,7 @@ export async function GET(request: NextRequest) {
       available_time: row.available_time ?? "",
       age_group: row.age_group ?? "",
       job: row.job ?? "",
+      job_rank: row.job_rank ?? "",
     }));
 
     return NextResponse.json({
