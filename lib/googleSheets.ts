@@ -111,16 +111,16 @@ export async function appendLeadRowToGoogleSheet(args: AppendLeadRowArgs): Promi
       args.kind, // D
       args.name, // E
       args.phone, // F
-      "", "", "", "", "", "", "", // G~M
-      sheetCell(args.entry_page), // N
-      sheetCell(args.region), // O
-      sheetCell(args.available_time), // P
-      sheetCell(args.age_group), // Q
-      sheetCell(args.job), // R
-      sheetCell(args.job_rank), // S: 직급
+      "", "", "", "", "", "", "", "", // G~N
+      sheetCell(args.entry_page), // O
+      sheetCell(args.region), // P
+      sheetCell(args.available_time), // Q
+      sheetCell(args.age_group), // R
+      sheetCell(args.job), // S
+      sheetCell(args.job_rank), // T: 직급
     ];
 
-    const writeRange = `${sheetName}!A${targetRow}:S${targetRow}`;
+    const writeRange = `${sheetName}!A${targetRow}:T${targetRow}`;
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: writeRange,
