@@ -5,8 +5,8 @@ import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { useRouter } from "next/navigation";
 import { useUTM } from "@/lib/useUTM";
 
-const HERO_B2B_1 = "/assets/hero_b2b1.jpg";
-const HERO_B2B_2 = "/assets/hero_b2b2.jpg";
+const HERO_B2B_1 = "/assets/hero_b2b1.jpeg";
+const HERO_B2B_2 = "/assets/hero_b2b2.jpeg";
 const HERO_B2B_FALLBACK = "/assets/hero_b2b.jpg";
 const BOOK_PDF = "/assets/book.pdf";
 
