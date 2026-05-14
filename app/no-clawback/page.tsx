@@ -254,8 +254,8 @@ export default function NoClawbackLandingPage() {
         style={{
           maxWidth: 480,
           margin: "0 auto",
-          padding: "24px 20px",
-          paddingBottom: `calc(24px + var(--safe-bottom))`,
+          padding: "24px 20px 0",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
           background: "#fff",
           display: "flex",
           justifyContent: "center",
@@ -268,7 +268,7 @@ export default function NoClawbackLandingPage() {
           style={{
             width: "100%",
             maxWidth: 400,
-            padding: "14px 20px",
+            padding: "28px 20px",
             boxSizing: "border-box",
             background: submitted ? "#adb5bd" : "var(--cta-bg)",
             color: "#fff",
