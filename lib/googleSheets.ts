@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { isGoogleSheetPhoneBlacklisted } from "@/lib/phoneBlacklist";
 
 type AppendLeadRowArgs = {
   dateKstYmd: string; // YYYY-MM-DD
@@ -74,6 +75,10 @@ export function canAppendToGoogleSheet(): boolean {
 }
 
 export async function appendLeadRowToGoogleSheet(args: AppendLeadRowArgs): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+  if (isGoogleSheetPhoneBlacklisted(args.phone)) {
+    return { ok: true, skipped: true };
+  }
+
   const spreadsheetId = env("GOOGLE_SHEETS_ID");
   const sheetName = env("GOOGLE_SHEETS_SHEET_NAME") || "시트1";
   const creds = decodeServiceAccountJson();
