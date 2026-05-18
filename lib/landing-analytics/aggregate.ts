@@ -28,6 +28,7 @@ export type LandingAnalyticsReport = {
     dropout_rate: number;
     next_section_reached: number;
     next_section_reach_rate: number;
+    submission_count: number;
   }[];
   device_depth_reach: {
     device: string;
@@ -325,6 +326,7 @@ function computeSectionDropout(
       next_section_reached,
       next_section_reach_rate:
         reached > 0 ? (next_section_reached / reached) * 100 : 0,
+      submission_count: 0,
     };
   });
 }

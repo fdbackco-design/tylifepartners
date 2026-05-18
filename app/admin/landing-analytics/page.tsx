@@ -192,7 +192,7 @@ export default function LandingAnalyticsAdminPage() {
                   <th style={{ padding: 8 }}>도달</th>
                   <th style={{ padding: 8 }}>이탈</th>
                   <th style={{ padding: 8 }}>이탈률</th>
-                  <th style={{ padding: 8 }}>다음 섹션 도달</th>
+                  <th style={{ padding: 8 }}>신청 시 구간</th>
                   <th style={{ padding: 8 }}>다음 섹션 도달률</th>
                 </tr>
               </thead>
@@ -203,12 +203,15 @@ export default function LandingAnalyticsAdminPage() {
                     <td style={{ padding: 8 }}>{row.reached}</td>
                     <td style={{ padding: 8 }}>{row.dropped}</td>
                     <td style={{ padding: 8 }}>{row.dropout_rate.toFixed(1)}%</td>
-                    <td style={{ padding: 8 }}>{row.next_section_reached}</td>
+                    <td style={{ padding: 8 }}>{row.submission_count}</td>
                     <td style={{ padding: 8 }}>{row.next_section_reach_rate.toFixed(1)}%</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <p style={{ marginTop: 8, fontSize: 12, color: "#64748b" }}>
+              신청 시 구간: 선택 기간·랜딩에서 상담 신청 시 해당 구간에 있던 건수(리드 DB 기준).
+            </p>
           </Section>
 
           <Section title="디바이스별 스크롤 도달률">

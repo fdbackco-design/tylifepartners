@@ -24,9 +24,9 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get("category") === "b2b" ? "b2b" : "b2c";
     const supabase = getSupabaseAdmin();
     const b2cSelect =
-      "id, name, phone, created_at, status, memo, desired_date, desired_time, location, entry_page, utm_source, utm_medium, utm_campaign, utm_content, max_scroll_depth, last_section_label";
+      "id, name, phone, created_at, status, memo, desired_date, desired_time, location, entry_page, utm_source, utm_medium, utm_campaign, utm_content";
     const b2bSelect =
-      "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, region, available_time, age_group, job, job_rank, max_scroll_depth, last_section_label";
+      "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, region, available_time, age_group, job, job_rank";
 
     let query =
       category === "b2b"
@@ -83,8 +83,6 @@ export async function GET(request: NextRequest) {
       utm_campaign?: string | null;
       utm_content?: string | null;
       entry_page?: string | null;
-      max_scroll_depth?: number | null;
-      last_section_label?: string | null;
       region?: string | null;
       available_time?: string | null;
       age_group?: string | null;
@@ -117,9 +115,6 @@ export async function GET(request: NextRequest) {
       utm_campaign: row.utm_campaign ?? "",
       utm_content: row.utm_content ?? "",
       entry_page: row.entry_page ?? "",
-      max_scroll_depth:
-        row.max_scroll_depth != null ? Number(row.max_scroll_depth) : null,
-      last_section_label: row.last_section_label ?? "",
       region: row.region ?? "",
       available_time: row.available_time ?? "",
       age_group: row.age_group ?? "",

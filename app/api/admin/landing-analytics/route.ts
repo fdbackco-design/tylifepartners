@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/adminSession";
 import { aggregateLandingAnalytics } from "@/lib/landing-analytics/aggregate";
+import {
+  attachSubmissionCountsToDropout,
+  fetchSubmissionCountBySection,
+} from "@/lib/landing-analytics/leadSubmissionCounts";
 import { LANDING_KEYS, type LandingKey } from "@/lib/landing-analytics/sections";
 import type { LandingEventAggregateRow } from "@/lib/landing-analytics/eventRow";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -55,7 +59,13 @@ export async function GET(request: NextRequest) {
     }
 
     const events = (data ?? []) as LandingEventAggregateRow[];
-    const report = aggregateLandingAnalytics(landing_key as LandingKey, events);
+    const key = landing_key as LandingKey;
+    const report = aggregateLandingAnalytics(key, events);
+    const submissionCounts = await fetchSubmissionCountBySection(key, from, to);
+    report.section_dropout = attachSubmissionCountsToDropout(
+      report.section_dropout,
+      submissionCounts
+    );
 
     return NextResponse.json({
       ok: true,
