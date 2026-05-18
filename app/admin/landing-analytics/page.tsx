@@ -192,8 +192,8 @@ export default function LandingAnalyticsAdminPage() {
                   <th style={{ padding: 8 }}>도달</th>
                   <th style={{ padding: 8 }}>이탈</th>
                   <th style={{ padding: 8 }}>이탈률</th>
-                  <th style={{ padding: 8 }}>신청 시 구간</th>
                   <th style={{ padding: 8 }}>다음 섹션 도달률</th>
+                  <th style={{ padding: 8 }}>신청 시 구간</th>
                 </tr>
               </thead>
               <tbody>
@@ -203,8 +203,8 @@ export default function LandingAnalyticsAdminPage() {
                     <td style={{ padding: 8 }}>{row.reached}</td>
                     <td style={{ padding: 8 }}>{row.dropped}</td>
                     <td style={{ padding: 8 }}>{row.dropout_rate.toFixed(1)}%</td>
-                    <td style={{ padding: 8 }}>{row.submission_count}</td>
                     <td style={{ padding: 8 }}>{row.next_section_reach_rate.toFixed(1)}%</td>
+                    <td style={{ padding: 8 }}>{row.submission_count}</td>
                   </tr>
                 ))}
               </tbody>
