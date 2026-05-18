@@ -25,7 +25,7 @@ function defaultToDate() {
 
 export default function LandingAnalyticsAdminPage() {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
-  const [landingKey, setLandingKey] = useState<LandingKey>("parent_main");
+  const [landingKey, setLandingKey] = useState<LandingKey>("business");
   const [fromDate, setFromDate] = useState(defaultFromDate);
   const [toDate, setToDate] = useState(defaultToDate);
   const [loading, setLoading] = useState(false);
