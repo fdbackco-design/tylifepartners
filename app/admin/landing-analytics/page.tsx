@@ -170,7 +170,7 @@ export default function LandingAnalyticsAdminPage() {
             />
           </div>
 
-          <Section title="스크롤 깊이 도달률">
+          <Section title="스크롤 깊이 도달률(몇 % 지점까지 봤나)">
             <BarList
               items={report.depth_reach_rates.map((d) => ({
                 label: `${d.depth}%`,
@@ -180,7 +180,7 @@ export default function LandingAnalyticsAdminPage() {
             />
           </Section>
 
-          <Section title="구간별 이탈률 (LANDING_SECTIONS 기준)">
+          <Section title="구간별 이탈률 (어떤 구간에서 나갔나)">
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
@@ -243,7 +243,7 @@ export default function LandingAnalyticsAdminPage() {
             />
           </Section>
 
-          <Section title="스크롤 히트맵 (10% 구간, 세션 max_depth 기준)">
+          <Section title="스크롤 히트맵 (10% 단위로 어디까지 도달했나)">
             <BarList
               items={report.scroll_heatmap.map((h) => ({
                 label: h.bucket,
@@ -253,7 +253,7 @@ export default function LandingAnalyticsAdminPage() {
             />
           </Section>
 
-          <Section title="클릭 y_ratio 분포 (10% 구간)">
+          <Section title="클릭 y_ratio 분포 (10% 단위로 어디를 눌렀나)">
             <BarList
               items={report.click_y_buckets.map((h) => ({
                 label: h.bucket,
