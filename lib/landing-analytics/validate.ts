@@ -104,6 +104,18 @@ export function parseTrackBody(raw: unknown): { ok: true; data: LandingTrackPayl
     }
   }
 
+  if (event_type === "section_dwell") {
+    if (!clampStr(body.section_name, 80)) {
+      return { ok: false, message: "section_dwell requires section_name" };
+    }
+    if (!clampStr(body.section_label, 120)) {
+      return { ok: false, message: "section_dwell requires section_label" };
+    }
+    if (duration_seconds == null || duration_seconds < 1) {
+      return { ok: false, message: "section_dwell requires duration_seconds >= 1" };
+    }
+  }
+
   const device_type = body.device_type;
   if (
     device_type != null &&

@@ -36,6 +36,13 @@ export type LandingAnalyticsReport = {
     reach_100: number;
   }[];
   section_clicks: { name: string; label: string; count: number }[];
+  section_dwell: {
+    name: string;
+    label: string;
+    total_seconds: number;
+    sessions_with_dwell: number;
+    avg_seconds: number;
+  }[];
   scroll_heatmap: { bucket: string; count: number; rate: number }[];
   click_y_buckets: { bucket: string; count: number }[];
 };
@@ -154,6 +161,8 @@ export function aggregateLandingAnalytics(
     count: clickCounts.get(sec.name)?.count ?? 0,
   }));
 
+  const section_dwell = computeSectionDwell(events, sections);
+
   const heatBuckets = new Map<number, number>();
   for (const s of sessionList) {
     const bucket = Math.min(9, Math.floor(maxDepthToYRatio(s.max_depth) * 10));
@@ -195,9 +204,51 @@ export function aggregateLandingAnalytics(
     section_dropout,
     device_depth_reach,
     section_clicks,
+    section_dwell,
     scroll_heatmap,
     click_y_buckets,
   };
+}
+
+function computeSectionDwell(
+  events: LandingEventAggregateRow[],
+  sections: LandingSection[]
+) {
+  const perSession = new Map<string, Map<string, number>>();
+
+  for (const ev of events) {
+    if (ev.event_type !== "section_dwell" || !ev.section_name) continue;
+    const sec = Math.round(ev.duration_seconds ?? 0);
+    if (sec < 1) continue;
+
+    let map = perSession.get(ev.session_id);
+    if (!map) {
+      map = new Map();
+      perSession.set(ev.session_id, map);
+    }
+    map.set(ev.section_name, (map.get(ev.section_name) ?? 0) + sec);
+  }
+
+  return sections.map((sec) => {
+    let total_seconds = 0;
+    let sessions_with_dwell = 0;
+
+    for (const map of Array.from(perSession.values())) {
+      const secSeconds = map.get(sec.name) ?? 0;
+      if (secSeconds > 0) {
+        total_seconds += secSeconds;
+        sessions_with_dwell += 1;
+      }
+    }
+
+    return {
+      name: sec.name,
+      label: sec.label,
+      total_seconds,
+      sessions_with_dwell,
+      avg_seconds: sessions_with_dwell > 0 ? total_seconds / sessions_with_dwell : 0,
+    };
+  });
 }
 
 function computeSectionDropout(

@@ -6,6 +6,7 @@ export const LANDING_EVENT_TYPES = [
   "click",
   "heartbeat",
   "leave",
+  "section_dwell",
 ] as const;
 
 export type LandingEventType = (typeof LANDING_EVENT_TYPES)[number];

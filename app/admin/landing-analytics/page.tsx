@@ -8,6 +8,7 @@ import {
   type LandingKey,
 } from "@/lib/landing-analytics/sections";
 import type { LandingAnalyticsReport } from "@/lib/landing-analytics/aggregate";
+import { formatDurationSeconds } from "@/lib/landing-analytics/formatDuration";
 
 function defaultFromDate() {
   const d = new Date();
@@ -241,6 +242,32 @@ export default function LandingAnalyticsAdminPage() {
                 max: Math.max(1, ...report.section_clicks.map((x) => x.count)),
               }))}
             />
+          </Section>
+
+          <Section title="섹션별 평균 체류 시간">
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                  <th style={{ padding: 8 }}>구간</th>
+                  <th style={{ padding: 8 }}>평균 체류</th>
+                  <th style={{ padding: 8 }}>총 체류</th>
+                  <th style={{ padding: 8 }}>체류 세션</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.section_dwell.map((row) => (
+                  <tr key={row.name} style={{ borderBottom: "1px solid #eee" }}>
+                    <td style={{ padding: 8 }}>{row.label}</td>
+                    <td style={{ padding: 8 }}>{formatDurationSeconds(row.avg_seconds)}</td>
+                    <td style={{ padding: 8 }}>{formatDurationSeconds(row.total_seconds)}</td>
+                    <td style={{ padding: 8 }}>{row.sessions_with_dwell}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p style={{ marginTop: 8, fontSize: 12, color: "#64748b" }}>
+              화면 중앙이 해당 구간에 있을 때 1초 단위로 누적하며, 약 10~15초마다 또는 이탈 시 전송됩니다.
+            </p>
           </Section>
 
           <Section title="스크롤 히트맵 (10% 단위로 어디까지 도달했나)">
