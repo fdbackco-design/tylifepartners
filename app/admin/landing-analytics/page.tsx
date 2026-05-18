@@ -8,10 +8,8 @@ import {
   type LandingKey,
 } from "@/lib/landing-analytics/sections";
 import type { LandingAnalyticsReport } from "@/lib/landing-analytics/aggregate";
-import { formatDurationSeconds } from "@/lib/landing-analytics/formatDuration";
 import {
   HeatmapHelpText,
-  ScrollPercentColorHeatmap,
   SectionColorHeatmap,
 } from "@/app/admin/landing-analytics/_components/ColorHeatmap";
 
@@ -255,50 +253,6 @@ export default function LandingAnalyticsAdminPage() {
             <SectionColorHeatmap
               rows={report.section_heatmap}
               empty={report.total_sessions === 0}
-            />
-          </Section>
-
-          <Section title="섹션별 평균 체류 시간">
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
-                  <th style={{ padding: 8 }}>구간</th>
-                  <th style={{ padding: 8 }}>평균 체류</th>
-                  <th style={{ padding: 8 }}>총 체류</th>
-                  <th style={{ padding: 8 }}>체류 세션</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.section_dwell.map((row) => (
-                  <tr key={row.name} style={{ borderBottom: "1px solid #eee" }}>
-                    <td style={{ padding: 8 }}>{row.label}</td>
-                    <td style={{ padding: 8 }}>{formatDurationSeconds(row.avg_seconds)}</td>
-                    <td style={{ padding: 8 }}>{formatDurationSeconds(row.total_seconds)}</td>
-                    <td style={{ padding: 8 }}>{row.sessions_with_dwell}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p style={{ marginTop: 8, fontSize: 12, color: "#64748b" }}>
-              화면 중앙이 해당 구간에 있을 때 1초 단위로 누적하며, 약 10~15초마다 또는 이탈 시 전송됩니다.
-            </p>
-          </Section>
-
-          <Section title="스크롤 히트맵 (10% 단위 · 색상)">
-            <ScrollPercentColorHeatmap
-              buckets={report.scroll_heatmap}
-              empty={report.total_sessions === 0}
-            />
-          </Section>
-
-          <Section title="클릭 y_ratio 분포 (클릭 위치 분석)">
-            <BarList
-              items={report.click_y_buckets.map((h) => ({
-                label: h.bucket,
-                value: h.count,
-                sub: `${h.count}회`,
-                max: Math.max(1, ...report.click_y_buckets.map((x) => x.count)),
-              }))}
             />
           </Section>
         </>
