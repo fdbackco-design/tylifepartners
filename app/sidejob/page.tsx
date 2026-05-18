@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { useUTM } from "@/lib/useUTM";
 
@@ -147,6 +148,7 @@ export default function SidejobLandingPage() {
 
   return (
     <main>
+      <LandingAnalyticsTracker landingKey="sidejob" />
       <header
         style={{
           position: "sticky",

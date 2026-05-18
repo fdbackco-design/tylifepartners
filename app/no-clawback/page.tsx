@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { useRouter } from "next/navigation";
 import { useUTM } from "@/lib/useUTM";
@@ -152,6 +153,7 @@ export default function NoClawbackLandingPage() {
 
   return (
     <main>
+      <LandingAnalyticsTracker landingKey="no_clawback" />
       <header
         style={{
           position: "sticky",

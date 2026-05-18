@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { DESIRED_TIME_OPTIONS, LOCATION_OPTIONS, getDesiredDateOptions } from "@/lib/formOptions";
 import { useUTM } from "@/lib/useUTM";
+import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { useRouter } from "next/navigation";
 
@@ -133,6 +134,7 @@ export default function MeLandingPage() {
 
   return (
     <main>
+      <LandingAnalyticsTracker landingKey="me" />
       <header
         style={{
           position: "sticky",

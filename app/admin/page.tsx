@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { buildAllPlatformLinks } from "@/lib/utm";
 import { formatPhoneKorean } from "@/lib/phone";
@@ -421,6 +422,29 @@ export default function AdminPage() {
         >
           UTM 링크
         </button>
+        <Link
+          href="/admin/landing-analytics"
+          onClick={() => {
+            if (isMobile) setNavOpen(false);
+          }}
+          style={{
+            display: "block",
+            width: "100%",
+            padding: "12px 20px",
+            border: "none",
+            borderLeft: "3px solid transparent",
+            background: "transparent",
+            textAlign: "left",
+            fontSize: 15,
+            fontWeight: 400,
+            cursor: "pointer",
+            textDecoration: "none",
+            color: "inherit",
+            boxSizing: "border-box",
+          }}
+        >
+          스크롤 히트맵
+        </Link>
       </aside>
 
       <main style={{ flex: 1, maxWidth: 1400, minWidth: 0, margin: 0, padding: 16, paddingBottom: 40, width: "100%" }}>
