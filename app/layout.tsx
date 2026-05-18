@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
+import { Suspense } from "react";
 import "./globals.css";
+
+const LandingSectionDebugGate = dynamic(
+  () => import("@/app/_components/LandingSectionDebugGate"),
+  { ssr: false }
+);
 
 export const metadata: Metadata = {
   title: "상담 신청",
@@ -64,6 +71,11 @@ fbq('track', 'PageView');
           }}
         />
         {children}
+        {process.env.NODE_ENV === "development" && (
+          <Suspense fallback={null}>
+            <LandingSectionDebugGate />
+          </Suspense>
+        )}
         {/* Beusable RUM */}
         <script
           type="text/javascript"
