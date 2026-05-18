@@ -10,6 +10,10 @@ import {
   computeMaxDepthPercent,
   readDocumentMetrics,
 } from "@/lib/landing-analytics/metrics";
+import {
+  initSubmissionSnapshot,
+  refreshSubmissionSnapshot,
+} from "@/lib/landing-analytics/submissionSnapshot";
 import { SectionDwellAccumulator } from "@/lib/landing-analytics/sectionDwell";
 import type { LandingTrackPayload } from "@/lib/landing-analytics/types";
 import { SCROLL_DEPTH_MILESTONES } from "@/lib/landing-analytics/types";
@@ -36,6 +40,7 @@ export default function LandingAnalyticsTracker({ landingKey }: Props) {
     startMsRef.current = Date.now();
     leaveSentRef.current = false;
     dwellAccumulatorRef.current = new SectionDwellAccumulator(landingKey);
+    initSubmissionSnapshot(landingKey);
 
     const base = () => buildBasePayload(landingKey);
 
@@ -65,6 +70,7 @@ export default function LandingAnalyticsTracker({ landingKey }: Props) {
     const updateScroll = () => {
       const { scrollY, viewportHeight, documentHeight } = readDocumentMetrics();
       maxScrollYRef.current = Math.max(maxScrollYRef.current, scrollY);
+      refreshSubmissionSnapshot(maxScrollYRef.current);
       const depth = computeMaxDepthPercent(
         maxScrollYRef.current,
         viewportHeight,

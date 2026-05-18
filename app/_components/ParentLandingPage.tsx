@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { DESIRED_TIME_OPTIONS, LOCATION_OPTIONS, getDesiredDateOptions } from "@/lib/formOptions";
 import { useUTM } from "@/lib/useUTM";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
+import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
 import { useRouter } from "next/navigation";
 
 const HERO_B2C_FALLBACK = "/assets/hero_cc.png";
@@ -102,6 +103,7 @@ export default function ParentLandingPage({ hero1, hero2, karrotPage, entryPage 
           utm_term: utm.utm_term || null,
           marketing_consent: marketingChecked ? 1 : null,
           entry_page: entryPage,
+          ...getSubmissionAnalyticsPayload(),
         }),
       });
 

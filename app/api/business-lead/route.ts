@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendLeadEmailNotification } from "@/lib/email";
 import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
+import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
 import { formatPhoneKorean } from "@/lib/phone";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
@@ -90,6 +91,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const analytics = parseSubmissionAnalytics(body as Record<string, unknown>);
+
     const supabase = getSupabaseAdmin();
     const { error } = await supabase.from("tylife_b2b").insert({
       name,
@@ -107,6 +110,10 @@ export async function POST(request: NextRequest) {
       age_group: ageGroup,
       job: job || null,
       job_rank: jobRankForDb,
+      analytics_session_id: analytics.analytics_session_id,
+      max_scroll_depth: analytics.max_scroll_depth,
+      last_section_name: analytics.last_section_name,
+      last_section_label: analytics.last_section_label,
     });
 
     if (error) {

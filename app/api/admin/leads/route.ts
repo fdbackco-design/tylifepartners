@@ -22,23 +22,29 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(parseInt(searchParams.get("limit") ?? "50", 10), 1), 100);
     const offset = Math.max(parseInt(searchParams.get("offset") ?? "0", 10), 0);
     const category = searchParams.get("category") === "b2b" ? "b2b" : "b2c";
-    const tableName = category === "b2b" ? "tylife_b2b" : "leads";
-
     const supabase = getSupabaseAdmin();
-    const selectCols =
-      tableName === "leads"
-        ? "id, name, phone, created_at, status, memo, desired_date, desired_time, location, entry_page, utm_source, utm_medium, utm_campaign, utm_content"
-        : "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, region, available_time, age_group, job, job_rank";
-    let query = supabase
-      .from(tableName)
-      .select(selectCols, { count: "exact" })
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
+    const b2cSelect =
+      "id, name, phone, created_at, status, memo, desired_date, desired_time, location, entry_page, utm_source, utm_medium, utm_campaign, utm_content, max_scroll_depth, last_section_label";
+    const b2bSelect =
+      "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, region, available_time, age_group, job, job_rank, max_scroll_depth, last_section_label";
 
-    let pendingQuery = supabase
-      .from(tableName)
-      .select("id", { count: "exact", head: true })
-      .eq("status", "대기");
+    let query =
+      category === "b2b"
+        ? supabase
+            .from("tylife_b2b")
+            .select(b2bSelect, { count: "exact" })
+            .order("created_at", { ascending: false })
+            .range(offset, offset + limit - 1)
+        : supabase
+            .from("leads")
+            .select(b2cSelect, { count: "exact" })
+            .order("created_at", { ascending: false })
+            .range(offset, offset + limit - 1);
+
+    let pendingQuery =
+      category === "b2b"
+        ? supabase.from("tylife_b2b").select("id", { count: "exact", head: true }).eq("status", "대기")
+        : supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "대기");
 
     if (search) {
       const safe = search.replace(/,/g, "");
@@ -77,6 +83,8 @@ export async function GET(request: NextRequest) {
       utm_campaign?: string | null;
       utm_content?: string | null;
       entry_page?: string | null;
+      max_scroll_depth?: number | null;
+      last_section_label?: string | null;
       region?: string | null;
       available_time?: string | null;
       age_group?: string | null;
@@ -109,6 +117,9 @@ export async function GET(request: NextRequest) {
       utm_campaign: row.utm_campaign ?? "",
       utm_content: row.utm_content ?? "",
       entry_page: row.entry_page ?? "",
+      max_scroll_depth:
+        row.max_scroll_depth != null ? Number(row.max_scroll_depth) : null,
+      last_section_label: row.last_section_label ?? "",
       region: row.region ?? "",
       available_time: row.available_time ?? "",
       age_group: row.age_group ?? "",

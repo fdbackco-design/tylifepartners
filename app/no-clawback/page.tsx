@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
+import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { useRouter } from "next/navigation";
 import { useUTM } from "@/lib/useUTM";
@@ -117,6 +118,7 @@ export default function NoClawbackLandingPage() {
           age_group: ageGroup,
           job: job || null,
           job_rank: job === INSURANCE_DESIGNER_JOB ? jobRank : null,
+          ...getSubmissionAnalyticsPayload(),
         }),
       });
 

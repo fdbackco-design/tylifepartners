@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
+import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { useUTM } from "@/lib/useUTM";
 
@@ -122,6 +123,7 @@ export default function SidejobLandingPage() {
           age_group: ageGroup,
           job: job || null,
           job_rank: job === INSURANCE_DESIGNER_JOB ? jobRank : null,
+          ...getSubmissionAnalyticsPayload(),
         }),
       });
       const data = await res.json();

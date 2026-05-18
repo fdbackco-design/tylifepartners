@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendLeadEmailNotification } from "@/lib/email";
 import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
+import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
 import { formatPhoneKorean } from "@/lib/phone";
 
 /** 클라이언트에서 보낸 유입 경로 (예: /, /v2, /me). 잘못된 값은 무시 */
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
       );
     }
     const phonePretty = formatPhoneKorean(phone);
+    const analytics = parseSubmissionAnalytics(body as Record<string, unknown>);
 
     const supabase = getSupabaseAdmin();
     const { error } = await supabase.from("leads").insert({
@@ -87,6 +89,10 @@ export async function POST(request: NextRequest) {
       utm_term: utmTerm || null,
       marketing_consent: marketingConsent,
       entry_page: entryPage,
+      analytics_session_id: analytics.analytics_session_id,
+      max_scroll_depth: analytics.max_scroll_depth,
+      last_section_name: analytics.last_section_name,
+      last_section_label: analytics.last_section_label,
     });
 
     if (error) {

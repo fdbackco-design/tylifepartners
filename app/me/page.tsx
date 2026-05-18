@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { DESIRED_TIME_OPTIONS, LOCATION_OPTIONS, getDesiredDateOptions } from "@/lib/formOptions";
 import { useUTM } from "@/lib/useUTM";
 import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
+import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { useRouter } from "next/navigation";
 
@@ -97,6 +98,7 @@ export default function MeLandingPage() {
           utm_term: utm.utm_term || null,
           marketing_consent: marketingChecked ? 1 : null,
           entry_page: "/me",
+          ...getSubmissionAnalyticsPayload(),
         }),
       });
 

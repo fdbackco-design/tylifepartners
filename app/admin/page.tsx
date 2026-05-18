@@ -38,6 +38,8 @@ export default function AdminPage() {
       utm_campaign: string;
       utm_content: string;
       entry_page: string;
+      max_scroll_depth: number | null;
+      last_section_label: string;
       region: string;
       available_time: string;
       age_group: string;
@@ -777,6 +779,11 @@ export default function AdminPage() {
                       <div>희망 상담시간: {row.desired_time || "-"}</div>
                       <div>사는 위치: {row.location || "-"}</div>
                       <div>유입페이지: {row.entry_page || "-"}</div>
+                      <div>신청 시 구간: {row.last_section_label || "-"}</div>
+                      <div>
+                        스크롤 깊이:{" "}
+                        {row.max_scroll_depth != null ? `${row.max_scroll_depth.toFixed(1)}%` : "-"}
+                      </div>
                       <div>유입경로: {row.utm_source || "-"}</div>
                     </div>
                   )}
@@ -792,6 +799,11 @@ export default function AdminPage() {
                       }}
                     >
                       <div>유입페이지: {row.entry_page || "-"}</div>
+                      <div>신청 시 구간: {row.last_section_label || "-"}</div>
+                      <div>
+                        스크롤 깊이:{" "}
+                        {row.max_scroll_depth != null ? `${row.max_scroll_depth.toFixed(1)}%` : "-"}
+                      </div>
                       <div>지역: {row.region || "-"}</div>
                       <div>상담가능시간: {row.available_time || "-"}</div>
                       <div>연령대: {row.age_group || "-"}</div>
@@ -878,6 +890,8 @@ export default function AdminPage() {
                         <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>유입경로</th>
                       </>
                     )}
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>신청 시 구간</th>
+                    <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>스크롤 깊이</th>
                     <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담상태</th>
                     <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>메모</th>
                     <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}></th>
@@ -945,6 +959,12 @@ export default function AdminPage() {
                           </td>
                         </>
                       )}
+                      <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap", maxWidth: 160 }} title={row.last_section_label || ""}>
+                        {row.last_section_label || "-"}
+                      </td>
+                      <td style={{ padding: "12px 10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                        {row.max_scroll_depth != null ? `${row.max_scroll_depth.toFixed(1)}%` : "-"}
+                      </td>
                       <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
                         <select
                           value={row.status}
