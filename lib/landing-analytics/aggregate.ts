@@ -3,6 +3,7 @@ import {
   type LandingKey,
   type LandingSection,
 } from "@/lib/landing-analytics/sections";
+import { computeHeatScore, computeReachOnlyHeatScore } from "@/lib/landing-analytics/heatScore";
 import { maxDepthToYRatio } from "@/lib/landing-analytics/metrics";
 import type { LandingEventAggregateRow } from "@/lib/landing-analytics/eventRow";
 
@@ -43,7 +44,22 @@ export type LandingAnalyticsReport = {
     sessions_with_dwell: number;
     avg_seconds: number;
   }[];
-  scroll_heatmap: { bucket: string; count: number; rate: number }[];
+  section_heatmap: {
+    name: string;
+    label: string;
+    reach_rate: number;
+    avg_dwell_seconds: number;
+    dropout_rate: number;
+    click_count: number;
+    heat_score: number;
+  }[];
+  scroll_heatmap: {
+    bucket: string;
+    bucket_start: number;
+    count: number;
+    rate: number;
+    heat_score: number;
+  }[];
   click_y_buckets: { bucket: string; count: number }[];
 };
 
@@ -163,6 +179,30 @@ export function aggregateLandingAnalytics(
 
   const section_dwell = computeSectionDwell(events, sections);
 
+  const maxSectionAvgDwell = Math.max(0, ...section_dwell.map((d) => d.avg_seconds));
+  const dropoutByName = new Map(section_dropout.map((d) => [d.name, d]));
+  const dwellByName = new Map(section_dwell.map((d) => [d.name, d]));
+  const clicksByName = new Map(section_clicks.map((c) => [c.name, c]));
+
+  const section_heatmap = sections.map((sec) => {
+    const dropout = dropoutByName.get(sec.name);
+    const dwell = dwellByName.get(sec.name);
+    const clicks = clicksByName.get(sec.name);
+    const reach_rate = total > 0 ? ((dropout?.reached ?? 0) / total) * 100 : 0;
+    const avg_dwell_seconds = dwell?.avg_seconds ?? 0;
+    const heat_score = computeHeatScore(reach_rate, avg_dwell_seconds, maxSectionAvgDwell);
+
+    return {
+      name: sec.name,
+      label: sec.label,
+      reach_rate,
+      avg_dwell_seconds,
+      dropout_rate: dropout?.dropout_rate ?? 0,
+      click_count: clicks?.count ?? 0,
+      heat_score,
+    };
+  });
+
   const heatBuckets = new Map<number, number>();
   for (const s of sessionList) {
     const bucket = Math.min(9, Math.floor(maxDepthToYRatio(s.max_depth) * 10));
@@ -173,10 +213,13 @@ export function aggregateLandingAnalytics(
     const count = heatBuckets.get(i) ?? 0;
     const startPct = i * 10;
     const endPct = i === 9 ? 100 : (i + 1) * 10;
+    const rate = total > 0 ? (count / total) * 100 : 0;
     return {
       bucket: `${startPct}–${endPct}%`,
+      bucket_start: startPct,
       count,
-      rate: total > 0 ? (count / total) * 100 : 0,
+      rate,
+      heat_score: computeReachOnlyHeatScore(rate),
     };
   });
 
@@ -205,6 +248,7 @@ export function aggregateLandingAnalytics(
     device_depth_reach,
     section_clicks,
     section_dwell,
+    section_heatmap,
     scroll_heatmap,
     click_y_buckets,
   };

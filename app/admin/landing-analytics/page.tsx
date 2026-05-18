@@ -9,6 +9,11 @@ import {
 } from "@/lib/landing-analytics/sections";
 import type { LandingAnalyticsReport } from "@/lib/landing-analytics/aggregate";
 import { formatDurationSeconds } from "@/lib/landing-analytics/formatDuration";
+import {
+  HeatmapHelpText,
+  ScrollPercentColorHeatmap,
+  SectionColorHeatmap,
+} from "@/app/admin/landing-analytics/_components/ColorHeatmap";
 
 function defaultFromDate() {
   const d = new Date();
@@ -171,7 +176,7 @@ export default function LandingAnalyticsAdminPage() {
             />
           </div>
 
-          <Section title="스크롤 깊이 도달률(몇 % 지점까지 봤나)">
+          <Section title="스크롤 깊이 도달률(어디까지 봤는지 확인)">
             <BarList
               items={report.depth_reach_rates.map((d) => ({
                 label: `${d.depth}%`,
@@ -181,7 +186,7 @@ export default function LandingAnalyticsAdminPage() {
             />
           </Section>
 
-          <Section title="구간별 이탈률 (어떤 구간에서 나갔나)">
+          <Section title="구간별 이탈률 (어디서 나갔는지 분석)">
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
@@ -244,6 +249,15 @@ export default function LandingAnalyticsAdminPage() {
             />
           </Section>
 
+          <HeatmapHelpText />
+
+          <Section title="섹션 히트맵 (도달률 + 체류 시간)">
+            <SectionColorHeatmap
+              rows={report.section_heatmap}
+              empty={report.total_sessions === 0}
+            />
+          </Section>
+
           <Section title="섹션별 평균 체류 시간">
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
@@ -270,17 +284,14 @@ export default function LandingAnalyticsAdminPage() {
             </p>
           </Section>
 
-          <Section title="스크롤 히트맵 (10% 단위로 어디까지 도달했나)">
-            <BarList
-              items={report.scroll_heatmap.map((h) => ({
-                label: h.bucket,
-                value: h.rate,
-                sub: `${h.count}세션`,
-              }))}
+          <Section title="스크롤 히트맵 (10% 단위 · 색상)">
+            <ScrollPercentColorHeatmap
+              buckets={report.scroll_heatmap}
+              empty={report.total_sessions === 0}
             />
           </Section>
 
-          <Section title="클릭 y_ratio 분포 (10% 단위로 어디를 눌렀나)">
+          <Section title="클릭 y_ratio 분포 (클릭 위치 분석)">
             <BarList
               items={report.click_y_buckets.map((h) => ({
                 label: h.bucket,
