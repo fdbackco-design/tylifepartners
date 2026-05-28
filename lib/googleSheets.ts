@@ -74,13 +74,113 @@ export function canAppendToGoogleSheet(): boolean {
   return Boolean(env("GOOGLE_SHEETS_ID") && decodeServiceAccountJson());
 }
 
+type SheetsClient = ReturnType<typeof google.sheets>;
+
+/**
+ * 대상 시트의 다음 빈 행(B열 기준) + 직전 A 시리얼 + 1 계산
+ */
+async function findTargetRow(
+  sheets: SheetsClient,
+  spreadsheetId: string,
+  sheetName: string
+): Promise<{ targetRow: number; serialA: number }> {
+  const readRange = `${sheetName}!A2:B50000`;
+  const existing = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: readRange,
+  });
+  const values = (existing.data.values ?? []) as unknown[][];
+
+  let insertIdx = -1;
+  for (let i = 0; i < values.length; i++) {
+    if (rowBEmpty(values[i] as unknown[])) {
+      insertIdx = i;
+      break;
+    }
+  }
+  const targetRow = insertIdx >= 0 ? 2 + insertIdx : 2 + values.length;
+  const serialA = nextSerialA(values, targetRow);
+  return { targetRow, serialA };
+}
+
+/**
+ * 시트1: A:F 기본 정보 + O 유입페이지 + P~T 상세
+ */
+async function writeMainSheet(
+  sheets: SheetsClient,
+  spreadsheetId: string,
+  sheetName: string,
+  args: AppendLeadRowArgs
+): Promise<void> {
+  const { targetRow, serialA } = await findTargetRow(sheets, spreadsheetId, sheetName);
+
+  const row: string[] = [
+    String(serialA), // A
+    args.dateKstYmd, // B
+    args.medium, // C
+    args.kind, // D
+    args.name, // E
+    args.phone, // F
+    "", "", "", "", "", "", "", "", // G~N
+    sheetCell(args.entry_page), // O
+    sheetCell(args.region), // P
+    sheetCell(args.available_time), // Q
+    sheetCell(args.age_group), // R
+    sheetCell(args.job), // S
+    sheetCell(args.job_rank), // T
+  ];
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!A${targetRow}:T${targetRow}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [row] },
+  });
+}
+
+/**
+ * CRM 시트: A:F 기본 정보(시트1과 동일) + H:L 상세
+ * (시트1의 P~T → CRM의 H~L)
+ */
+async function writeCrmSheet(
+  sheets: SheetsClient,
+  spreadsheetId: string,
+  sheetName: string,
+  args: AppendLeadRowArgs
+): Promise<void> {
+  const { targetRow, serialA } = await findTargetRow(sheets, spreadsheetId, sheetName);
+
+  const row: string[] = [
+    String(serialA), // A
+    args.dateKstYmd, // B
+    args.medium, // C
+    args.kind, // D
+    args.name, // E
+    args.phone, // F
+    "", // G
+    sheetCell(args.region), // H
+    sheetCell(args.available_time), // I
+    sheetCell(args.age_group), // J
+    sheetCell(args.job), // K
+    sheetCell(args.job_rank), // L
+  ];
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!A${targetRow}:L${targetRow}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [row] },
+  });
+}
+
 export async function appendLeadRowToGoogleSheet(args: AppendLeadRowArgs): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   if (isGoogleSheetPhoneBlacklisted(args.phone)) {
     return { ok: true, skipped: true };
   }
 
   const spreadsheetId = env("GOOGLE_SHEETS_ID");
-  const sheetName = env("GOOGLE_SHEETS_SHEET_NAME") || "시트1";
+  const mainSheetName = env("GOOGLE_SHEETS_SHEET_NAME") || "시트1";
+  const crmSheetName = env("GOOGLE_SHEETS_CRM_SHEET_NAME") || "CRM";
   const creds = decodeServiceAccountJson();
   if (!spreadsheetId || !creds) return { ok: true, skipped: true };
 
@@ -92,48 +192,15 @@ export async function appendLeadRowToGoogleSheet(args: AppendLeadRowArgs): Promi
     });
     const sheets = google.sheets({ version: "v4", auth });
 
-    const readRange = `${sheetName}!A2:B50000`;
-    const existing = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: readRange,
-    });
-    const values = (existing.data.values ?? []) as unknown[][];
+    await writeMainSheet(sheets, spreadsheetId, mainSheetName, args);
 
-    let insertIdx = -1;
-    for (let i = 0; i < values.length; i++) {
-      if (rowBEmpty(values[i] as unknown[])) {
-        insertIdx = i;
-        break;
-      }
+    // CRM 시트 기록 실패는 메인 기록 성공을 가리지 않도록 별도로 캐치
+    try {
+      await writeCrmSheet(sheets, spreadsheetId, crmSheetName, args);
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      console.error("appendLeadRowToGoogleSheet CRM sheet error:", err);
     }
-    const targetRow = insertIdx >= 0 ? 2 + insertIdx : 2 + values.length;
-    const serialA = nextSerialA(values, targetRow);
-
-    const row: string[] = [
-      String(serialA), // A: 직전 행 번호 + 1
-      args.dateKstYmd, // B
-      args.medium, // C
-      args.kind, // D
-      args.name, // E
-      args.phone, // F
-      "", "", "", "", "", "", "", "", // G~N
-      sheetCell(args.entry_page), // O
-      sheetCell(args.region), // P
-      sheetCell(args.available_time), // Q
-      sheetCell(args.age_group), // R
-      sheetCell(args.job), // S
-      sheetCell(args.job_rank), // T: 직급
-    ];
-
-    const writeRange = `${sheetName}!A${targetRow}:T${targetRow}`;
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: writeRange,
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [row],
-      },
-    });
 
     return { ok: true };
   } catch (e) {
@@ -141,4 +208,3 @@ export async function appendLeadRowToGoogleSheet(args: AppendLeadRowArgs): Promi
     return { ok: false, error: err };
   }
 }
-
