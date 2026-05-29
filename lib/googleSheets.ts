@@ -155,19 +155,22 @@ async function writeCrmSheet(
     args.dateKstYmd, // B
     args.medium, // C
     args.kind, // D
-    args.name, // E
-    args.phone, // F
+    "", // E
+    "", // F
     "", // G
     sheetCell(args.region), // H
     sheetCell(args.available_time), // I
     sheetCell(args.age_group), // J
     sheetCell(args.job), // K
     sheetCell(args.job_rank), // L
+    "", "", "", "", // M~P
+    args.name, // Q
+    args.phone, // R
   ];
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${sheetName}!A${targetRow}:L${targetRow}`,
+    range: `${sheetName}!A${targetRow}:R${targetRow}`,
     valueInputOption: "USER_ENTERED",
     requestBody: { values: [row] },
   });
