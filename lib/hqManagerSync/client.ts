@@ -3,6 +3,7 @@ import { getHqManagerSyncSecret, getHqManagerSyncWebAppUrl } from "@/lib/hqManag
 
 const MAX_ATTEMPTS = 3;
 const BASE_DELAY_MS = 500;
+const MAX_REDIRECTS = 5;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -15,6 +16,79 @@ export type HqManagerSyncCallResult = {
   statusCode?: number;
   responseBody?: string;
 };
+
+type AppsScriptResponse = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  duplicated?: boolean;
+};
+
+/**
+ * Apps Script 웹앱은 302로 googleusercontent.com 등으로 리다이렉트한다.
+ * fetch 기본 follow는 POST를 GET으로 바꿔 doPost가 실행되지 않을 수 있으므로
+ * POST body를 유지한 채 수동으로 리다이렉트를 따라간다.
+ */
+async function fetchAppsScriptPost(url: string, body: string): Promise<Response> {
+  let currentUrl = url;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const res = await fetch(currentUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body,
+      redirect: "manual",
+    });
+
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location || hop === MAX_REDIRECTS) {
+        return res;
+      }
+      currentUrl = new URL(location, currentUrl).toString();
+      continue;
+    }
+
+    return res;
+  }
+
+  throw new Error("Apps Script redirect hop limit exceeded");
+}
+
+function parseAppsScriptResponse(body: string): {
+  ok: boolean;
+  error?: string;
+  data?: AppsScriptResponse;
+} {
+  const trimmed = body.trim();
+
+  if (!trimmed) {
+    return { ok: false, error: "Apps Script 응답이 비어 있습니다." };
+  }
+
+  if (trimmed.startsWith("<")) {
+    return {
+      ok: false,
+      error: `HTML 응답 수신 (doPost 미실행 가능): ${trimmed.slice(0, 200)}`,
+    };
+  }
+
+  try {
+    const data = JSON.parse(trimmed) as AppsScriptResponse;
+    if (data.ok === true) {
+      return { ok: true, data };
+    }
+    const detail = data.message || data.error || JSON.stringify(data);
+    return { ok: false, error: detail, data };
+  } catch {
+    return {
+      ok: false,
+      error: `JSON 파싱 실패: ${trimmed.slice(0, 300)}`,
+    };
+  }
+}
 
 export async function callHqManagerSyncWebApp(
   payload: HqManagerSyncPayload,
@@ -31,6 +105,7 @@ export async function callHqManagerSyncWebApp(
     };
   }
 
+  const requestBody = JSON.stringify({ ...payload, token: secret });
   const maxAttempts = options?.maxAttempts ?? MAX_ATTEMPTS;
   let lastError = "unknown error";
   let lastStatus: number | undefined;
@@ -38,39 +113,47 @@ export async function callHqManagerSyncWebApp(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      // token은 JSON body로만 전달 (Apps Script는 커스텀 헤더를 받지 못함.
-      // 헤더에 한글 등 비ASCII를 넣으면 Node fetch가 ByteString 오류로 즉시 실패함)
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ ...payload, token: secret }),
-      });
+      const res = await fetchAppsScriptPost(url, requestBody);
 
       lastStatus = res.status;
       lastBody = await res.text();
 
-      if (res.ok) {
-        console.info("[hqManagerSync] sync success", {
+      if (!res.ok) {
+        lastError = `HTTP ${res.status}: ${lastBody.slice(0, 500)}`;
+        console.warn("[hqManagerSync] sync attempt failed", {
           eventId: payload.eventId,
           rowNumber: payload.rowNumber,
           managerName: payload.newManagerName,
           attempt,
           statusCode: res.status,
+          body: lastBody.slice(0, 200),
         });
-        return { ok: true, attempts: attempt, statusCode: res.status, responseBody: lastBody };
-      }
+      } else {
+        const parsed = parseAppsScriptResponse(lastBody);
+        if (parsed.ok) {
+          console.info("[hqManagerSync] sync success", {
+            eventId: payload.eventId,
+            rowNumber: payload.rowNumber,
+            managerName: payload.newManagerName,
+            attempt,
+            statusCode: res.status,
+            duplicated: parsed.data?.duplicated ?? false,
+            response: lastBody.slice(0, 500),
+          });
+          return { ok: true, attempts: attempt, statusCode: res.status, responseBody: lastBody };
+        }
 
-      lastError = `HTTP ${res.status}: ${lastBody.slice(0, 500)}`;
-      console.warn("[hqManagerSync] sync attempt failed", {
-        eventId: payload.eventId,
-        rowNumber: payload.rowNumber,
-        managerName: payload.newManagerName,
-        attempt,
-        statusCode: res.status,
-        body: lastBody.slice(0, 200),
-      });
+        lastError = parsed.error ?? "Apps Script ok=false";
+        console.warn("[hqManagerSync] sync rejected by Apps Script", {
+          eventId: payload.eventId,
+          rowNumber: payload.rowNumber,
+          managerName: payload.newManagerName,
+          attempt,
+          statusCode: res.status,
+          error: lastError,
+          body: lastBody.slice(0, 500),
+        });
+      }
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
       console.warn("[hqManagerSync] sync attempt error", {
@@ -95,6 +178,7 @@ export async function callHqManagerSyncWebApp(
     attempts: maxAttempts,
     error: lastError,
     statusCode: lastStatus,
+    body: lastBody.slice(0, 500),
   });
 
   return {
