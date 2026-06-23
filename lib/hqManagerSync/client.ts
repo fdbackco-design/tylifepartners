@@ -24,6 +24,12 @@ type AppsScriptResponse = {
   duplicated?: boolean;
 };
 
+function appendTokenToUrl(baseUrl: string, token: string): string {
+  const u = new URL(baseUrl);
+  u.searchParams.set("token", token);
+  return u.toString();
+}
+
 /**
  * Apps Script 웹앱 POST 흐름:
  * 1) script.google.com …/exec 에 POST → doPost 실행
@@ -115,6 +121,7 @@ export async function callHqManagerSyncWebApp(
   }
 
   const requestBody = JSON.stringify({ ...payload, token: secret });
+  const requestUrl = appendTokenToUrl(url, secret);
   const maxAttempts = options?.maxAttempts ?? MAX_ATTEMPTS;
   let lastError = "unknown error";
   let lastStatus: number | undefined;
@@ -122,7 +129,7 @@ export async function callHqManagerSyncWebApp(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const res = await fetchAppsScriptPost(url, requestBody);
+      const res = await fetchAppsScriptPost(requestUrl, requestBody);
 
       lastStatus = res.status;
       lastBody = await res.text();

@@ -1,10 +1,21 @@
 const DEFAULT_HQ_SPREADSHEET_ID = "1tHi28hTsRMVeQCEDiAmLFy9fe_ox8Bp82jPenWfTTqw";
 const DEFAULT_HQ_SHEET_NAME = "시트1";
 
+function normalizeEnvValue(raw: string): string {
+  let t = raw.trim();
+  if (
+    (t.startsWith('"') && t.endsWith('"')) ||
+    (t.startsWith("'") && t.endsWith("'"))
+  ) {
+    t = t.slice(1, -1).trim();
+  }
+  return t;
+}
+
 function env(name: string): string | null {
   const v = process.env[name];
   if (!v) return null;
-  const t = v.trim();
+  const t = normalizeEnvValue(v);
   return t ? t : null;
 }
 
