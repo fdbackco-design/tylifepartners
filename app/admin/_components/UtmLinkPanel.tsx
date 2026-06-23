@@ -426,7 +426,7 @@ export default function UtmLinkPanel() {
               type="text"
               value={newValue}
               onChange={(e) => setNewValue(e.target.value)}
-              placeholder="예: instagram_reel"
+              placeholder="예: member_id"
               style={inputStyle}
               disabled={saving}
             />
@@ -439,7 +439,7 @@ export default function UtmLinkPanel() {
               type="text"
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
-              placeholder="예: 인스타 릴스"
+              placeholder="예: 영업자 이름"
               style={inputStyle}
               disabled={saving}
             />
