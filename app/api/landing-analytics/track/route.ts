@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { isLandingAnalyticsIpExcluded } from "@/lib/landingAnalyticsIpExclude";
 import { parseTrackBody, toDbRow } from "@/lib/landing-analytics/validate";
+import { getClientIp } from "@/lib/requestClientIp";
 
 /**
  * POST /api/landing-analytics/track
@@ -24,6 +26,11 @@ export async function POST(request: NextRequest) {
     const parsed = parseTrackBody(raw);
     if (!parsed.ok) {
       return NextResponse.json({ ok: false, message: parsed.message }, { status: 400 });
+    }
+
+    const clientIp = getClientIp(request);
+    if (isLandingAnalyticsIpExcluded(clientIp)) {
+      return NextResponse.json({ ok: true, skipped: true });
     }
 
     const supabase = getSupabaseAdmin();
