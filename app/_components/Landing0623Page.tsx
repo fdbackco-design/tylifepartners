@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 
 const HERO_FALLBACK = "/assets/hero_cc.png";
 const BROCHURE_PDF = "/assets/tylife_bro.pdf";
+const BROCHURE_ICON = "/assets/icon-brochure-download.png";
 
 type KarrotPixel = {
   track: (event: string, params?: Record<string, unknown>) => void;
@@ -228,7 +229,7 @@ export default function Landing0623Page({
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: 10,
+            gap: 14,
             padding: "24px 32px",
             width: "100%",
             maxWidth: 400,
@@ -244,6 +245,23 @@ export default function Landing0623Page({
             boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
           }}
         >
+          <span
+            aria-hidden
+            style={{
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              backgroundColor: "#495057",
+              WebkitMaskImage: `url(${BROCHURE_ICON})`,
+              WebkitMaskSize: "contain",
+              WebkitMaskRepeat: "no-repeat",
+              WebkitMaskPosition: "center",
+              maskImage: `url(${BROCHURE_ICON})`,
+              maskSize: "contain",
+              maskRepeat: "no-repeat",
+              maskPosition: "center",
+            }}
+          />
           상품 소개서 받아보기
         </button>
       </div>
