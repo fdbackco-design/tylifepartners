@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { sendLeadEmailNotification } from "@/lib/email";
-import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
-import { syncHqManagerAfterSheetAppend } from "@/lib/hqManagerSync/assign";
+import { processBusinessLeadSideEffects } from "@/lib/businessLeadSideEffects";
 import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
-import { resolveSheetMediumFromUtmSource } from "@/lib/utmSourceMapping";
 import { isLanding0623EntryPage, normalizeLanding0623EntryPage } from "@/lib/landing0623";
 import { formatPhoneKorean } from "@/lib/phone";
-import { randomUUID } from "crypto";
+import { runAfterResponse } from "@/lib/runAfterResponse";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
 const ALLOWED_JOB_RANKS = new Set(["지점장 이상", "팀장 이상", "FC"]);
@@ -145,73 +142,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, message: msg }, { status: 500 });
     }
 
-    // 구글 시트 기록 (실패해도 제출 성공은 유지)
-    {
-      const medium = await resolveSheetMediumFromUtmSource(utmSource, source);
-      const managerName = medium.trim() || null;
-      const sheetResult = await appendLeadRowToGoogleSheet({
+    // 구글 시트·담당자 동기화·이메일은 응답 후 백그라운드 처리
+    runAfterResponse(
+      processBusinessLeadSideEffects({
         dateKstYmd: formatKstYmd(new Date()),
-        medium,
-        managerName,
-        kind: "B2B",
         name,
-        phone: phonePretty,
-        entry_page: entryPage,
-        region: region || null,
-        available_time: availableTime || null,
-        age_group: ageGroup || null,
-        job: job || null,
-        job_rank: jobRankForDb,
-      });
-      if (!sheetResult.ok && !sheetResult.skipped) {
-        console.error("Google Sheets append failed:", sheetResult.error);
-      } else if (
-        sheetResult.ok &&
-        sheetResult.targetRow &&
-        managerName &&
-        !sheetResult.skipped
-      ) {
-        const syncResult = await syncHqManagerAfterSheetAppend({
-          rowNumber: sheetResult.targetRow,
-          newManagerName: managerName,
-          customerName: name,
-          phone: phonePretty,
-          eventId: randomUUID(),
-          spreadsheetId: sheetResult.spreadsheetId,
-          sheetName: sheetResult.sheetName,
-        });
-        if (!syncResult.syncComplete) {
-          console.error("[hqManagerSync] post-append sync failed", {
-            eventId: syncResult.eventId,
-            rowNumber: sheetResult.targetRow,
-            managerName,
-            error: syncResult.syncError,
-          });
-        }
-      }
-    }
-
-    // 이메일 알림 (실패해도 제출 성공은 유지)
-    const emailResult = await sendLeadEmailNotification({
-      kind: "b2b",
-      name,
-      phone,
-      createdAtIso: new Date().toISOString(),
-      adminUrl: "https://www.tylifepartners.com/admin",
-      entry_page: entryPage,
-      region: region || null,
-      available_time: availableTime || null,
-      age_group: ageGroup || null,
-      job: job || null,
-      job_rank: jobRankForDb,
-      utm_source: utmSource || null,
-      utm_medium: utmMedium || null,
-      utm_campaign: utmCampaign || null,
-      utm_content: utmContent || null,
-    });
-    if (!emailResult.ok && !emailResult.skipped) {
-      console.error("Business lead email notify failed:", emailResult.error);
-    }
+        phone,
+        phonePretty,
+        source,
+        utmSource,
+        utmMedium,
+        utmCampaign,
+        utmContent,
+        entryPage,
+        region,
+        availableTime,
+        ageGroup,
+        job,
+        jobRankForDb,
+      })
+    );
 
     return NextResponse.json({ ok: true });
   } catch (e) {
