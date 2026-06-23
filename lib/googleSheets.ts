@@ -3,10 +3,12 @@ import { isGoogleSheetPhoneBlacklisted } from "@/lib/phoneBlacklist";
 
 type AppendLeadRowArgs = {
   dateKstYmd: string; // YYYY-MM-DD
-  medium: string; // 유입매체
+  medium: string; // 유입매체 (C열)
   kind: "B2C" | "B2B"; // 광고구분
   name: string;
   phone: string;
+  /** G열 담당자 (미지정 시 medium과 동일) */
+  managerName?: string | null;
   entry_page?: string | null;
   region?: string | null;
   available_time?: string | null;
@@ -186,7 +188,7 @@ async function writeMainSheet(
   spreadsheetId: string,
   sheetName: string,
   args: AppendLeadRowArgs
-): Promise<void> {
+): Promise<number> {
   const { targetRow, serialA } = await findTargetRow(sheets, spreadsheetId, sheetName);
 
   const row: string[] = [
@@ -196,7 +198,7 @@ async function writeMainSheet(
     args.kind, // D
     args.name, // E
     args.phone, // F
-    args.medium, // G
+    args.managerName ?? args.medium, // G (담당자 — utm sheet_label)
     "", "", "", "", "", "", "", // H~N
     sheetCell(args.entry_page), // O
     sheetCell(args.region), // P
@@ -212,6 +214,8 @@ async function writeMainSheet(
     valueInputOption: "USER_ENTERED",
     requestBody: { values: [row] },
   });
+
+  return targetRow;
 }
 
 /**
@@ -233,7 +237,7 @@ async function writeCrmSheet(
     args.kind, // D
     "", // E
     "", // F
-    args.medium, // G
+    args.managerName ?? args.medium, // G
     sheetCell(args.region), // H
     sheetCell(args.available_time), // I
     sheetCell(args.age_group), // J
@@ -252,7 +256,18 @@ async function writeCrmSheet(
   });
 }
 
-export async function appendLeadRowToGoogleSheet(args: AppendLeadRowArgs): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+export type AppendLeadRowResult = {
+  ok: boolean;
+  skipped?: boolean;
+  error?: string;
+  targetRow?: number;
+  spreadsheetId?: string;
+  sheetName?: string;
+};
+
+export async function appendLeadRowToGoogleSheet(
+  args: AppendLeadRowArgs
+): Promise<AppendLeadRowResult> {
   if (isGoogleSheetPhoneBlacklisted(args.phone)) {
     return { ok: true, skipped: true };
   }
@@ -267,7 +282,7 @@ export async function appendLeadRowToGoogleSheet(args: AppendLeadRowArgs): Promi
     const sheets = createSheetsClient();
     if (!sheets) return { ok: true, skipped: true };
 
-    await writeMainSheet(sheets, spreadsheetId, mainSheetName, args);
+    const targetRow = await writeMainSheet(sheets, spreadsheetId, mainSheetName, args);
 
     // CRM 시트 기록 실패는 메인 기록 성공을 가리지 않도록 별도로 캐치
     try {
@@ -277,7 +292,7 @@ export async function appendLeadRowToGoogleSheet(args: AppendLeadRowArgs): Promi
       console.error("appendLeadRowToGoogleSheet CRM sheet error:", err);
     }
 
-    return { ok: true };
+    return { ok: true, targetRow, spreadsheetId, sheetName: mainSheetName };
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);
     return { ok: false, error: err };

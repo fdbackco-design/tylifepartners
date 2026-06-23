@@ -241,7 +241,10 @@ export default function UtmLinkPanel() {
         )}
         {selectedItem && (
           <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
-            구글 시트 C·G열 표시: <strong>{selectedItem.sheet_label}</strong>
+            구글 시트 C열(유입매체)·G열(담당자) 표시: <strong>{selectedItem.sheet_label}</strong>
+            <span style={{ display: "block", marginTop: 4, fontWeight: 400 }}>
+              상담 신청 시 G열에 자동 입력되며 담당자 시트로 동기화됩니다.
+            </span>
           </p>
         )}
       </div>
@@ -446,7 +449,7 @@ export default function UtmLinkPanel() {
           </div>
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
-              구글 시트 표시명 (C·G열, 선택)
+              구글 시트 표시명 — C열(유입매체)·G열(담당자)
             </label>
             <input
               type="text"

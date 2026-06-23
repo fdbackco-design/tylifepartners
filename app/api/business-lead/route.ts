@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendLeadEmailNotification } from "@/lib/email";
 import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
+import { syncHqManagerAfterSheetAppend } from "@/lib/hqManagerSync/assign";
 import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
 import { resolveSheetMediumFromUtmSource } from "@/lib/utmSourceMapping";
 import { isLanding0623EntryPage, normalizeLanding0623EntryPage } from "@/lib/landing0623";
 import { formatPhoneKorean } from "@/lib/phone";
+import { randomUUID } from "crypto";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
 const ALLOWED_JOB_RANKS = new Set(["지점장 이상", "팀장 이상", "FC"]);
@@ -146,9 +148,11 @@ export async function POST(request: NextRequest) {
     // 구글 시트 기록 (실패해도 제출 성공은 유지)
     {
       const medium = await resolveSheetMediumFromUtmSource(utmSource, source);
+      const managerName = medium.trim() || null;
       const sheetResult = await appendLeadRowToGoogleSheet({
         dateKstYmd: formatKstYmd(new Date()),
         medium,
+        managerName,
         kind: "B2B",
         name,
         phone: phonePretty,
@@ -161,6 +165,29 @@ export async function POST(request: NextRequest) {
       });
       if (!sheetResult.ok && !sheetResult.skipped) {
         console.error("Google Sheets append failed:", sheetResult.error);
+      } else if (
+        sheetResult.ok &&
+        sheetResult.targetRow &&
+        managerName &&
+        !sheetResult.skipped
+      ) {
+        const syncResult = await syncHqManagerAfterSheetAppend({
+          rowNumber: sheetResult.targetRow,
+          newManagerName: managerName,
+          customerName: name,
+          phone: phonePretty,
+          eventId: randomUUID(),
+          spreadsheetId: sheetResult.spreadsheetId,
+          sheetName: sheetResult.sheetName,
+        });
+        if (!syncResult.syncComplete) {
+          console.error("[hqManagerSync] post-append sync failed", {
+            eventId: syncResult.eventId,
+            rowNumber: sheetResult.targetRow,
+            managerName,
+            error: syncResult.syncError,
+          });
+        }
       }
     }
 
