@@ -51,7 +51,8 @@ export async function processBusinessLeadSideEffects(
   });
 
   const medium = await resolveSheetMediumFromUtmSource(input.utmSource, input.source);
-  const managerName = medium.trim() || null;
+  const managerName =
+    input.entryPage === "/0623" ? "" : medium.trim() || null;
   const sheetResult = await appendLeadRowToGoogleSheet({
     dateKstYmd: input.dateKstYmd,
     medium,
