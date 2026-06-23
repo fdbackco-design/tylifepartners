@@ -293,7 +293,7 @@ export default function Landing0623Page({
           margin: 0,
           lineHeight: 0,
           background: "#e9ecef",
-          paddingBottom: showFixedCta ? "calc(88px + var(--safe-bottom))" : 0,
+          paddingBottom: showFixedCta ? "calc(80px + var(--safe-bottom))" : 0,
         }}
       >
         <img
@@ -311,8 +311,8 @@ export default function Landing0623Page({
             bottom: 0,
             left: 0,
             right: 0,
-            padding: "12px 16px",
-            paddingBottom: `calc(12px + var(--safe-bottom))`,
+            padding: "10px 16px",
+            paddingBottom: `calc(10px + var(--safe-bottom))`,
             background: "var(--bg-page)",
             maxWidth: 480,
             margin: "0 auto",
@@ -330,12 +330,12 @@ export default function Landing0623Page({
               justifyContent: "center",
               gap: 12,
               width: "100%",
-              padding: "18px 20px",
+              padding: "15px 18px",
               background: submitted ? "#adb5bd" : "var(--cta-bg)",
               color: "#fff",
               border: "none",
               borderRadius: "var(--radius)",
-              fontSize: 27,
+              fontSize: 25,
               fontWeight: 800,
               cursor: submitted ? "default" : "pointer",
               transition: "background 0.2s",
@@ -351,8 +351,8 @@ export default function Landing0623Page({
               <span
                 aria-hidden
                 style={{
-                  width: 27,
-                  height: 27,
+                  width: 25,
+                  height: 25,
                   flexShrink: 0,
                   backgroundColor: "#fff",
                   WebkitMaskImage: `url(${CONSULTATION_ICON})`,
