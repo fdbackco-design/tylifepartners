@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 const HERO_FALLBACK = "/assets/hero_cc.png";
 const BROCHURE_PDF = "/assets/tylife_bro.pdf";
 const BROCHURE_ICON = "/assets/icon-brochure-download.png";
+const CONSULTATION_ICON = "/assets/icon-consultation-write.png";
 
 type KarrotPixel = {
   track: (event: string, params?: Record<string, unknown>) => void;
@@ -229,8 +230,8 @@ export default function Landing0623Page({
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: 14,
-            padding: "24px 32px",
+            gap: 12,
+            padding: "18px 32px",
             width: "100%",
             maxWidth: 400,
             boxSizing: "border-box",
@@ -238,7 +239,7 @@ export default function Landing0623Page({
             color: "#495057",
             border: "1px solid #ced4da",
             borderRadius: 9999,
-            fontSize: 36,
+            fontSize: 27,
             fontWeight: 800,
             cursor: "pointer",
             WebkitTapHighlightColor: "transparent",
@@ -248,8 +249,8 @@ export default function Landing0623Page({
           <span
             aria-hidden
             style={{
-              width: 36,
-              height: 36,
+              width: 27,
+              height: 27,
               flexShrink: 0,
               backgroundColor: "#495057",
               WebkitMaskImage: `url(${BROCHURE_ICON})`,
@@ -272,7 +273,7 @@ export default function Landing0623Page({
           margin: 0,
           lineHeight: 0,
           background: "#e9ecef",
-          paddingBottom: showFixedCta ? "calc(110px + var(--safe-bottom))" : 0,
+          paddingBottom: showFixedCta ? "calc(88px + var(--safe-bottom))" : 0,
         }}
       >
         <img
@@ -304,13 +305,17 @@ export default function Landing0623Page({
             onClick={openSheet}
             disabled={submitted}
             style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 12,
               width: "100%",
-              padding: "24px 20px",
+              padding: "18px 20px",
               background: submitted ? "#adb5bd" : "var(--cta-bg)",
               color: "#fff",
               border: "none",
               borderRadius: "var(--radius)",
-              fontSize: 36,
+              fontSize: 27,
               fontWeight: 800,
               cursor: submitted ? "default" : "pointer",
               transition: "background 0.2s",
@@ -322,6 +327,25 @@ export default function Landing0623Page({
               if (!submitted) e.currentTarget.style.background = "var(--cta-bg)";
             }}
           >
+            {!submitted && (
+              <span
+                aria-hidden
+                style={{
+                  width: 27,
+                  height: 27,
+                  flexShrink: 0,
+                  backgroundColor: "#fff",
+                  WebkitMaskImage: `url(${CONSULTATION_ICON})`,
+                  WebkitMaskSize: "contain",
+                  WebkitMaskRepeat: "no-repeat",
+                  WebkitMaskPosition: "center",
+                  maskImage: `url(${CONSULTATION_ICON})`,
+                  maskSize: "contain",
+                  maskRepeat: "no-repeat",
+                  maskPosition: "center",
+                }}
+              />
+            )}
             {submitted ? "접수 완료" : "상담 신청하기"}
           </button>
         </div>
