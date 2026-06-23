@@ -25,20 +25,20 @@ type AppsScriptResponse = {
 };
 
 /**
- * Apps Script 웹앱은 302로 googleusercontent.com 등으로 리다이렉트한다.
- * fetch 기본 follow는 POST를 GET으로 바꿔 doPost가 실행되지 않을 수 있으므로
- * POST body를 유지한 채 수동으로 리다이렉트를 따라간다.
+ * Apps Script 웹앱 POST 흐름:
+ * 1) script.google.com …/exec 에 POST → doPost 실행
+ * 2) 302 → googleusercontent.com (응답 수신용 URL)
+ * 3) 리다이렉트 URL은 GET만 허용 — POST로 따라가면 405 Page Not Found
  */
 async function fetchAppsScriptPost(url: string, body: string): Promise<Response> {
   let currentUrl = url;
+  let method: "POST" | "GET" = "POST";
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const res = await fetch(currentUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body,
+      method,
+      headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
+      body: method === "POST" ? body : undefined,
       redirect: "manual",
     });
 
@@ -48,6 +48,7 @@ async function fetchAppsScriptPost(url: string, body: string): Promise<Response>
         return res;
       }
       currentUrl = new URL(location, currentUrl).toString();
+      method = "GET";
       continue;
     }
 
@@ -102,6 +103,14 @@ export async function callHqManagerSyncWebApp(
       ok: false,
       attempts: 0,
       error: "HQ_MANAGER_SYNC_WEB_APP_URL 또는 HQ_MANAGER_SYNC_SECRET 미설정",
+    };
+  }
+
+  if (url.includes("/dev")) {
+    return {
+      ok: false,
+      attempts: 0,
+      error: "HQ_MANAGER_SYNC_WEB_APP_URL은 /exec 배포 URL이어야 합니다 (/dev 아님)",
     };
   }
 
