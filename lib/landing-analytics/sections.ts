@@ -6,7 +6,9 @@ export type LandingKey =
   | "me"
   | "business"
   | "no_clawback"
-  | "sidejob";
+  | "sidejob"
+  | "landing_0623"
+  | "landing_0623s";
 
 export type LandingSection = {
   name: string;
@@ -25,6 +27,8 @@ export const LANDING_KEYS: LandingKey[] = [
   "business",
   "no_clawback",
   "sidejob",
+  "landing_0623",
+  "landing_0623s",
 ];
 
 export const LANDING_SECTIONS: Record<LandingKey, LandingSection[]> = {
@@ -97,6 +101,16 @@ export const LANDING_SECTIONS: Record<LandingKey, LandingSection[]> = {
     { name: "section_03", label: "3. 회사 신뢰", start: 0.6482, end: 0.8987 },
     { name: "section_04", label: "4. FAQ/마무리", start: 0.8987, end: 1.0 },
   ],
+  landing_0623: [
+    { name: "section_01", label: "1. 상단 이미지", start: 0.0, end: 0.45 },
+    { name: "section_02", label: "2. 소개서 버튼", start: 0.45, end: 0.55 },
+    { name: "section_03", label: "3. 하단 이미지", start: 0.55, end: 1.0 },
+  ],
+  landing_0623s: [
+    { name: "section_01", label: "1. 상단 이미지", start: 0.0, end: 0.45 },
+    { name: "section_02", label: "2. 소개서 버튼", start: 0.45, end: 0.55 },
+    { name: "section_03", label: "3. 하단 이미지", start: 0.55, end: 1.0 },
+  ],
 };
 
 export const DEFAULT_LANDING_SECTIONS: LandingSection[] = [
@@ -132,4 +146,6 @@ export const LANDING_KEY_LABELS: Record<LandingKey, string> = {
   business: "/business",
   no_clawback: "/no-clawback",
   sidejob: "/sidejob",
+  landing_0623: "/0623",
+  landing_0623s: "/0623s",
 };
