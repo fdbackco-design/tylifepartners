@@ -74,6 +74,81 @@ export function canAppendToGoogleSheet(): boolean {
   return Boolean(env("GOOGLE_SHEETS_ID") && decodeServiceAccountJson());
 }
 
+function createSheetsClient(): SheetsClient | null {
+  const creds = decodeServiceAccountJson();
+  if (!creds) return null;
+  const auth = new google.auth.JWT({
+    email: creds.client_email,
+    key: creds.private_key,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+  return google.sheets({ version: "v4", auth });
+}
+
+function normalizePhoneDigits(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
+/** 시트1 F열(연락처)로 행 번호 조회 (1-based, 헤더 제외 데이터 행) */
+export async function findMainSheetRowByPhone(
+  spreadsheetId: string,
+  sheetName: string,
+  phone: string
+): Promise<number | null> {
+  const sheets = createSheetsClient();
+  if (!sheets) return null;
+
+  const target = normalizePhoneDigits(phone);
+  if (!target) return null;
+
+  const readRange = `${sheetName}!F2:F50000`;
+  const existing = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: readRange,
+  });
+  const values = (existing.data.values ?? []) as unknown[][];
+
+  for (let i = 0; i < values.length; i++) {
+    const cell = values[i]?.[0];
+    if (cell == null) continue;
+    const rowPhone = normalizePhoneDigits(String(cell));
+    if (rowPhone && rowPhone === target) {
+      return 2 + i;
+    }
+  }
+
+  return null;
+}
+
+/** 시트1 G열(담당자) 단일 셀 업데이트 — 기존 행 append 로직과 분리 */
+export async function updateMainSheetManagerColumn(
+  spreadsheetId: string,
+  sheetName: string,
+  rowNumber: number,
+  managerName: string
+): Promise<{ ok: boolean; error?: string }> {
+  const sheets = createSheetsClient();
+  if (!sheets) {
+    return { ok: false, error: "Google Sheets 서비스 계정이 설정되지 않았습니다." };
+  }
+  if (rowNumber < 2) {
+    return { ok: false, error: "유효하지 않은 행 번호입니다." };
+  }
+
+  try {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${sheetName}!G${rowNumber}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[managerName.trim()]] },
+    });
+    return { ok: true };
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: err };
+  }
+}
+
 type SheetsClient = ReturnType<typeof google.sheets>;
 
 /**
@@ -189,12 +264,8 @@ export async function appendLeadRowToGoogleSheet(args: AppendLeadRowArgs): Promi
   if (!spreadsheetId || !creds) return { ok: true, skipped: true };
 
   try {
-    const auth = new google.auth.JWT({
-      email: creds.client_email,
-      key: creds.private_key,
-      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-    });
-    const sheets = google.sheets({ version: "v4", auth });
+    const sheets = createSheetsClient();
+    if (!sheets) return { ok: true, skipped: true };
 
     await writeMainSheet(sheets, spreadsheetId, mainSheetName, args);
 

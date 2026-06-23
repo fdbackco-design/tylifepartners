@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import UtmLinkPanel from "@/app/admin/_components/UtmLinkPanel";
+import HqManagerAssignControl from "@/app/admin/_components/HqManagerAssignControl";
 import { formatPhoneKorean } from "@/lib/phone";
 
 const PAGE_SIZE = 20;
@@ -669,6 +670,18 @@ export default function AdminPage() {
                       <div>유입경로: {row.utm_source || "-"}</div>
                     </div>
                   )}
+                  {category === "b2b" && (
+                    <div style={{ marginTop: 14 }}>
+                      <div style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600, marginBottom: 6 }}>
+                        본사 시트 담당자
+                      </div>
+                      <HqManagerAssignControl
+                        leadId={row.id}
+                        customerName={row.name}
+                        phone={row.phone}
+                      />
+                    </div>
+                  )}
                   <div style={{ marginTop: 14, fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>메모</div>
                   <textarea
                     value={row.memo}
@@ -749,6 +762,11 @@ export default function AdminPage() {
                     )}
                     <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>상담상태</th>
                     <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>메모</th>
+                    {category === "b2b" && (
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>
+                        담당자 배정
+                      </th>
+                    )}
                     <th style={{ padding: "12px 10px", textAlign: "left", fontWeight: 600 }}></th>
                   </tr>
                 </thead>
@@ -848,6 +866,15 @@ export default function AdminPage() {
                           }}
                         />
                       </td>
+                      {category === "b2b" && (
+                        <td style={{ padding: "12px 10px", verticalAlign: "top" }}>
+                          <HqManagerAssignControl
+                            leadId={row.id}
+                            customerName={row.name}
+                            phone={row.phone}
+                          />
+                        </td>
+                      )}
                       <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
                         <button
                           type="button"
