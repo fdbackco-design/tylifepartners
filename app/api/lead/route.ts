@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
     const utmContent = body.utm_content != null ? String(body.utm_content).trim() : null;
     const utmTerm = body.utm_term != null ? String(body.utm_term).trim() : null;
     const entryPage = normalizeEntryPage(body.entry_page);
+    const entryPageRaw = body.entry_page != null ? String(body.entry_page).trim() : "";
     const region = body.region != null ? String(body.region).trim() : null;
     const availableTime = body.available_time != null ? String(body.available_time).trim() : null;
     const ageGroup = body.age_group != null ? String(body.age_group).trim() : null;
@@ -114,9 +115,13 @@ export async function POST(request: NextRequest) {
     // 구글 시트 기록 (실패해도 제출 성공은 유지)
     {
       const medium = await resolveSheetMediumFromUtmSource(utmSource, source);
+      // /no-clawback 유입은 G열(담당자) 공란 유지
+      const managerName =
+        entryPageRaw === "no-clawback" || entryPageRaw === "/no-clawback" ? "" : undefined;
       const sheetResult = await appendLeadRowToGoogleSheet({
         dateKstYmd: formatKstYmd(new Date()),
         medium,
+        managerName,
         kind: "B2C",
         name,
         phone: phonePretty,
