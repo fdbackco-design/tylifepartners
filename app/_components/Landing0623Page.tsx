@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { DESIRED_TIME_OPTIONS, LOCATION_OPTIONS, getDesiredDateOptions } from "@/lib/formOptions";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useUTM } from "@/lib/useUTM";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
@@ -13,6 +12,9 @@ const HERO_FALLBACK = "/assets/hero_cc.png";
 const BROCHURE_PDF = "/assets/tylife_bro.pdf";
 const BROCHURE_ICON = "/assets/icon-brochure-download.png";
 const CONSULTATION_ICON = "/assets/icon-consultation-write.png";
+
+const INSURANCE_DESIGNER_JOB = "보험설계사";
+const JOB_RANK_OPTIONS = ["지점장 이상", "팀장 이상", "FC"] as const;
 
 type KarrotPixel = {
   track: (event: string, params?: Record<string, unknown>) => void;
@@ -56,17 +58,17 @@ export default function Landing0623Page({
   const [showFixedCta, setShowFixedCta] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [desiredDate, setDesiredDate] = useState("");
-  const [desiredTime, setDesiredTime] = useState("");
-  const [location, setLocation] = useState("");
+  const [region, setRegion] = useState("");
+  const [availableTime, setAvailableTime] = useState("");
+  const [ageGroup, setAgeGroup] = useState("");
+  const [job, setJob] = useState("");
+  const [jobRank, setJobRank] = useState("");
   const [privacyRequiredChecked, setPrivacyRequiredChecked] = useState(false);
   const [marketingChecked, setMarketingChecked] = useState(false);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [img1Error, setImg1Error] = useState(false);
   const [img2Error, setImg2Error] = useState(false);
   const utm = useUTM();
-
-  const desiredDateOptions = useMemo(() => getDesiredDateOptions(), [sheetOpen]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -110,6 +112,22 @@ export default function Landing0623Page({
       showToast("연락처를 확인해주세요. (숫자 10~11자리)", true);
       return;
     }
+    if (!region) {
+      showToast("지역을 선택해주세요.", true);
+      return;
+    }
+    if (!availableTime) {
+      showToast("상담가능시간을 선택해주세요.", true);
+      return;
+    }
+    if (!ageGroup) {
+      showToast("연령대를 선택해주세요.", true);
+      return;
+    }
+    if (job === INSURANCE_DESIGNER_JOB && !jobRank) {
+      showToast("직급을 선택해주세요.", true);
+      return;
+    }
     if (!privacyRequiredChecked) {
       showToast("개인정보제공 동의서에 동의해 주세요. (필수)", true);
       return;
@@ -123,15 +141,18 @@ export default function Landing0623Page({
         body: JSON.stringify({
           name: name.trim(),
           phone: rawPhone,
-          source: utm.utm_source || "daangn",
-          location: location || null,
-          desired_time: desiredTime || null,
+          source: utm.utm_source || entryPage.replace(/^\//, ""),
           utm_source: utm.utm_source || null,
           utm_medium: utm.utm_medium || null,
           utm_campaign: utm.utm_campaign || null,
           utm_content: utm.utm_content || null,
           utm_term: utm.utm_term || null,
           marketing_consent: marketingChecked ? 1 : null,
+          region,
+          available_time: availableTime,
+          age_group: ageGroup,
+          job: job || null,
+          job_rank: job === INSURANCE_DESIGNER_JOB ? jobRank : null,
           entry_page: entryPage,
           ...getSubmissionAnalyticsPayload(),
         }),
@@ -391,20 +412,16 @@ export default function Landing0623Page({
                 paddingBottom: `calc(24px + var(--safe-bottom))`,
                 overflowY: "auto",
                 flex: 1,
+                minHeight: 0,
+                WebkitOverflowScrolling: "touch",
               }}
             >
-              <h2 style={{ margin: "0 0 20px", fontSize: 22, fontWeight: 600 }}>상담 신청</h2>
+              <h2 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 600 }}>파트너 상담</h2>
               <form onSubmit={handleSubmit}>
-                <div style={{ marginBottom: 20 }}>
+                <div style={{ marginBottom: 16 }}>
                   <label
                     htmlFor="lead-0623-name"
-                    style={{
-                      display: "block",
-                      marginBottom: 8,
-                      fontSize: 18,
-                      color: "var(--text-secondary)",
-                      fontWeight: 500,
-                    }}
+                    style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}
                   >
                     이름 (한글 2~10자)
                   </label>
@@ -418,25 +435,19 @@ export default function Landing0623Page({
                     disabled={loading}
                     style={{
                       width: "100%",
-                      padding: "14px 16px",
+                      padding: "12px 14px",
                       border: "1px solid var(--border)",
                       borderRadius: 8,
-                      fontSize: 18,
+                      fontSize: 16,
                       outline: "none",
                     }}
                   />
                 </div>
 
-                <div style={{ marginBottom: 20 }}>
+                <div style={{ marginBottom: 16 }}>
                   <label
                     htmlFor="lead-0623-phone"
-                    style={{
-                      display: "block",
-                      marginBottom: 8,
-                      fontSize: 18,
-                      color: "var(--text-secondary)",
-                      fontWeight: 500,
-                    }}
+                    style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}
                   >
                     연락처 (010-0000-0000)
                   </label>
@@ -451,121 +462,178 @@ export default function Landing0623Page({
                     disabled={loading}
                     style={{
                       width: "100%",
-                      padding: "14px 16px",
+                      padding: "12px 14px",
                       border: "1px solid var(--border)",
                       borderRadius: 8,
-                      fontSize: 18,
+                      fontSize: 16,
                       outline: "none",
                     }}
                   />
                 </div>
 
-                <div style={{ marginBottom: 20 }}>
+                <div style={{ marginBottom: 16 }}>
                   <label
-                    htmlFor="lead-0623-desired-date"
-                    style={{
-                      display: "block",
-                      marginBottom: 8,
-                      fontSize: 18,
-                      color: "var(--text-secondary)",
-                      fontWeight: 500,
-                    }}
+                    htmlFor="lead-0623-region"
+                    style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}
                   >
-                    희망 상담일
+                    지역 (필수)
                   </label>
                   <select
-                    id="lead-0623-desired-date"
-                    value={desiredDate}
-                    onChange={(e) => setDesiredDate(e.target.value)}
+                    id="lead-0623-region"
+                    value={region}
+                    onChange={(e) => setRegion(e.target.value)}
                     disabled={loading}
                     style={{
                       width: "100%",
-                      padding: "14px 16px",
+                      padding: "12px 14px",
                       border: "1px solid var(--border)",
                       borderRadius: 8,
-                      fontSize: 18,
+                      fontSize: 16,
                       outline: "none",
+                      background: "#fff",
                     }}
                   >
-                    {desiredDateOptions.map((o) => (
-                      <option key={o.value || "empty"} value={o.value}>
-                        {o.label}
+                    <option value="">선택하세요</option>
+                    <option value="서울">서울</option>
+                    <option value="경기">경기</option>
+                    <option value="인천">인천</option>
+                    <option value="강원">강원</option>
+                    <option value="충청">충청</option>
+                    <option value="경상">경상</option>
+                    <option value="전라">전라</option>
+                    <option value="대구">대구</option>
+                    <option value="울산">울산</option>
+                    <option value="제주">제주</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label
+                    htmlFor="lead-0623-available-time"
+                    style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}
+                  >
+                    상담가능시간 (필수)
+                  </label>
+                  <select
+                    id="lead-0623-available-time"
+                    value={availableTime}
+                    onChange={(e) => setAvailableTime(e.target.value)}
+                    disabled={loading}
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 16,
+                      outline: "none",
+                      background: "#fff",
+                    }}
+                  >
+                    <option value="">선택하세요</option>
+                    <option value="오전">오전</option>
+                    <option value="오후">오후</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label
+                    htmlFor="lead-0623-age-group"
+                    style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}
+                  >
+                    연령대 (필수)
+                  </label>
+                  <select
+                    id="lead-0623-age-group"
+                    value={ageGroup}
+                    onChange={(e) => setAgeGroup(e.target.value)}
+                    disabled={loading}
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 16,
+                      outline: "none",
+                      background: "#fff",
+                    }}
+                  >
+                    <option value="">선택하세요</option>
+                    <option value="20대">20대</option>
+                    <option value="30대">30대</option>
+                    <option value="40대">40대</option>
+                    <option value="50대">50대</option>
+                    <option value="60대 이상">60대 이상</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label
+                    htmlFor="lead-0623-job"
+                    style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}
+                  >
+                    직업 (선택)
+                  </label>
+                  <select
+                    id="lead-0623-job"
+                    value={job}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setJob(v);
+                      if (v !== INSURANCE_DESIGNER_JOB) setJobRank("");
+                    }}
+                    disabled={loading}
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 16,
+                      outline: "none",
+                      background: "#fff",
+                    }}
+                  >
+                    <option value="">선택하세요</option>
+                    <option value="직장인">직장인</option>
+                    <option value="보험설계사">보험설계사</option>
+                    <option value="자영업">자영업</option>
+                    <option value="개인사업자">개인사업자</option>
+                    <option value="기타">기타</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label
+                    htmlFor="lead-0623-job-rank"
+                    style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}
+                  >
+                    직급 {job === INSURANCE_DESIGNER_JOB ? "(필수)" : ""}
+                  </label>
+                  <select
+                    id="lead-0623-job-rank"
+                    value={jobRank}
+                    onChange={(e) => setJobRank(e.target.value)}
+                    disabled={loading || job !== INSURANCE_DESIGNER_JOB}
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 16,
+                      outline: "none",
+                      background: job === INSURANCE_DESIGNER_JOB ? "#fff" : "#f1f3f5",
+                      color: job === INSURANCE_DESIGNER_JOB ? "inherit" : "var(--text-secondary)",
+                    }}
+                  >
+                    <option value="">선택하세요</option>
+                    {JOB_RANK_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <div style={{ marginBottom: 20 }}>
-                  <label
-                    htmlFor="lead-0623-desired-time"
-                    style={{
-                      display: "block",
-                      marginBottom: 8,
-                      fontSize: 18,
-                      color: "var(--text-secondary)",
-                      fontWeight: 500,
-                    }}
-                  >
-                    희망 상담시간
-                  </label>
-                  <select
-                    id="lead-0623-desired-time"
-                    value={desiredTime}
-                    onChange={(e) => setDesiredTime(e.target.value)}
-                    disabled={loading}
-                    style={{
-                      width: "100%",
-                      padding: "14px 16px",
-                      border: "1px solid var(--border)",
-                      borderRadius: 8,
-                      fontSize: 18,
-                      outline: "none",
-                    }}
-                  >
-                    {DESIRED_TIME_OPTIONS.map((o) => (
-                      <option key={o.value || "empty"} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ marginBottom: 20 }}>
-                  <label
-                    htmlFor="lead-0623-location"
-                    style={{
-                      display: "block",
-                      marginBottom: 8,
-                      fontSize: 18,
-                      color: "var(--text-secondary)",
-                      fontWeight: 500,
-                    }}
-                  >
-                    사는 위치
-                  </label>
-                  <select
-                    id="lead-0623-location"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    disabled={loading}
-                    style={{
-                      width: "100%",
-                      padding: "14px 16px",
-                      border: "1px solid var(--border)",
-                      borderRadius: 8,
-                      fontSize: 18,
-                      outline: "none",
-                    }}
-                  >
-                    {LOCATION_OPTIONS.map((o) => (
-                      <option key={o.value || "empty"} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <p style={{ margin: "0 0 20px", fontSize: 16, color: "var(--text-secondary)" }}>
+                <p style={{ margin: "0 0 20px", fontSize: 12, color: "var(--text-secondary)" }}>
                   제출 시 상담 안내를 위해 연락드려요.
                 </p>
 
@@ -574,6 +642,7 @@ export default function Landing0623Page({
                   marketingChecked={marketingChecked}
                   onRequiredCheckedChange={setPrivacyRequiredChecked}
                   onMarketingCheckedChange={setMarketingChecked}
+                  compact
                 />
 
                 <button
@@ -581,12 +650,12 @@ export default function Landing0623Page({
                   disabled={loading || !privacyRequiredChecked}
                   style={{
                     width: "100%",
-                    padding: "16px",
+                    padding: "14px",
                     background: loading || !privacyRequiredChecked ? "#adb5bd" : "var(--cta-bg)",
                     color: "#fff",
                     border: "none",
                     borderRadius: 8,
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: 600,
                     cursor: loading || !privacyRequiredChecked ? "default" : "pointer",
                   }}
