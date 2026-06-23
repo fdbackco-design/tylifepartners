@@ -121,7 +121,8 @@ async function writeMainSheet(
     args.kind, // D
     args.name, // E
     args.phone, // F
-    "", "", "", "", "", "", "", "", // G~N
+    args.medium, // G
+    "", "", "", "", "", "", "", // H~N
     sheetCell(args.entry_page), // O
     sheetCell(args.region), // P
     sheetCell(args.available_time), // Q
@@ -157,7 +158,7 @@ async function writeCrmSheet(
     args.kind, // D
     "", // E
     "", // F
-    "", // G
+    args.medium, // G
     sheetCell(args.region), // H
     sheetCell(args.available_time), // I
     sheetCell(args.age_group), // J

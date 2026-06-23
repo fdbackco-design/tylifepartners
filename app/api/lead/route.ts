@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendLeadEmailNotification } from "@/lib/email";
 import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
 import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
+import { resolveSheetMediumFromUtmSource } from "@/lib/utmSourceMapping";
 import { formatPhoneKorean } from "@/lib/phone";
 
 /** 클라이언트에서 보낸 유입 경로 (예: /, /v2, /me). 잘못된 값은 무시 */
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
 
     // 구글 시트 기록 (실패해도 제출 성공은 유지)
     {
-      const medium = utmSource || source || "";
+      const medium = await resolveSheetMediumFromUtmSource(utmSource, source);
       const sheetResult = await appendLeadRowToGoogleSheet({
         dateKstYmd: formatKstYmd(new Date()),
         medium,

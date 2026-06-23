@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
-import { buildAllPlatformLinks } from "@/lib/utm";
+import UtmLinkPanel from "@/app/admin/_components/UtmLinkPanel";
 import { formatPhoneKorean } from "@/lib/phone";
 
 const PAGE_SIZE = 20;
@@ -55,10 +55,6 @@ export default function AdminPage() {
   const [saveMsg, setSaveMsg] = useState<{ id: string; msg: string; error?: boolean } | null>(null);
   const [exportLoading, setExportLoading] = useState(false);
   const [category, setCategory] = useState<"b2c" | "b2b" | "utm">("b2c");
-  const [utmBaseUrl, setUtmBaseUrl] = useState("https://www.tylifepartners.com");
-  const [utmPath, setUtmPath] = useState("/");
-  const [utmCampaign, setUtmCampaign] = useState("");
-  const [utmContent, setUtmContent] = useState("");
   const [navOpen, setNavOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -541,134 +537,7 @@ export default function AdminPage() {
         )}
 
       {category === "utm" ? (
-        <div style={{ maxWidth: 700 }}>
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 14, fontWeight: 500 }}>사이트 URL</label>
-            <input
-              type="url"
-              value={utmBaseUrl}
-              onChange={(e) => setUtmBaseUrl(e.target.value)}
-              placeholder="https://www.tylifepartners.com"
-              style={{
-                width: "100%",
-                padding: "10px 14px",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                fontSize: 15,
-              }}
-            />
-          </div>
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 14, fontWeight: 500 }}>경로</label>
-            <select
-              value={utmPath}
-              onChange={(e) => setUtmPath(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px 14px",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                fontSize: 15,
-              }}
-            >
-              <option value="/">/ (메인)</option>
-              <option value="/me">/me</option>
-              <option value="/business">/business</option>
-              <option value="/sidejob">/sidejob</option>
-            </select>
-          </div>
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 14, fontWeight: 500 }}>캠페인명 (선택)</label>
-            <input
-              type="text"
-              value={utmCampaign}
-              onChange={(e) => setUtmCampaign(e.target.value)}
-              placeholder="예: 2026_상담_캠페인"
-              style={{
-                width: "100%",
-                padding: "10px 14px",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                fontSize: 15,
-              }}
-            />
-          </div>
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 14, fontWeight: 500 }}>
-              utm_content (선택)
-            </label>
-            <input
-              type="text"
-              value={utmContent}
-              onChange={(e) => setUtmContent(e.target.value)}
-              placeholder="예: hero_banner, reel_01"
-              style={{
-                width: "100%",
-                padding: "10px 14px",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                fontSize: 15,
-              }}
-            />
-          </div>
-          <div style={{ background: "var(--bg-card)", borderRadius: 8, padding: 20, border: "1px solid var(--border)" }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>플랫폼별 UTM 링크</h3>
-            {utmBaseUrl
-              ? buildAllPlatformLinks(
-                  utmBaseUrl.replace(/\/$/, ""),
-                  utmPath,
-                  utmCampaign || undefined,
-                  utmContent || undefined
-                ).map((item) => (
-                  <div key={item.platform} style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: "var(--text-secondary)" }}>
-                      {item.label}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <input
-                        type="text"
-                        readOnly
-                        value={item.url}
-                        style={{
-                          flex: 1,
-                          minWidth: 200,
-                          padding: "8px 12px",
-                          fontSize: 13,
-                          border: "1px solid var(--border)",
-                          borderRadius: 6,
-                          background: "#f8f9fa",
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(item.url);
-                        }}
-                        style={{
-                          padding: "8px 12px",
-                          background: "var(--cta-bg)",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 6,
-                          fontSize: 13,
-                          cursor: "pointer",
-                        }}
-                      >
-                        복사
-                      </button>
-                    </div>
-                  </div>
-                ))
-              : "사이트 URL을 입력해 주세요."}
-          </div>
-        </div>
+        <UtmLinkPanel />
       ) : (
         <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12 }}>

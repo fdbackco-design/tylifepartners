@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendLeadEmailNotification } from "@/lib/email";
 import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
 import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
+import { resolveSheetMediumFromUtmSource } from "@/lib/utmSourceMapping";
 import { formatPhoneKorean } from "@/lib/phone";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
 
     // 구글 시트 기록 (실패해도 제출 성공은 유지)
     {
-      const medium = utmSource || source || "";
+      const medium = await resolveSheetMediumFromUtmSource(utmSource, source);
       const sheetResult = await appendLeadRowToGoogleSheet({
         dateKstYmd: formatKstYmd(new Date()),
         medium,
