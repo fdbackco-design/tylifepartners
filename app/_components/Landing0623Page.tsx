@@ -229,7 +229,7 @@ export default function Landing0623Page({
             alignItems: "center",
             justifyContent: "center",
             gap: 10,
-            padding: "16px 24px",
+            padding: "24px 32px",
             width: "100%",
             maxWidth: 400,
             boxSizing: "border-box",
@@ -237,7 +237,7 @@ export default function Landing0623Page({
             color: "#495057",
             border: "1px solid #ced4da",
             borderRadius: 9999,
-            fontSize: 18,
+            fontSize: 36,
             fontWeight: 800,
             cursor: "pointer",
             WebkitTapHighlightColor: "transparent",
@@ -254,7 +254,7 @@ export default function Landing0623Page({
           margin: 0,
           lineHeight: 0,
           background: "#e9ecef",
-          paddingBottom: showFixedCta ? "calc(72px + var(--safe-bottom))" : 0,
+          paddingBottom: showFixedCta ? "calc(110px + var(--safe-bottom))" : 0,
         }}
       >
         <img
@@ -287,12 +287,12 @@ export default function Landing0623Page({
             disabled={submitted}
             style={{
               width: "100%",
-              padding: "16px 20px",
+              padding: "24px 20px",
               background: submitted ? "#adb5bd" : "var(--cta-bg)",
               color: "#fff",
               border: "none",
               borderRadius: "var(--radius)",
-              fontSize: 18,
+              fontSize: 36,
               fontWeight: 800,
               cursor: submitted ? "default" : "pointer",
               transition: "background 0.2s",
