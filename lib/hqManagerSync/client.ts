@@ -38,13 +38,14 @@ export async function callHqManagerSyncWebApp(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
+      // token은 JSON body로만 전달 (Apps Script는 커스텀 헤더를 받지 못함.
+      // 헤더에 한글 등 비ASCII를 넣으면 Node fetch가 ByteString 오류로 즉시 실패함)
       const res = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Internal-Token": secret,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, token: secret }),
       });
 
       lastStatus = res.status;
