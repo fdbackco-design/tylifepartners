@@ -4,6 +4,7 @@ import { sendLeadEmailNotification } from "@/lib/email";
 import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
 import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
 import { resolveSheetMediumFromUtmSource } from "@/lib/utmSourceMapping";
+import { isLanding0623EntryPage, normalizeLanding0623EntryPage } from "@/lib/landing0623";
 import { formatPhoneKorean } from "@/lib/phone";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
@@ -31,7 +32,11 @@ export async function POST(request: NextRequest) {
     const name = String(body.name ?? "").trim();
     const phone = String(body.phone ?? "").replace(/\D/g, "");
     const source = String(body.source ?? "business").trim() || "business";
-    const entryPage = String(body.entry_page ?? "business").trim() || "business";
+    const entryPageRaw = String(body.entry_page ?? "business").trim() || "business";
+    const entryPage = isLanding0623EntryPage(entryPageRaw)
+      ? normalizeLanding0623EntryPage(entryPageRaw)
+      : entryPageRaw;
+    const is0623Landing = isLanding0623EntryPage(entryPage);
     const utmSource = body.utm_source != null ? String(body.utm_source).trim() : null;
     const utmMedium = body.utm_medium != null ? String(body.utm_medium).trim() : null;
     const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
@@ -39,8 +44,13 @@ export async function POST(request: NextRequest) {
     const utmTerm = body.utm_term != null ? String(body.utm_term).trim() : null;
     const marketingConsent =
       body.marketing_consent === 1 || body.marketing_consent === "1" ? 1 : null;
-    const region = body.region != null ? String(body.region).trim() : "";
-    const availableTime = body.available_time != null ? String(body.available_time).trim() : "";
+    const region = body.region != null ? String(body.region).trim() : body.location != null ? String(body.location).trim() : "";
+    const availableTime =
+      body.available_time != null
+        ? String(body.available_time).trim()
+        : body.desired_time != null
+          ? String(body.desired_time).trim()
+          : "";
     const ageGroup = body.age_group != null ? String(body.age_group).trim() : "";
     const job = body.job != null ? String(body.job).trim() : "";
     const jobRankRaw = body.job_rank != null ? String(body.job_rank).trim() : "";
@@ -64,28 +74,30 @@ export async function POST(request: NextRequest) {
       );
     }
     const phonePretty = formatPhoneKorean(phone);
-    if (!region) {
-      return NextResponse.json(
-        { ok: false, message: "지역을 선택해주세요." },
-        { status: 400 }
-      );
-    }
-    if (!availableTime) {
-      return NextResponse.json(
-        { ok: false, message: "상담가능시간을 선택해주세요." },
-        { status: 400 }
-      );
-    }
-    if (!ageGroup) {
-      return NextResponse.json(
-        { ok: false, message: "연령대를 선택해주세요." },
-        { status: 400 }
-      );
+    if (!is0623Landing) {
+      if (!region) {
+        return NextResponse.json(
+          { ok: false, message: "지역을 선택해주세요." },
+          { status: 400 }
+        );
+      }
+      if (!availableTime) {
+        return NextResponse.json(
+          { ok: false, message: "상담가능시간을 선택해주세요." },
+          { status: 400 }
+        );
+      }
+      if (!ageGroup) {
+        return NextResponse.json(
+          { ok: false, message: "연령대를 선택해주세요." },
+          { status: 400 }
+        );
+      }
     }
 
     const jobRankForDb =
       job === INSURANCE_DESIGNER_JOB && jobRankRaw && ALLOWED_JOB_RANKS.has(jobRankRaw) ? jobRankRaw : null;
-    if (job === INSURANCE_DESIGNER_JOB && !jobRankForDb) {
+    if (!is0623Landing && job === INSURANCE_DESIGNER_JOB && !jobRankForDb) {
       return NextResponse.json(
         { ok: false, message: "보험설계사인 경우 직급을 선택해주세요." },
         { status: 400 }
@@ -106,9 +118,9 @@ export async function POST(request: NextRequest) {
       utm_content: utmContent || null,
       utm_term: utmTerm || null,
       marketing_consent: marketingConsent,
-      region,
-      available_time: availableTime,
-      age_group: ageGroup,
+      region: region || null,
+      available_time: availableTime || null,
+      age_group: ageGroup || null,
       job: job || null,
       job_rank: jobRankForDb,
       analytics_session_id: analytics.analytics_session_id,

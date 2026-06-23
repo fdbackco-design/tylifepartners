@@ -15,8 +15,8 @@ const LANDING_LEAD_CONFIG: Record<
   business: { table: "tylife_b2b", entryPages: ["business", "/business"] },
   no_clawback: { table: "tylife_b2b", entryPages: ["no-clawback", "/no-clawback"] },
   sidejob: { table: "tylife_b2b", entryPages: ["sidejob", "/sidejob"] },
-  landing_0623: { table: "leads", entryPages: ["0623", "/0623"] },
-  landing_0623s: { table: "leads", entryPages: ["0623s", "/0623s"] },
+  landing_0623: { table: "tylife_b2b", entryPages: ["0623", "/0623"] },
+  landing_0623s: { table: "tylife_b2b", entryPages: ["0623s", "/0623s"] },
 };
 
 /** 기간·랜딩별 상담 신청 시 last_section_name 건수 */

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/adminSession";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { normalizeUtmSourceValue } from "@/lib/utmSourceMapping";
+import { parseUtmSourceInput, utmSourcesDbErrorMessage } from "@/lib/utmSourceMapping";
 
 /**
  * GET /api/admin/utm-sources — UTM source 목록
@@ -22,7 +22,10 @@ export async function GET() {
 
     if (error) {
       console.error("GET utm_sources error:", error);
-      return NextResponse.json({ ok: false, message: "목록 조회에 실패했습니다." }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, message: utmSourcesDbErrorMessage(error, "조회") },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ ok: true, items: data ?? [] });
@@ -40,28 +43,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const value = normalizeUtmSourceValue(String(body.value ?? ""));
-    const label = String(body.label ?? "").trim();
-    const sheetLabel = String(body.sheet_label ?? label).trim();
+    const parsed = parseUtmSourceInput(body);
+    if (!parsed.ok) {
+      return NextResponse.json({ ok: false, message: parsed.message }, { status: 400 });
+    }
 
-    if (!value) {
-      return NextResponse.json(
-        { ok: false, message: "utm_source 값은 영문·숫자·_·- 만 64자 이내로 입력해 주세요." },
-        { status: 400 }
-      );
-    }
-    if (!label || label.length > 80) {
-      return NextResponse.json(
-        { ok: false, message: "표시 이름을 입력해 주세요. (80자 이내)" },
-        { status: 400 }
-      );
-    }
-    if (!sheetLabel || sheetLabel.length > 80) {
-      return NextResponse.json(
-        { ok: false, message: "시트 표시명을 입력해 주세요. (80자 이내)" },
-        { status: 400 }
-      );
-    }
+    const { value, label, sheetLabel } = parsed.data;
 
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
@@ -78,7 +65,10 @@ export async function POST(request: NextRequest) {
         );
       }
       console.error("POST utm_sources error:", error);
-      return NextResponse.json({ ok: false, message: "저장에 실패했습니다." }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, message: utmSourcesDbErrorMessage(error, "저장") },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ ok: true, item: data });

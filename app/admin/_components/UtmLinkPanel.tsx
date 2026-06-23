@@ -11,6 +11,27 @@ const inputStyle: React.CSSProperties = {
   fontSize: 15,
 };
 
+const btnSecondary: React.CSSProperties = {
+  padding: "8px 12px",
+  background: "#fff",
+  color: "#495057",
+  border: "1px solid var(--border)",
+  borderRadius: 6,
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const btnDanger: React.CSSProperties = {
+  ...btnSecondary,
+  color: "#c92a2a",
+  borderColor: "#ffc9c9",
+};
+
+function emptyEditForm() {
+  return { value: "", label: "", sheetLabel: "" };
+}
+
 export default function UtmLinkPanel() {
   const [baseUrl, setBaseUrl] = useState("https://www.tylifepartners.com");
   const [path, setPath] = useState("/0623s");
@@ -18,6 +39,9 @@ export default function UtmLinkPanel() {
   const [items, setItems] = useState<UtmSourceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState(emptyEditForm);
+  const [actionId, setActionId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [newValue, setNewValue] = useState("");
   const [newLabel, setNewLabel] = useState("");
@@ -87,6 +111,74 @@ export default function UtmLinkPanel() {
       showToast("네트워크 오류가 발생했습니다.", true);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const startEdit = (item: UtmSourceRow) => {
+    setEditingId(item.id);
+    setEditForm({
+      value: item.value,
+      label: item.label,
+      sheetLabel: item.sheet_label,
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm(emptyEditForm());
+  };
+
+  const handleUpdate = async (e: React.FormEvent, id: string) => {
+    e.preventDefault();
+    if (actionId) return;
+    setActionId(id);
+    try {
+      const res = await fetch(`/api/admin/utm-sources/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          value: editForm.value,
+          label: editForm.label,
+          sheet_label: editForm.sheetLabel || editForm.label,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setSelectedValue(data.item.value);
+        cancelEdit();
+        await fetchItems();
+        showToast("utm_source가 수정되었습니다.");
+      } else {
+        showToast(data.message || "수정에 실패했습니다.", true);
+      }
+    } catch {
+      showToast("네트워크 오류가 발생했습니다.", true);
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleDelete = async (item: UtmSourceRow) => {
+    if (actionId) return;
+    const ok = window.confirm(`「${item.label} (${item.value})」 utm_source를 삭제할까요?`);
+    if (!ok) return;
+
+    setActionId(item.id);
+    try {
+      const res = await fetch(`/api/admin/utm-sources/${item.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.ok) {
+        if (editingId === item.id) cancelEdit();
+        if (selectedValue === item.value) setSelectedValue("");
+        await fetchItems();
+        showToast("utm_source가 삭제되었습니다.");
+      } else {
+        showToast(data.message || "삭제에 실패했습니다.", true);
+      }
+    } catch {
+      showToast("네트워크 오류가 발생했습니다.", true);
+    } finally {
+      setActionId(null);
     }
   };
 
@@ -198,6 +290,122 @@ export default function UtmLinkPanel() {
             복사
           </button>
         </div>
+      </div>
+
+      <div
+        style={{
+          background: "var(--bg-card)",
+          borderRadius: 8,
+          padding: 20,
+          border: "1px solid var(--border)",
+          marginBottom: 28,
+        }}
+      >
+        <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>utm_source 관리</h3>
+        {loading ? (
+          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>목록 불러오는 중...</div>
+        ) : items.length === 0 ? (
+          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>등록된 utm_source가 없습니다.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {items.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: 14,
+                  background: editingId === item.id ? "#f8f9fa" : "#fff",
+                }}
+              >
+                {editingId === item.id ? (
+                  <form onSubmit={(e) => handleUpdate(e, item.id)}>
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ display: "block", marginBottom: 4, fontSize: 12, fontWeight: 500 }}>
+                        utm_source 값
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.value}
+                        onChange={(e) => setEditForm((f) => ({ ...f, value: e.target.value }))}
+                        style={inputStyle}
+                        disabled={actionId === item.id}
+                      />
+                    </div>
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ display: "block", marginBottom: 4, fontSize: 12, fontWeight: 500 }}>
+                        표시 이름
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.label}
+                        onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))}
+                        style={inputStyle}
+                        disabled={actionId === item.id}
+                      />
+                    </div>
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ display: "block", marginBottom: 4, fontSize: 12, fontWeight: 500 }}>
+                        구글 시트 표시명
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.sheetLabel}
+                        onChange={(e) => setEditForm((f) => ({ ...f, sheetLabel: e.target.value }))}
+                        style={inputStyle}
+                        disabled={actionId === item.id}
+                      />
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="submit"
+                        disabled={actionId === item.id}
+                        style={{
+                          padding: "8px 14px",
+                          background: actionId === item.id ? "#adb5bd" : "var(--cta-bg)",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 6,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: actionId === item.id ? "default" : "pointer",
+                        }}
+                      >
+                        {actionId === item.id ? "저장 중..." : "저장"}
+                      </button>
+                      <button type="button" onClick={cancelEdit} style={btnSecondary} disabled={actionId === item.id}>
+                        취소
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
+                      {item.label}{" "}
+                      <span style={{ fontWeight: 400, color: "var(--text-secondary)" }}>({item.value})</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 10 }}>
+                      시트 표시: {item.sheet_label}
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button type="button" onClick={() => startEdit(item)} style={btnSecondary} disabled={!!actionId}>
+                        수정
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item)}
+                        style={btnDanger}
+                        disabled={!!actionId}
+                      >
+                        {actionId === item.id ? "삭제 중..." : "삭제"}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div

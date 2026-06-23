@@ -117,16 +117,15 @@ export default function Landing0623Page({
 
     setLoading(true);
     try {
-      const res = await fetch("/api/lead", {
+      const res = await fetch("/api/business-lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
           phone: rawPhone,
           source: utm.utm_source || "daangn",
-          desired_date: desiredDate || null,
-          desired_time: desiredTime || null,
           location: location || null,
+          desired_time: desiredTime || null,
           utm_source: utm.utm_source || null,
           utm_medium: utm.utm_medium || null,
           utm_campaign: utm.utm_campaign || null,
