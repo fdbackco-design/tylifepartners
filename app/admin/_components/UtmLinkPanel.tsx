@@ -55,6 +55,7 @@ export default function UtmLinkPanel() {
   const [newValue, setNewValue] = useState("");
   const [newLabel, setNewLabel] = useState("");
   const [newSheetLabel, setNewSheetLabel] = useState("");
+  const [search, setSearch] = useState("");
 
   const showToast = useCallback((msg: string, error?: boolean) => {
     setToast({ msg, error });
@@ -90,6 +91,15 @@ export default function UtmLinkPanel() {
     if (!baseUrl.trim() || !selectedValue) return "";
     return buildUtmLink(baseUrl.trim(), path.trim() || "/0623s", selectedValue);
   }, [baseUrl, path, selectedValue]);
+
+  const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (item) =>
+        item.label.toLowerCase().includes(q) || item.value.toLowerCase().includes(q)
+    );
+  }, [items, search]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,12 +323,110 @@ export default function UtmLinkPanel() {
           marginBottom: 28,
         }}
       >
-        <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>utm_source 관리</h3>
+        <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>utm_source 추가</h3>
+        <form onSubmit={handleAdd}>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
+              utm_source 값 (URL·DB 저장)
+            </label>
+            <input
+              type="text"
+              value={newValue}
+              onChange={(e) => setNewValue(e.target.value)}
+              placeholder="예: member_id"
+              style={inputStyle}
+              disabled={saving}
+            />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
+              표시 이름
+            </label>
+            <input
+              type="text"
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              placeholder="예: 영업자 이름"
+              style={inputStyle}
+              disabled={saving}
+            />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
+              구글 시트 표시명 — C열(유입매체)·G열(담당자)
+            </label>
+            <input
+              type="text"
+              value={newSheetLabel}
+              onChange={(e) => setNewSheetLabel(e.target.value)}
+              placeholder="비우면 표시 이름과 동일"
+              style={inputStyle}
+              disabled={saving}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={saving}
+            style={{
+              padding: "10px 18px",
+              background: saving ? "#adb5bd" : "var(--cta-bg)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: saving ? "default" : "pointer",
+            }}
+          >
+            {saving ? "저장 중..." : "추가하기"}
+          </button>
+        </form>
+      </div>
+
+      <div
+        style={{
+          background: "var(--bg-card)",
+          borderRadius: 8,
+          padding: 20,
+          border: "1px solid var(--border)",
+          marginBottom: 28,
+        }}
+      >
+        <h3 style={{ margin: "0 0 16px", fontSize: 16, display: "flex", alignItems: "center", gap: 8 }}>
+          utm_source 관리
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--cta-bg)",
+              background: "rgba(0,0,0,0.04)",
+              borderRadius: 999,
+              padding: "2px 10px",
+            }}
+          >
+            {items.length}개
+          </span>
+        </h3>
         {loading ? (
           <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>목록 불러오는 중...</div>
         ) : items.length === 0 ? (
           <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>등록된 utm_source가 없습니다.</div>
         ) : (
+          <>
+          <div style={{ marginBottom: 14 }}>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="표시 이름 또는 utm_source 값으로 검색"
+              style={inputStyle}
+            />
+          </div>
+          {filteredItems.length === 0 ? (
+            <div style={{ fontSize: 14, color: "var(--text-secondary)", padding: "8px 0" }}>
+              「{search.trim()}」 검색 결과가 없습니다.
+            </div>
+          ) : (
           <div style={{ overflowX: "auto" }}>
             <table
               style={{
@@ -354,7 +462,7 @@ export default function UtmLinkPanel() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => {
+                {filteredItems.map((item) => {
                   const editing = editingId === item.id;
                   const busy = actionId === item.id;
                   return (
@@ -471,75 +579,9 @@ export default function UtmLinkPanel() {
               </tbody>
             </table>
           </div>
+          )}
+          </>
         )}
-      </div>
-
-      <div
-        style={{
-          background: "var(--bg-card)",
-          borderRadius: 8,
-          padding: 20,
-          border: "1px solid var(--border)",
-        }}
-      >
-        <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>utm_source 추가</h3>
-        <form onSubmit={handleAdd}>
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
-              utm_source 값 (URL·DB 저장)
-            </label>
-            <input
-              type="text"
-              value={newValue}
-              onChange={(e) => setNewValue(e.target.value)}
-              placeholder="예: member_id"
-              style={inputStyle}
-              disabled={saving}
-            />
-          </div>
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
-              표시 이름
-            </label>
-            <input
-              type="text"
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-              placeholder="예: 영업자 이름"
-              style={inputStyle}
-              disabled={saving}
-            />
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
-              구글 시트 표시명 — C열(유입매체)·G열(담당자)
-            </label>
-            <input
-              type="text"
-              value={newSheetLabel}
-              onChange={(e) => setNewSheetLabel(e.target.value)}
-              placeholder="비우면 표시 이름과 동일"
-              style={inputStyle}
-              disabled={saving}
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={saving}
-            style={{
-              padding: "10px 18px",
-              background: saving ? "#adb5bd" : "var(--cta-bg)",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: saving ? "default" : "pointer",
-            }}
-          >
-            {saving ? "저장 중..." : "추가하기"}
-          </button>
-        </form>
       </div>
 
       {toast && (
