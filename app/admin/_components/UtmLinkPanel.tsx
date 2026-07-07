@@ -11,6 +11,15 @@ const inputStyle: React.CSSProperties = {
   fontSize: 15,
 };
 
+const cellInputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "7px 10px",
+  border: "1px solid var(--border)",
+  borderRadius: 6,
+  fontSize: 13,
+  boxSizing: "border-box",
+};
+
 const btnSecondary: React.CSSProperties = {
   padding: "8px 12px",
   background: "#fff",
@@ -310,103 +319,157 @@ export default function UtmLinkPanel() {
         ) : items.length === 0 ? (
           <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>등록된 utm_source가 없습니다.</div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {items.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  padding: 14,
-                  background: editingId === item.id ? "#f8f9fa" : "#fff",
-                }}
-              >
-                {editingId === item.id ? (
-                  <form onSubmit={(e) => handleUpdate(e, item.id)}>
-                    <div style={{ marginBottom: 10 }}>
-                      <label style={{ display: "block", marginBottom: 4, fontSize: 12, fontWeight: 500 }}>
-                        utm_source 값
-                      </label>
-                      <input
-                        type="text"
-                        value={editForm.value}
-                        onChange={(e) => setEditForm((f) => ({ ...f, value: e.target.value }))}
-                        style={inputStyle}
-                        disabled={actionId === item.id}
-                      />
-                    </div>
-                    <div style={{ marginBottom: 10 }}>
-                      <label style={{ display: "block", marginBottom: 4, fontSize: 12, fontWeight: 500 }}>
-                        표시 이름
-                      </label>
-                      <input
-                        type="text"
-                        value={editForm.label}
-                        onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))}
-                        style={inputStyle}
-                        disabled={actionId === item.id}
-                      />
-                    </div>
-                    <div style={{ marginBottom: 12 }}>
-                      <label style={{ display: "block", marginBottom: 4, fontSize: 12, fontWeight: 500 }}>
-                        구글 시트 표시명
-                      </label>
-                      <input
-                        type="text"
-                        value={editForm.sheetLabel}
-                        onChange={(e) => setEditForm((f) => ({ ...f, sheetLabel: e.target.value }))}
-                        style={inputStyle}
-                        disabled={actionId === item.id}
-                      />
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        type="submit"
-                        disabled={actionId === item.id}
-                        style={{
-                          padding: "8px 14px",
-                          background: actionId === item.id ? "#adb5bd" : "var(--cta-bg)",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 6,
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor: actionId === item.id ? "default" : "pointer",
-                        }}
-                      >
-                        {actionId === item.id ? "저장 중..." : "저장"}
-                      </button>
-                      <button type="button" onClick={cancelEdit} style={btnSecondary} disabled={actionId === item.id}>
-                        취소
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
-                      {item.label}{" "}
-                      <span style={{ fontWeight: 400, color: "var(--text-secondary)" }}>({item.value})</span>
-                    </div>
-                    <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 10 }}>
-                      시트 표시: {item.sheet_label}
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button type="button" onClick={() => startEdit(item)} style={btnSecondary} disabled={!!actionId}>
-                        수정
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(item)}
-                        style={btnDanger}
-                        disabled={!!actionId}
-                      >
-                        {actionId === item.id ? "삭제 중..." : "삭제"}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: 14,
+                tableLayout: "fixed",
+              }}
+            >
+              <colgroup>
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "24%" }} />
+                <col style={{ width: "26%" }} />
+                <col style={{ width: "28%" }} />
+              </colgroup>
+              <thead>
+                <tr style={{ borderBottom: "2px solid var(--border)" }}>
+                  {["표시 이름", "utm_source 값", "구글 시트 표시명", "관리"].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        textAlign: "left",
+                        padding: "10px 8px",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "var(--text-secondary)",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const editing = editingId === item.id;
+                  const busy = actionId === item.id;
+                  return (
+                    <tr
+                      key={item.id}
+                      style={{
+                        borderBottom: "1px solid var(--border)",
+                        background: editing ? "#f8f9fa" : "transparent",
+                      }}
+                    >
+                      {editing ? (
+                        <>
+                          <td style={{ padding: "10px 8px", verticalAlign: "top" }}>
+                            <input
+                              type="text"
+                              value={editForm.label}
+                              onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))}
+                              style={cellInputStyle}
+                              disabled={busy}
+                            />
+                          </td>
+                          <td style={{ padding: "10px 8px", verticalAlign: "top" }}>
+                            <input
+                              type="text"
+                              value={editForm.value}
+                              onChange={(e) => setEditForm((f) => ({ ...f, value: e.target.value }))}
+                              style={cellInputStyle}
+                              disabled={busy}
+                            />
+                          </td>
+                          <td style={{ padding: "10px 8px", verticalAlign: "top" }}>
+                            <input
+                              type="text"
+                              value={editForm.sheetLabel}
+                              onChange={(e) => setEditForm((f) => ({ ...f, sheetLabel: e.target.value }))}
+                              style={cellInputStyle}
+                              disabled={busy}
+                            />
+                          </td>
+                          <td style={{ padding: "10px 8px", verticalAlign: "top" }}>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              <button
+                                type="button"
+                                onClick={(e) => handleUpdate(e, item.id)}
+                                disabled={busy}
+                                style={{
+                                  padding: "6px 12px",
+                                  background: busy ? "#adb5bd" : "var(--cta-bg)",
+                                  color: "#fff",
+                                  border: "none",
+                                  borderRadius: 6,
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  cursor: busy ? "default" : "pointer",
+                                }}
+                              >
+                                {busy ? "저장 중..." : "저장"}
+                              </button>
+                              <button type="button" onClick={cancelEdit} style={btnSecondary} disabled={busy}>
+                                취소
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td style={{ padding: "12px 8px", fontWeight: 600, wordBreak: "break-word" }}>
+                            {item.label}
+                          </td>
+                          <td
+                            style={{
+                              padding: "12px 8px",
+                              color: "var(--text-secondary)",
+                              fontFamily: "monospace",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {item.value}
+                          </td>
+                          <td
+                            style={{
+                              padding: "12px 8px",
+                              color: "var(--text-secondary)",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {item.sheet_label}
+                          </td>
+                          <td style={{ padding: "12px 8px" }}>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              <button
+                                type="button"
+                                onClick={() => startEdit(item)}
+                                style={btnSecondary}
+                                disabled={!!actionId}
+                              >
+                                수정
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(item)}
+                                style={btnDanger}
+                                disabled={!!actionId}
+                              >
+                                {busy ? "삭제 중..." : "삭제"}
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
