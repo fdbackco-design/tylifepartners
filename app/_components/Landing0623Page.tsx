@@ -38,14 +38,19 @@ function openBrochurePdf() {
 }
 
 export type Landing0623PageProps = {
+  hero1?: string;
   hero2: string;
+  /** false면 상품 소개서 버튼 숨김 (기본 true) */
+  showBrochure?: boolean;
   entryPage: string;
   karrotPage: string;
   landingKey: LandingKey;
 };
 
 export default function Landing0623Page({
+  hero1 = "/assets/hero_0623_1.jpg",
   hero2,
+  showBrochure = true,
   entryPage,
   karrotPage,
   landingKey,
@@ -189,7 +194,7 @@ export default function Landing0623Page({
 
   const closeSheet = () => setSheetOpen(false);
 
-  const hero1Src = img1Error ? HERO_FALLBACK : "/assets/hero_0623_1.jpg";
+  const hero1Src = img1Error ? HERO_FALLBACK : hero1;
   const hero2Src = img2Error ? HERO_FALLBACK : hero2;
 
   return (
@@ -233,59 +238,61 @@ export default function Landing0623Page({
         />
       </section>
 
-      <div
-        style={{
-          maxWidth: 480,
-          margin: "0 auto",
-          padding: "24px 20px",
-          background: "#fff",
-          display: "flex",
-          justifyContent: "center",
-        }}
-      >
-        <button
-          type="button"
-          onClick={openBrochurePdf}
+      {showBrochure && (
+        <div
           style={{
-            display: "inline-flex",
-            alignItems: "center",
+            maxWidth: 480,
+            margin: "0 auto",
+            padding: "24px 20px",
+            background: "#fff",
+            display: "flex",
             justifyContent: "center",
-            gap: 12,
-            padding: "18px 32px",
-            width: "100%",
-            maxWidth: 400,
-            boxSizing: "border-box",
-            background: "#e9ecef",
-            color: "#495057",
-            border: "1px solid #ced4da",
-            borderRadius: 9999,
-            fontSize: 27,
-            fontWeight: 800,
-            cursor: "pointer",
-            WebkitTapHighlightColor: "transparent",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
           }}
         >
-          <span
-            aria-hidden
+          <button
+            type="button"
+            onClick={openBrochurePdf}
             style={{
-              width: 27,
-              height: 27,
-              flexShrink: 0,
-              backgroundColor: "#495057",
-              WebkitMaskImage: `url(${BROCHURE_ICON})`,
-              WebkitMaskSize: "contain",
-              WebkitMaskRepeat: "no-repeat",
-              WebkitMaskPosition: "center",
-              maskImage: `url(${BROCHURE_ICON})`,
-              maskSize: "contain",
-              maskRepeat: "no-repeat",
-              maskPosition: "center",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 12,
+              padding: "18px 32px",
+              width: "100%",
+              maxWidth: 400,
+              boxSizing: "border-box",
+              background: "#e9ecef",
+              color: "#495057",
+              border: "1px solid #ced4da",
+              borderRadius: 9999,
+              fontSize: 27,
+              fontWeight: 800,
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+              boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
             }}
-          />
-          상품 소개서 받아보기
-        </button>
-      </div>
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 27,
+                height: 27,
+                flexShrink: 0,
+                backgroundColor: "#495057",
+                WebkitMaskImage: `url(${BROCHURE_ICON})`,
+                WebkitMaskSize: "contain",
+                WebkitMaskRepeat: "no-repeat",
+                WebkitMaskPosition: "center",
+                maskImage: `url(${BROCHURE_ICON})`,
+                maskSize: "contain",
+                maskRepeat: "no-repeat",
+                maskPosition: "center",
+              }}
+            />
+            상품 소개서 받아보기
+          </button>
+        </div>
+      )}
 
       <section
         ref={secondSectionRef}

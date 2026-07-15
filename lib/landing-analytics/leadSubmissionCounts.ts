@@ -17,6 +17,8 @@ const LANDING_LEAD_CONFIG: Record<
   sidejob: { table: "tylife_b2b", entryPages: ["sidejob", "/sidejob"] },
   landing_0623: { table: "tylife_b2b", entryPages: ["0623", "/0623"] },
   landing_0623s: { table: "tylife_b2b", entryPages: ["0623s", "/0623s"] },
+  landing_0715: { table: "tylife_b2b", entryPages: ["0715", "/0715"] },
+  landing_0715s: { table: "tylife_b2b", entryPages: ["0715s", "/0715s"] },
 };
 
 /** 기간·랜딩별 상담 신청 시 last_section_name 건수 */

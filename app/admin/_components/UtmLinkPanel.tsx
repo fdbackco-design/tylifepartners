@@ -43,7 +43,7 @@ function emptyEditForm() {
 
 export default function UtmLinkPanel() {
   const [baseUrl, setBaseUrl] = useState("https://www.tylifepartners.com");
-  const [path, setPath] = useState("/0623s");
+  const [path, setPath] = useState("/0715s");
   const [selectedValue, setSelectedValue] = useState("");
   const [items, setItems] = useState<UtmSourceRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +89,7 @@ export default function UtmLinkPanel() {
 
   const generatedLink = useMemo(() => {
     if (!baseUrl.trim() || !selectedValue) return "";
-    return buildUtmLink(baseUrl.trim(), path.trim() || "/0623s", selectedValue);
+    return buildUtmLink(baseUrl.trim(), path.trim() || "/0715s", selectedValue);
   }, [baseUrl, path, selectedValue]);
 
   const filteredItems = useMemo(() => {
@@ -232,7 +232,7 @@ export default function UtmLinkPanel() {
           type="text"
           value={path}
           onChange={(e) => setPath(e.target.value)}
-          placeholder="/0623s"
+          placeholder="/0715s"
           style={inputStyle}
         />
       </div>

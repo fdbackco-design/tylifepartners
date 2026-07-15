@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { processBusinessLeadSideEffects } from "@/lib/businessLeadSideEffects";
 import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
 import { isLanding0623EntryPage, normalizeLanding0623EntryPage } from "@/lib/landing0623";
+import { isLanding0715EntryPage, normalizeLanding0715EntryPage } from "@/lib/landing0715";
 import { formatPhoneKorean } from "@/lib/phone";
 import { runAfterResponse } from "@/lib/runAfterResponse";
 
@@ -34,7 +35,9 @@ export async function POST(request: NextRequest) {
     const entryPageRaw = String(body.entry_page ?? "business").trim() || "business";
     const entryPage = isLanding0623EntryPage(entryPageRaw)
       ? normalizeLanding0623EntryPage(entryPageRaw)
-      : entryPageRaw;
+      : isLanding0715EntryPage(entryPageRaw)
+        ? normalizeLanding0715EntryPage(entryPageRaw)
+        : entryPageRaw;
     const is0623Landing = isLanding0623EntryPage(entryPage);
     const utmSource = body.utm_source != null ? String(body.utm_source).trim() : null;
     const utmMedium = body.utm_medium != null ? String(body.utm_medium).trim() : null;
