@@ -51,8 +51,11 @@ export async function processBusinessLeadSideEffects(
   });
 
   const medium = await resolveSheetMediumFromUtmSource(input.utmSource, input.source);
+  // /0623, /0715 → G열 공란 / /0623s, /0715s → utm sheet_label + 담당자 동기화
   const managerName =
-    input.entryPage === "/0623" ? "" : medium.trim() || null;
+    input.entryPage === "/0623" || input.entryPage === "/0715"
+      ? ""
+      : medium.trim() || null;
   const sheetResult = await appendLeadRowToGoogleSheet({
     dateKstYmd: input.dateKstYmd,
     medium,
