@@ -9,6 +9,8 @@ type EmailLeadPayload = {
   phone: string;
   createdAtIso?: string;
   adminUrl: string;
+  /** 동일 연락처의 과거 제출 이력이 있으면 true(재문의) */
+  isRepeat?: boolean;
   // b2c
   desired_date?: string | null;
   desired_time?: string | null;
@@ -55,9 +57,15 @@ function formatKstYmdHm(iso: string): string | null {
   return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}`;
 }
 
+function buildSubjectLabel(p: EmailLeadPayload): string {
+  const kst = formatKstYmdHm(p.createdAtIso ?? new Date().toISOString()) ?? p.createdAtIso ?? "";
+  const kind = p.isRepeat ? "재문의" : "신규문의";
+  return `[FEED Life 랜딩 ${kind} | ${kst}]`;
+}
+
 function buildText(p: EmailLeadPayload): string {
   const lines: string[] = [];
-  lines.push(`[TY Life Partners] 신규 상담 신청 (${p.kind.toUpperCase()})`);
+  lines.push(buildSubjectLabel(p));
   lines.push("");
   lines.push(`이름: ${p.name}`);
   lines.push(`연락처: ${formatPhoneKorean(p.phone)}`);
@@ -109,7 +117,7 @@ export async function sendLeadEmailNotification(payload: EmailLeadPayload): Prom
     auth: { user, pass },
   });
 
-  const subject = `[TY Life] 신규 상담 신청 (${payload.kind.toUpperCase()}) - ${payload.name}`;
+  const subject = buildSubjectLabel(payload);
   const text = buildText(payload);
 
   try {

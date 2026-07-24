@@ -42,7 +42,9 @@ function emptyEditForm() {
 }
 
 export default function UtmLinkPanel() {
-  const [baseUrl, setBaseUrl] = useState("https://www.tylifepartners.com");
+  const [baseUrl, setBaseUrl] = useState(
+    process.env.NEXT_PUBLIC_SITE_URL || "https://www.tylifepartners.com"
+  );
   const [path, setPath] = useState("/0715s");
   const [selectedValue, setSelectedValue] = useState("");
   const [items, setItems] = useState<UtmSourceRow[]>([]);

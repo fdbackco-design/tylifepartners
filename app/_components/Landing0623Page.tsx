@@ -31,7 +31,7 @@ function openBrochurePdf() {
   window.open(BROCHURE_PDF, "_blank", "noopener,noreferrer");
   const link = document.createElement("a");
   link.href = BROCHURE_PDF;
-  link.download = "TY Life Partners 브로셔.pdf";
+  link.download = "FEED Life 브로셔.pdf";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

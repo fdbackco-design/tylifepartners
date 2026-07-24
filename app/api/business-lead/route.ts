@@ -109,27 +109,38 @@ export async function POST(request: NextRequest) {
     const analytics = parseSubmissionAnalytics(body as Record<string, unknown>);
 
     const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from("tylife_b2b").insert({
-      name,
-      phone,
-      source: utmSource || source,
-      entry_page: entryPage,
-      utm_source: utmSource || null,
-      utm_medium: utmMedium || null,
-      utm_campaign: utmCampaign || null,
-      utm_content: utmContent || null,
-      utm_term: utmTerm || null,
-      marketing_consent: marketingConsent,
-      region: region || null,
-      available_time: availableTime || null,
-      age_group: ageGroup || null,
-      job: job || null,
-      job_rank: jobRankForDb,
-      analytics_session_id: analytics.analytics_session_id,
-      max_scroll_depth: analytics.max_scroll_depth,
-      last_section_name: analytics.last_section_name,
-      last_section_label: analytics.last_section_label,
-    });
+
+    const { count: priorSubmissionCount } = await supabase
+      .from("tylife_b2b")
+      .select("id", { count: "exact", head: true })
+      .eq("phone", phone);
+    const isRepeat = (priorSubmissionCount ?? 0) > 0;
+
+    const { data: insertedLead, error } = await supabase
+      .from("tylife_b2b")
+      .insert({
+        name,
+        phone,
+        source: utmSource || source,
+        entry_page: entryPage,
+        utm_source: utmSource || null,
+        utm_medium: utmMedium || null,
+        utm_campaign: utmCampaign || null,
+        utm_content: utmContent || null,
+        utm_term: utmTerm || null,
+        marketing_consent: marketingConsent,
+        region: region || null,
+        available_time: availableTime || null,
+        age_group: ageGroup || null,
+        job: job || null,
+        job_rank: jobRankForDb,
+        analytics_session_id: analytics.analytics_session_id,
+        max_scroll_depth: analytics.max_scroll_depth,
+        last_section_name: analytics.last_section_name,
+        last_section_label: analytics.last_section_label,
+      })
+      .select("id")
+      .single();
 
     if (error) {
       console.error("Supabase tylife_b2b insert error:", error);
@@ -145,14 +156,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, message: msg }, { status: 500 });
     }
 
-    // 구글 시트·담당자 동기화·이메일은 응답 후 백그라운드 처리
+    // 구글 시트·담당자 동기화·이메일·FEED Life CRM 동기화는 응답 후 백그라운드 처리
     runAfterResponse(
       processBusinessLeadSideEffects({
+        submissionId: insertedLead?.id ?? null,
         dateKstYmd: formatKstYmd(new Date()),
         name,
         phone,
         phonePretty,
         source,
+        isRepeat,
         utmSource,
         utmMedium,
         utmCampaign,

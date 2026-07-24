@@ -5,6 +5,9 @@ import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
 import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
 import { resolveSheetMediumFromUtmSource } from "@/lib/utmSourceMapping";
 import { formatPhoneKorean } from "@/lib/phone";
+import { getSiteUrl } from "@/lib/siteUrl";
+import { syncLeadToCrm } from "@/lib/crmSync";
+import { runAfterResponse } from "@/lib/runAfterResponse";
 
 /** 클라이언트에서 보낸 유입 경로 (예: /, /v2, /me). 잘못된 값은 무시 */
 function normalizeEntryPage(raw: unknown): string | null {
@@ -77,25 +80,36 @@ export async function POST(request: NextRequest) {
     const analytics = parseSubmissionAnalytics(body as Record<string, unknown>);
 
     const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from("leads").insert({
-      name,
-      phone,
-      source: utmSource || source,
-      desired_date: desiredDate || null,
-      desired_time: desiredTime || null,
-      location: location || null,
-      utm_source: utmSource || null,
-      utm_medium: utmMedium || null,
-      utm_campaign: utmCampaign || null,
-      utm_content: utmContent || null,
-      utm_term: utmTerm || null,
-      marketing_consent: marketingConsent,
-      entry_page: entryPage,
-      analytics_session_id: analytics.analytics_session_id,
-      max_scroll_depth: analytics.max_scroll_depth,
-      last_section_name: analytics.last_section_name,
-      last_section_label: analytics.last_section_label,
-    });
+
+    const { count: priorSubmissionCount } = await supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("phone", phone);
+    const isRepeat = (priorSubmissionCount ?? 0) > 0;
+
+    const { data: insertedLead, error } = await supabase
+      .from("leads")
+      .insert({
+        name,
+        phone,
+        source: utmSource || source,
+        desired_date: desiredDate || null,
+        desired_time: desiredTime || null,
+        location: location || null,
+        utm_source: utmSource || null,
+        utm_medium: utmMedium || null,
+        utm_campaign: utmCampaign || null,
+        utm_content: utmContent || null,
+        utm_term: utmTerm || null,
+        marketing_consent: marketingConsent,
+        entry_page: entryPage,
+        analytics_session_id: analytics.analytics_session_id,
+        max_scroll_depth: analytics.max_scroll_depth,
+        last_section_name: analytics.last_section_name,
+        last_section_label: analytics.last_section_label,
+      })
+      .select("id")
+      .single();
 
     if (error) {
       console.error("Supabase insert error:", error);
@@ -143,7 +157,8 @@ export async function POST(request: NextRequest) {
       name,
       phone,
       createdAtIso: new Date().toISOString(),
-      adminUrl: "https://www.tylifepartners.com/admin",
+      adminUrl: `${getSiteUrl()}/admin`,
+      isRepeat,
       entry_page: entryPage,
       desired_date: desiredDate || null,
       desired_time: desiredTime || null,
@@ -155,6 +170,37 @@ export async function POST(request: NextRequest) {
     });
     if (!emailResult.ok && !emailResult.skipped) {
       console.error("Lead email notify failed:", emailResult.error);
+    }
+
+    // FEED Life CRM 동기화 (응답 이후 백그라운드) - 실패해도 위의 DB/Sheets/
+    // 이메일 처리는 이미 끝난 뒤이므로 고객 응답에 영향을 주지 않는다.
+    if (insertedLead?.id) {
+      runAfterResponse(
+        syncLeadToCrm({
+          submissionId: insertedLead.id,
+          sourceTable: "leads",
+          customerName: name,
+          phone,
+          region: location || null,
+          ageGroup: ageGroup || null,
+          message:
+            [
+              desiredDate ? `희망 상담일: ${desiredDate}` : null,
+              desiredTime ? `희망 상담시간: ${desiredTime}` : null,
+              location ? `사는 위치: ${location}` : null,
+            ]
+              .filter(Boolean)
+              .join(", ") || null,
+          privacyConsent: true,
+          receivedAtIso: new Date().toISOString(),
+          landingPage: entryPage,
+          utmSource,
+          utmMedium,
+          utmCampaign,
+          utmContent,
+          utmTerm,
+        })
+      );
     }
 
     return NextResponse.json({ ok: true });
