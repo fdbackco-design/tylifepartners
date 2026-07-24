@@ -73,7 +73,9 @@ async function callCrmIngest(
     const body = await res.json().catch(() => null);
 
     if (res.ok && body && typeof body === "object" && "status" in body) {
-      return { status: String((body as { status: unknown }).status), result: body, error: null };
+      // CRM RPC는 소문자 snake_case(synced_new_lead 등)를 반환한다 -
+      // crm_sync_status.crm_sync_status CHECK 제약은 대문자 상수라 정규화한다.
+      return { status: String((body as { status: unknown }).status).toUpperCase(), result: body, error: null };
     }
 
     const message =
