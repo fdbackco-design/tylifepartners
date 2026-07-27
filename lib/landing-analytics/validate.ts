@@ -1,4 +1,4 @@
-import { LANDING_KEYS } from "@/lib/landing-analytics/sections";
+import { isValidLandingKey } from "@/lib/landing-analytics/sections";
 import {
   LANDING_EVENT_TYPES,
   SCROLL_DEPTH_MILESTONES,
@@ -65,7 +65,7 @@ export function parseTrackBody(raw: unknown): { ok: true; data: LandingTrackPayl
   }
 
   const landing_key = body.landing_key;
-  if (typeof landing_key !== "string" || !LANDING_KEYS.includes(landing_key as (typeof LANDING_KEYS)[number])) {
+  if (typeof landing_key !== "string" || !isValidLandingKey(landing_key)) {
     return { ok: false, message: "Invalid landing_key" };
   }
 

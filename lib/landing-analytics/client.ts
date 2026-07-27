@@ -1,5 +1,4 @@
 import { getDeviceType } from "@/lib/landing-analytics/device";
-import type { LandingKey } from "@/lib/landing-analytics/sections";
 import type { LandingTrackPayload } from "@/lib/landing-analytics/types";
 import { parseUTMFromUrl } from "@/lib/utm";
 
@@ -53,7 +52,7 @@ function readUtm(): Pick<
   };
 }
 
-export function buildBasePayload(landingKey: LandingKey): Omit<LandingTrackPayload, "event_type"> {
+export function buildBasePayload(landingKey: string): Omit<LandingTrackPayload, "event_type"> {
   const viewport_width = typeof window !== "undefined" ? window.innerWidth : 0;
   const viewport_height = typeof window !== "undefined" ? window.innerHeight : 0;
   const document_height =

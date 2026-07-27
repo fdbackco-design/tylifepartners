@@ -167,11 +167,19 @@ export function getLandingSections(landingKey: string): LandingSection[] {
   return LANDING_SECTIONS[landingKey as LandingKey] ?? DEFAULT_LANDING_SECTIONS;
 }
 
+export function isValidLandingKey(key: string): boolean {
+  if (LANDING_KEYS.includes(key as LandingKey)) return true;
+  return /^managed_[a-zA-Z0-9_-]+$/.test(key);
+}
+
 export function getLandingSectionByRatio(
   landingKey: string,
-  yRatio: number
+  yRatio: number,
+  sectionsOverride?: LandingSection[] | null
 ): LandingSection | null {
-  const sections = getLandingSections(landingKey);
+  const sections = sectionsOverride?.length
+    ? sectionsOverride
+    : getLandingSections(landingKey);
   return (
     sections.find((section) => yRatio >= section.start && yRatio < section.end) ??
     sections[sections.length - 1] ??

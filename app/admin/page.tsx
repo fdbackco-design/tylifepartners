@@ -419,6 +419,29 @@ export default function AdminPage() {
           UTM 링크
         </button>
         <Link
+          href="/admin/landings"
+          onClick={() => {
+            if (isMobile) setNavOpen(false);
+          }}
+          style={{
+            display: "block",
+            width: "100%",
+            padding: "12px 20px",
+            border: "none",
+            borderLeft: "3px solid transparent",
+            background: "transparent",
+            textAlign: "left",
+            fontSize: 15,
+            fontWeight: 400,
+            cursor: "pointer",
+            textDecoration: "none",
+            color: "inherit",
+            boxSizing: "border-box",
+          }}
+        >
+          랜딩 생성
+        </Link>
+        <Link
           href="/admin/landing-analytics"
           onClick={() => {
             if (isMobile) setNavOpen(false);

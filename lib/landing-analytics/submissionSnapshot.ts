@@ -4,7 +4,10 @@ import {
   readDocumentMetrics,
 } from "@/lib/landing-analytics/metrics";
 import { computeCenterYRatio } from "@/lib/landing-analytics/sectionDwell";
-import { getLandingSectionByRatio, type LandingKey } from "@/lib/landing-analytics/sections";
+import {
+  getLandingSectionByRatio,
+  type LandingSection,
+} from "@/lib/landing-analytics/sections";
 
 export type SubmissionAnalyticsPayload = {
   analytics_session_id: string;
@@ -13,11 +16,16 @@ export type SubmissionAnalyticsPayload = {
   last_section_label: string | null;
 };
 
-let activeLandingKey: LandingKey | null = null;
+let activeLandingKey: string | null = null;
+let activeSections: LandingSection[] | null = null;
 let snapshot: SubmissionAnalyticsPayload | null = null;
 
-export function initSubmissionSnapshot(landingKey: LandingKey): void {
+export function initSubmissionSnapshot(
+  landingKey: string,
+  sections?: LandingSection[] | null
+): void {
   activeLandingKey = landingKey;
+  activeSections = sections?.length ? sections : null;
   snapshot = {
     analytics_session_id: getOrCreateLandingSessionId(),
     max_scroll_depth: 0,
@@ -41,7 +49,7 @@ export function refreshSubmissionSnapshot(maxScrollY?: number): void {
 
   const yRatio = computeCenterYRatio();
   if (yRatio != null) {
-    const section = getLandingSectionByRatio(activeLandingKey, yRatio);
+    const section = getLandingSectionByRatio(activeLandingKey, yRatio, activeSections);
     if (section) {
       snapshot.last_section_name = section.name;
       snapshot.last_section_label = section.label;

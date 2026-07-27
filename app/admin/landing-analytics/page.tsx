@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   LANDING_KEYS,
   LANDING_KEY_LABELS,
-  type LandingKey,
 } from "@/lib/landing-analytics/sections";
 import type { LandingAnalyticsReport } from "@/lib/landing-analytics/aggregate";
 import {
@@ -25,7 +24,8 @@ function defaultToDate() {
 
 export default function LandingAnalyticsAdminPage() {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
-  const [landingKey, setLandingKey] = useState<LandingKey>("landing_0715s");
+  const [landingKey, setLandingKey] = useState<string>("landing_0715s");
+  const [managedOptions, setManagedOptions] = useState<{ key: string; label: string }[]>([]);
   const [fromDate, setFromDate] = useState(defaultFromDate);
   const [toDate, setToDate] = useState(defaultToDate);
   const [loading, setLoading] = useState(false);
@@ -36,6 +36,22 @@ export default function LandingAnalyticsAdminPage() {
   const checkAuth = useCallback(async () => {
     const res = await fetch("/api/admin/leads?limit=1");
     setLoggedIn(res.ok);
+    if (res.ok) {
+      try {
+        const lr = await fetch("/api/admin/landings");
+        const lj = await lr.json();
+        if (lr.ok && Array.isArray(lj.items)) {
+          setManagedOptions(
+            lj.items.map((it: { slug: string; path: string; title: string }) => ({
+              key: `managed_${it.slug}`,
+              label: `${it.title} (${it.path})`,
+            }))
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    }
   }, []);
 
   const loadReport = useCallback(async () => {
@@ -107,12 +123,17 @@ export default function LandingAnalyticsAdminPage() {
           랜딩
           <select
             value={landingKey}
-            onChange={(e) => setLandingKey(e.target.value as LandingKey)}
+            onChange={(e) => setLandingKey(e.target.value)}
             style={{ padding: "8px 10px", minWidth: 180 }}
           >
             {LANDING_KEYS.map((k) => (
               <option key={k} value={k}>
                 {LANDING_KEY_LABELS[k]}
+              </option>
+            ))}
+            {managedOptions.map((o) => (
+              <option key={o.key} value={o.key}>
+                {o.label}
               </option>
             ))}
           </select>
