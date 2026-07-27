@@ -84,6 +84,15 @@ export default function ManagedLandingPage({
 
   const landingKey = landingKeyForManaged(slug);
 
+  // URL이 바뀌면 (관리자 미리보기 업로드 등) fallback 고정을 해제하고 새 이미지를 다시 로드
+  useEffect(() => {
+    setImg1Error(false);
+  }, [hero1Url]);
+
+  useEffect(() => {
+    setImg2Error(false);
+  }, [hero2Url]);
+
   useEffect(() => {
     if (ctaPosition === "always") {
       setShowFixedCta(true);
@@ -212,8 +221,8 @@ export default function ManagedLandingPage({
 
   const closeSheet = () => setSheetOpen(false);
 
-  const hero1Src = img1Error ? HERO_FALLBACK : hero1Url;
-  const hero2Src = img2Error ? HERO_FALLBACK : hero2Url;
+  const hero1Src = !hero1Url.trim() || img1Error ? HERO_FALLBACK : hero1Url.trim();
+  const hero2Src = !hero2Url.trim() || img2Error ? HERO_FALLBACK : hero2Url.trim();
 
   return (
     <main>
@@ -249,10 +258,13 @@ export default function ManagedLandingPage({
 
       <section style={{ margin: 0, lineHeight: 0, background: "#e9ecef" }}>
         <img
+          key={`hero1-${hero1Url}`}
           src={hero1Src}
           alt=""
           style={{ width: "100%", height: "auto", display: "block", verticalAlign: "bottom" }}
-          onError={() => setImg1Error(true)}
+          onError={() => {
+            if (hero1Url.trim()) setImg1Error(true);
+          }}
         />
       </section>
 
@@ -323,10 +335,13 @@ export default function ManagedLandingPage({
         }}
       >
         <img
+          key={`hero2-${hero2Url}`}
           src={hero2Src}
           alt=""
           style={{ width: "100%", height: "auto", display: "block", verticalAlign: "bottom" }}
-          onError={() => setImg2Error(true)}
+          onError={() => {
+            if (hero2Url.trim()) setImg2Error(true);
+          }}
         />
       </section>
 
