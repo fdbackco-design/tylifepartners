@@ -365,7 +365,12 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
             미리보기 (관리자 전용 구간 측정) · 공개 URL: {path || item.path}
           </div>
           <div style={{ maxHeight: "80vh", overflow: "auto", background: "#fff" }}>
-            {previewProps && <ManagedLandingPage {...previewProps} />}
+            {previewProps && (
+              <ManagedLandingPage
+                key={`${previewProps.hero1Url}|${previewProps.hero2Url}|${previewProps.showBrochure}|${previewProps.brochureUrl ?? ""}|${previewProps.ctaPosition}`}
+                {...previewProps}
+              />
+            )}
           </div>
         </section>
       </div>
