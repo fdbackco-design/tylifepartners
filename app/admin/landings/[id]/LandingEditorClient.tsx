@@ -1,12 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ManagedLandingPage from "@/app/_components/ManagedLandingPage";
-import {
-  computeLandingScrollMetrics,
-  formatYRatio,
-} from "@/lib/landingScrollMetrics";
+import { formatYRatio, yRatio } from "@/lib/landingScrollMetrics";
 import type {
   ManagedCtaPosition,
   ManagedLandingRow,
@@ -40,8 +37,8 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
   const [published, setPublished] = useState(false);
   const [sections, setSections] = useState<ManagedLandingSection[]>([]);
   const [sectionLabel, setSectionLabel] = useState("");
-  const [pendingStart, setPendingStart] = useState<number | null>(null);
   const [yHint, setYHint] = useState("0.0000");
+  const previewScrollRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -76,19 +73,27 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
     void load();
   }, [load]);
 
+  /** 미리보기 스크롤 컨테이너 기준 — 페이지 최상단=0, 현재 보이는 상단 경계=측정점 */
+  const readPreviewTopRatio = useCallback((): number => {
+    const el = previewScrollRef.current;
+    if (!el) return 0;
+    const scrollHeight = el.scrollHeight;
+    if (scrollHeight <= 0) return 0;
+    return yRatio(el.scrollTop, scrollHeight);
+  }, []);
+
   useEffect(() => {
-    const refresh = () => {
-      const m = computeLandingScrollMetrics();
-      setYHint(formatYRatio(m.yRatioCenter));
-    };
+    const el = previewScrollRef.current;
+    const refresh = () => setYHint(formatYRatio(readPreviewTopRatio()));
     refresh();
-    window.addEventListener("scroll", refresh, { passive: true });
+    if (!el) return;
+    el.addEventListener("scroll", refresh, { passive: true });
     window.addEventListener("resize", refresh, { passive: true });
     return () => {
-      window.removeEventListener("scroll", refresh);
+      el.removeEventListener("scroll", refresh);
       window.removeEventListener("resize", refresh);
     };
-  }, []);
+  }, [readPreviewTopRatio, item, hero1, hero2]);
 
   const save = async (patch?: Partial<ManagedLandingRow>) => {
     setSaving(true);
@@ -131,15 +136,18 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
   };
 
   const markSectionPoint = () => {
-    const y = Number(yHint);
-    if (!Number.isFinite(y)) return;
-    if (pendingStart == null) {
-      setPendingStart(y);
-      setMsg(`구간 시작점 기록: ${formatYRatio(y)}. 끝점에서 다시 눌러주세요.`);
+    const end = readPreviewTopRatio();
+    const prevEnd =
+      sections.length > 0 ? Math.max(...sections.map((s) => s.end)) : 0;
+    const start = prevEnd;
+
+    if (end <= start + 0.0005) {
+      setError(
+        "현재 위치가 이전 구간 끝과 같거나 앞에 있습니다. 미리보기를 더 아래로 스크롤한 뒤 다시 찍어주세요."
+      );
       return;
     }
-    const start = Math.min(pendingStart, y);
-    const end = Math.max(pendingStart, y);
+
     const idx = sections.length + 1;
     const next: ManagedLandingSection = {
       name: `section_${String(idx).padStart(2, "0")}`,
@@ -147,10 +155,32 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
       start,
       end,
     };
-    setSections((prev) => [...prev, next].sort((a, b) => a.start - b.start));
-    setPendingStart(null);
+    setSections((prev) => [...prev, next]);
     setSectionLabel("");
-    setMsg(`구간 추가: ${next.label} (${formatYRatio(start)}–${formatYRatio(end)})`);
+    setError("");
+    setMsg(
+      `구간 추가: ${next.label} (${formatYRatio(start)}–${formatYRatio(end)}) · 다음 구간은 이어서 찍습니다.`
+    );
+  };
+
+  const closeLastSectionToEnd = () => {
+    const prevEnd =
+      sections.length > 0 ? Math.max(...sections.map((s) => s.end)) : 0;
+    if (prevEnd >= 0.999) {
+      setError("이미 페이지 끝까지 구간이 채워져 있습니다.");
+      return;
+    }
+    const idx = sections.length + 1;
+    const next: ManagedLandingSection = {
+      name: `section_${String(idx).padStart(2, "0")}`,
+      label: sectionLabel.trim() || `${idx}. 구간`,
+      start: prevEnd,
+      end: 1,
+    };
+    setSections((prev) => [...prev, next]);
+    setSectionLabel("");
+    setError("");
+    setMsg(`마지막 구간 마감: ${next.label} (${formatYRatio(prevEnd)}–1.0000)`);
   };
 
   const previewProps = useMemo(() => {
@@ -286,12 +316,17 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
 
           <h3 style={{ margin: "0 0 8px", fontSize: 15 }}>스크롤 히트맵 구간</h3>
           <p style={{ margin: "0 0 8px", fontSize: 12, color: "#868e96" }}>
-            오른쪽 미리보기를 스크롤하며 중앙 y_ratio로 구간을 찍습니다. (관리자 전용)
+            미리보기 <strong>최상단=0</strong> 기준입니다. 원하는 위치까지 스크롤한 뒤
+            「시작점 찍기」를 누르면 <strong>이전 구간 끝 ~ 현재 화면 상단</strong>이
+            한 구간으로 추가됩니다.
           </p>
           <div style={{ fontFamily: "monospace", fontSize: 12, marginBottom: 8 }}>
-            현재 중앙 y_ratio: <strong>{yHint}</strong>
-            {pendingStart != null && (
-              <span style={{ color: "#e67700" }}> · 시작 {formatYRatio(pendingStart)}</span>
+            현재 화면 상단 y_ratio: <strong>{yHint}</strong>
+            {sections.length > 0 && (
+              <span style={{ color: "#868e96" }}>
+                {" "}
+                · 다음 시작 {formatYRatio(Math.max(...sections.map((s) => s.end)))}
+              </span>
             )}
           </div>
           <input
@@ -300,15 +335,18 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
             placeholder="구간 이름 (예: 1. 메인 후킹)"
             style={{ ...inputStyle, marginBottom: 8 }}
           />
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <button type="button" onClick={markSectionPoint} style={btnSecondary}>
-              {pendingStart == null ? "시작점 찍기" : "끝점 찍고 추가"}
+              시작점 찍기
+            </button>
+            <button type="button" onClick={closeLastSectionToEnd} style={btnSecondary}>
+              끝까지 마감
             </button>
             <button
               type="button"
               onClick={() => {
-                setPendingStart(null);
                 setSections([]);
+                setMsg("구간을 초기화했습니다.");
               }}
               style={btnSecondary}
             >
@@ -364,7 +402,10 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
           >
             미리보기 (관리자 전용 구간 측정) · 공개 URL: {path || item.path}
           </div>
-          <div style={{ maxHeight: "80vh", overflow: "auto", background: "#fff" }}>
+          <div
+            ref={previewScrollRef}
+            style={{ maxHeight: "80vh", overflow: "auto", background: "#fff" }}
+          >
             {previewProps && (
               <ManagedLandingPage
                 key={`${previewProps.hero1Url}|${previewProps.hero2Url}|${previewProps.showBrochure}|${previewProps.brochureUrl ?? ""}|${previewProps.ctaPosition}`}
