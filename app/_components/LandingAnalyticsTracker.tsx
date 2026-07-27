@@ -4,8 +4,7 @@
 
 import { useEffect, useRef } from "react";
 import { buildBasePayload, sendLandingEvent } from "@/lib/landing-analytics/client";
-import { getLandingSectionByRatio } from "@/lib/landing-analytics/sections";
-import type { LandingKey } from "@/lib/landing-analytics/sections";
+import { getLandingSectionByRatio, type LandingSection } from "@/lib/landing-analytics/sections";
 import {
   computeMaxDepthPercent,
   readDocumentMetrics,
@@ -23,10 +22,12 @@ const HEARTBEAT_MS_MAX = 15_000;
 const DWELL_TICK_MS = 1_000;
 
 type Props = {
-  landingKey: LandingKey;
+  landingKey: string;
+  /** managed landing 등 DB 섹션 오버라이드 */
+  sections?: LandingSection[] | null;
 };
 
-export default function LandingAnalyticsTracker({ landingKey }: Props) {
+export default function LandingAnalyticsTracker({ landingKey, sections }: Props) {
   const maxScrollYRef = useRef(0);
   const maxDepthRef = useRef(0);
   const sentDepthsRef = useRef<Set<number>>(new Set());
@@ -39,8 +40,8 @@ export default function LandingAnalyticsTracker({ landingKey }: Props) {
   useEffect(() => {
     startMsRef.current = Date.now();
     leaveSentRef.current = false;
-    dwellAccumulatorRef.current = new SectionDwellAccumulator(landingKey);
-    initSubmissionSnapshot(landingKey);
+    dwellAccumulatorRef.current = new SectionDwellAccumulator(landingKey, sections);
+    initSubmissionSnapshot(landingKey, sections);
 
     const base = () => buildBasePayload(landingKey);
 
@@ -165,7 +166,7 @@ export default function LandingAnalyticsTracker({ landingKey }: Props) {
       const x_ratio = Math.min(1, Math.max(0, e.clientX / viewportWidth));
       const absoluteY = e.clientY + scrollY;
       const y_ratio = Math.min(1, Math.max(0, absoluteY / documentHeight));
-      const section = getLandingSectionByRatio(landingKey, y_ratio);
+      const section = getLandingSectionByRatio(landingKey, y_ratio, sections);
 
       sendLandingEvent({
         ...base(),
@@ -206,7 +207,7 @@ export default function LandingAnalyticsTracker({ landingKey }: Props) {
       if (dwellTickRef.current) clearInterval(dwellTickRef.current);
       sendLeave(true);
     };
-  }, [landingKey]);
+  }, [landingKey, sections]);
 
   return null;
 }

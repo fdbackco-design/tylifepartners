@@ -107,6 +107,19 @@ export async function POST(request: NextRequest) {
     }
 
     const analytics = parseSubmissionAnalytics(body as Record<string, unknown>);
+    const landingIdRaw = body.landing_id != null ? String(body.landing_id).trim() : "";
+    const landingId =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        landingIdRaw
+      )
+        ? landingIdRaw
+        : null;
+    const landingPath =
+      body.landing_path != null
+        ? String(body.landing_path).trim() || null
+        : landingId
+          ? entryPage
+          : null;
 
     const supabase = getSupabaseAdmin();
     const { error } = await supabase.from("tylife_b2b").insert({
@@ -114,6 +127,8 @@ export async function POST(request: NextRequest) {
       phone,
       source: utmSource || source,
       entry_page: entryPage,
+      landing_id: landingId,
+      landing_path: landingPath,
       utm_source: utmSource || null,
       utm_medium: utmMedium || null,
       utm_campaign: utmCampaign || null,

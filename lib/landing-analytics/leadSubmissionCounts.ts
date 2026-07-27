@@ -28,19 +28,29 @@ export async function fetchSubmissionCountBySection(
   to: Date
 ): Promise<Map<string, number>> {
   const config = LANDING_LEAD_CONFIG[landingKey];
-  const supabase = getSupabaseAdmin();
+  return fetchSubmissionCountByEntryPages(config.table, config.entryPages, from, to);
+}
 
+export async function fetchSubmissionCountByEntryPages(
+  table: LeadTable,
+  entryPages: string[],
+  from: Date,
+  to: Date
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (!entryPages.length) return counts;
+
+  const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
-    .from(config.table)
+    .from(table)
     .select("last_section_name")
-    .in("entry_page", config.entryPages)
+    .in("entry_page", entryPages)
     .gte("created_at", from.toISOString())
     .lte("created_at", to.toISOString())
     .not("last_section_name", "is", null);
 
-  const counts = new Map<string, number>();
   if (error) {
-    console.error("fetchSubmissionCountBySection error:", error);
+    console.error("fetchSubmissionCountByEntryPages error:", error);
     return counts;
   }
 

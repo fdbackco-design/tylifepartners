@@ -18,7 +18,7 @@ export type ScrollDepthMilestone = (typeof SCROLL_DEPTH_MILESTONES)[number];
 export type DeviceType = "mobile" | "tablet" | "desktop";
 
 export type LandingTrackPayload = {
-  landing_key: LandingKey;
+  landing_key: LandingKey | string;
   session_id: string;
   event_type: LandingEventType;
   page_url?: string;

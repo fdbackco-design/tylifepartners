@@ -3,10 +3,17 @@ import { verifyAdminSession } from "@/lib/adminSession";
 import { aggregateLandingAnalytics } from "@/lib/landing-analytics/aggregate";
 import {
   attachSubmissionCountsToDropout,
+  fetchSubmissionCountByEntryPages,
   fetchSubmissionCountBySection,
 } from "@/lib/landing-analytics/leadSubmissionCounts";
-import { LANDING_KEYS, type LandingKey } from "@/lib/landing-analytics/sections";
+import {
+  isValidLandingKey,
+  LANDING_KEYS,
+  type LandingKey,
+} from "@/lib/landing-analytics/sections";
 import type { LandingEventAggregateRow } from "@/lib/landing-analytics/eventRow";
+import { getManagedLandingSectionsByKey, getManagedLandingBySlug } from "@/lib/managedLandings/store";
+import { slugFromManagedLandingKey } from "@/lib/managedLandings/types";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const MAX_ROWS = 50_000;
@@ -23,7 +30,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const landing_key = searchParams.get("landing_key") ?? "parent_main";
-    if (!LANDING_KEYS.includes(landing_key as LandingKey)) {
+    if (!isValidLandingKey(landing_key)) {
       return NextResponse.json({ ok: false, message: "Invalid landing_key" }, { status: 400 });
     }
 
@@ -59,9 +66,19 @@ export async function GET(request: NextRequest) {
     }
 
     const events = (data ?? []) as LandingEventAggregateRow[];
-    const key = landing_key as LandingKey;
-    const report = aggregateLandingAnalytics(key, events);
-    const submissionCounts = await fetchSubmissionCountBySection(key, from, to);
+    const managedSections = await getManagedLandingSectionsByKey(landing_key);
+    const report = aggregateLandingAnalytics(landing_key, events, managedSections);
+
+    let submissionCounts: Map<string, number>;
+    if (LANDING_KEYS.includes(landing_key as LandingKey)) {
+      submissionCounts = await fetchSubmissionCountBySection(landing_key as LandingKey, from, to);
+    } else {
+      const slug = slugFromManagedLandingKey(landing_key);
+      const landing = slug ? await getManagedLandingBySlug(slug) : null;
+      const pages = landing ? [landing.path, landing.path.replace(/^\//, "")] : [];
+      submissionCounts = await fetchSubmissionCountByEntryPages("tylife_b2b", pages, from, to);
+    }
+
     report.section_dropout = attachSubmissionCountsToDropout(
       report.section_dropout,
       submissionCounts

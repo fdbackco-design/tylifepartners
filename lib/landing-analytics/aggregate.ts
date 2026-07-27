@@ -107,8 +107,9 @@ function buildSessionMap(events: LandingEventAggregateRow[]): Map<string, Sessio
 }
 
 export function aggregateLandingAnalytics(
-  landingKey: LandingKey,
-  events: LandingEventAggregateRow[]
+  landingKey: LandingKey | string,
+  events: LandingEventAggregateRow[],
+  sectionsOverride?: LandingSection[] | null
 ): LandingAnalyticsReport {
   const sessions = buildSessionMap(events);
   const sessionList = Array.from(sessions.values());
@@ -134,7 +135,8 @@ export function aggregateLandingAnalytics(
   const avg_max_depth =
     total > 0 ? sessionList.reduce((sum, s) => sum + s.max_depth, 0) / total : 0;
 
-  const sections = getLandingSections(landingKey);
+  const sections =
+    sectionsOverride?.length ? sectionsOverride : getLandingSections(landingKey);
   const section_dropout = computeSectionDropout(sessionList, sections);
 
   const deviceMap = new Map<string, SessionSummary[]>();
