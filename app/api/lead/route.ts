@@ -5,6 +5,8 @@ import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
 import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
 import { resolveSheetMediumFromUtmSource } from "@/lib/utmSourceMapping";
 import { formatPhoneKorean } from "@/lib/phone";
+import { runAfterResponse } from "@/lib/runAfterResponse";
+import { syncLeadToCrm } from "@/lib/crmSync";
 
 /** 클라이언트에서 보낸 유입 경로 (예: /, /v2, /me). 잘못된 값은 무시 */
 function normalizeEntryPage(raw: unknown): string | null {
@@ -77,7 +79,7 @@ export async function POST(request: NextRequest) {
     const analytics = parseSubmissionAnalytics(body as Record<string, unknown>);
 
     const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from("leads").insert({
+    const { data: insertedLead, error } = await supabase.from("leads").insert({
       name,
       phone,
       source: utmSource || source,
@@ -95,7 +97,10 @@ export async function POST(request: NextRequest) {
       max_scroll_depth: analytics.max_scroll_depth,
       last_section_name: analytics.last_section_name,
       last_section_label: analytics.last_section_label,
-    });
+    })
+      // 저장되는 값·컬럼은 그대로. CRM 동기화용 submission_id/실제 접수 시각만 돌려받는다.
+      .select("id, created_at")
+      .single();
 
     if (error) {
       console.error("Supabase insert error:", error);
@@ -155,6 +160,35 @@ export async function POST(request: NextRequest) {
     });
     if (!emailResult.ok && !emailResult.skipped) {
       console.error("Lead email notify failed:", emailResult.error);
+    }
+
+    // FEED Life CRM 동기화 — 위 DB 저장·구글 시트·이메일이 전부 끝난 뒤 마지막 단계로만 추가.
+    // 응답을 지연시키지 않도록 응답 이후 백그라운드로 실행하고, 실패해도 위 처리는 롤백하지 않는다.
+    // (환경변수 미설정 시 syncLeadToCrm 내부에서 아무것도 하지 않음)
+    if (insertedLead?.id && insertedLead?.created_at) {
+      runAfterResponse(
+        syncLeadToCrm(supabase, {
+          submissionId: insertedLead.id,
+          sourceTable: "leads",
+          customerName: name,
+          phone, // 위에서 이미 replace(/\D/g, "") 처리된 숫자만의 값
+          region: location || region || null,
+          ageGroup: ageGroup || null,
+          occupation: job || null,
+          inquiryType: null,
+          message: null,
+          // 필수 개인정보 동의에 체크하지 않으면 폼 제출 자체가 불가능한 구조
+          privacyConsent: true,
+          receivedAtIso: new Date(insertedLead.created_at).toISOString(),
+          landingPage: entryPage,
+          referrer: request.headers.get("referer"),
+          utmSource: utmSource || null,
+          utmMedium: utmMedium || null,
+          utmCampaign: utmCampaign || null,
+          utmContent: utmContent || null,
+          utmTerm: utmTerm || null,
+        })
+      );
     }
 
     return NextResponse.json({ ok: true });
