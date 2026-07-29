@@ -6,6 +6,7 @@ import { isLanding0623EntryPage, normalizeLanding0623EntryPage } from "@/lib/lan
 import { isLanding0715EntryPage, normalizeLanding0715EntryPage } from "@/lib/landing0715";
 import { formatPhoneKorean } from "@/lib/phone";
 import { runAfterResponse } from "@/lib/runAfterResponse";
+import { syncLeadToCrm } from "@/lib/crmSync";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
 const ALLOWED_JOB_RANKS = new Set(["지점장 이상", "팀장 이상", "FC"]);
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
           : null;
 
     const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from("tylife_b2b").insert({
+    const { data: insertedLead, error } = await supabase.from("tylife_b2b").insert({
       name,
       phone,
       source: utmSource || source,
@@ -144,7 +145,10 @@ export async function POST(request: NextRequest) {
       max_scroll_depth: analytics.max_scroll_depth,
       last_section_name: analytics.last_section_name,
       last_section_label: analytics.last_section_label,
-    });
+    })
+      // 저장되는 값·컬럼은 그대로. CRM 동기화용 submission_id/실제 접수 시각만 돌려받는다.
+      .select("id, created_at")
+      .single();
 
     if (error) {
       console.error("Supabase tylife_b2b insert error:", error);
@@ -161,24 +165,58 @@ export async function POST(request: NextRequest) {
     }
 
     // 구글 시트·담당자 동기화·이메일은 응답 후 백그라운드 처리
+    const sideEffects = processBusinessLeadSideEffects({
+      dateKstYmd: formatKstYmd(new Date()),
+      name,
+      phone,
+      phonePretty,
+      source,
+      utmSource,
+      utmMedium,
+      utmCampaign,
+      utmContent,
+      entryPage,
+      region,
+      availableTime,
+      ageGroup,
+      job,
+      jobRankForDb,
+    });
+
+    // FEED Life CRM 동기화 — 위 백그라운드 체인(구글 시트 → 담당자 분배 → 이메일)이 전부 끝난 뒤
+    // 마지막 단계로만 실행한다. 기존 처리가 실패하더라도 롤백하지 않고(finally), 기존 에러 전파도
+    // 그대로 유지한다. (환경변수 미설정 시 syncLeadToCrm 내부에서 아무것도 하지 않음)
+    const referrer = request.headers.get("referer");
     runAfterResponse(
-      processBusinessLeadSideEffects({
-        dateKstYmd: formatKstYmd(new Date()),
-        name,
-        phone,
-        phonePretty,
-        source,
-        utmSource,
-        utmMedium,
-        utmCampaign,
-        utmContent,
-        entryPage,
-        region,
-        availableTime,
-        ageGroup,
-        job,
-        jobRankForDb,
-      })
+      (async () => {
+        try {
+          await sideEffects;
+        } finally {
+          if (insertedLead?.id && insertedLead?.created_at) {
+            await syncLeadToCrm(supabase, {
+              submissionId: insertedLead.id,
+              sourceTable: "tylife_b2b",
+              customerName: name,
+              phone, // 위에서 이미 replace(/\D/g, "") 처리된 숫자만의 값
+              region: region || null,
+              ageGroup: ageGroup || null,
+              occupation: job || null,
+              inquiryType: null,
+              message: null,
+              // 필수 개인정보 동의에 체크하지 않으면 폼 제출 자체가 불가능한 구조
+              privacyConsent: true,
+              receivedAtIso: new Date(insertedLead.created_at).toISOString(),
+              landingPage: entryPage,
+              referrer,
+              utmSource: utmSource || null,
+              utmMedium: utmMedium || null,
+              utmCampaign: utmCampaign || null,
+              utmContent: utmContent || null,
+              utmTerm: utmTerm || null,
+            });
+          }
+        }
+      })()
     );
 
     return NextResponse.json({ ok: true });
