@@ -6,6 +6,11 @@ import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
 import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { useUTM } from "@/lib/useUTM";
+import {
+  BASE_REGIONS,
+  formatRegionValue,
+  getDistrictsForRegion,
+} from "@/lib/regions";
 
 const HERO_JOB_1 = "/assets/hero_job.jpg";
 const HERO_JOB_2 = "/assets/hero_job2.jpg";
@@ -34,6 +39,8 @@ export default function SidejobLandingPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [region, setRegion] = useState("");
+  const [regionDetailEnabled, setRegionDetailEnabled] = useState(false);
+  const [district, setDistrict] = useState("");
   const [availableTime, setAvailableTime] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
   const [job, setJob] = useState("");
@@ -85,6 +92,10 @@ export default function SidejobLandingPage() {
       showToast("지역을 선택해주세요.", true);
       return;
     }
+    if (regionDetailEnabled && !district) {
+      showToast("상세 지역(구/시)을 선택해주세요.", true);
+      return;
+    }
     if (!availableTime) {
       showToast("상담가능시간을 선택해주세요.", true);
       return;
@@ -118,7 +129,7 @@ export default function SidejobLandingPage() {
           utm_content: utm.utm_content || null,
           utm_term: utm.utm_term || null,
           marketing_consent: marketingChecked ? 1 : null,
-          region,
+          region: formatRegionValue(region, regionDetailEnabled ? district : null),
           available_time: availableTime,
           age_group: ageGroup,
           job: job || null,
@@ -400,7 +411,10 @@ export default function SidejobLandingPage() {
                   <select
                     id="sidejob-lead-region"
                     value={region}
-                    onChange={(e) => setRegion(e.target.value)}
+                    onChange={(e) => {
+                      setRegion(e.target.value);
+                      setDistrict("");
+                    }}
                     disabled={loading}
                     style={{
                       width: "100%",
@@ -413,17 +427,58 @@ export default function SidejobLandingPage() {
                     }}
                   >
                     <option value="">선택하세요</option>
-                    <option value="서울">서울</option>
-                    <option value="경기">경기</option>
-                    <option value="인천">인천</option>
-                    <option value="강원">강원</option>
-                    <option value="충청">충청</option>
-                    <option value="경상">경상</option>
-                    <option value="전라">전라</option>
-                    <option value="대구">대구</option>
-                    <option value="울산">울산</option>
-                    <option value="제주">제주</option>
+                    {BASE_REGIONS.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
                   </select>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginTop: 10,
+                      fontSize: 14,
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={regionDetailEnabled}
+                      onChange={(e) => {
+                        setRegionDetailEnabled(e.target.checked);
+                        if (!e.target.checked) setDistrict("");
+                      }}
+                      disabled={loading}
+                    />
+                    상세 지역(구/시) 입력
+                  </label>
+                  {regionDetailEnabled && (
+                    <select
+                      id="sidejob-lead-district"
+                      value={district}
+                      onChange={(e) => setDistrict(e.target.value)}
+                      disabled={loading || !region}
+                      style={{
+                        width: "100%",
+                        marginTop: 10,
+                        padding: "12px 14px",
+                        border: "1px solid var(--border)",
+                        borderRadius: 8,
+                        fontSize: 16,
+                        outline: "none",
+                        background: region ? "#fff" : "#f1f3f5",
+                      }}
+                    >
+                      <option value="">{region ? "구/시 선택" : "지역을 먼저 선택하세요"}</option>
+                      {getDistrictsForRegion(region).map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div style={{ marginBottom: 16 }}>

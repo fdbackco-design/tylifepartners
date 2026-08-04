@@ -1,3 +1,7 @@
+import type { ManagedFormConfig } from "@/lib/managedLandings/formConfig";
+
+export type { ManagedFormConfig } from "@/lib/managedLandings/formConfig";
+
 export type ManagedCtaPosition = "always" | "from_bottom" | "after_bottom";
 
 export type ManagedLandingSection = {
@@ -19,6 +23,7 @@ export type ManagedLandingRow = {
   brochure_url: string | null;
   cta_position: ManagedCtaPosition;
   sections: ManagedLandingSection[];
+  form_config: ManagedFormConfig;
   published: boolean;
   created_at: string;
   updated_at: string;
@@ -34,6 +39,7 @@ export type ManagedLandingInput = {
   brochure_url?: string | null;
   cta_position?: ManagedCtaPosition;
   sections?: ManagedLandingSection[];
+  form_config?: ManagedFormConfig;
   published?: boolean;
 };
 

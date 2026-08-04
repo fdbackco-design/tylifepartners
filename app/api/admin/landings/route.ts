@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
       brochure_url: body.brochure_url,
       cta_position: body.cta_position as ManagedCtaPosition | undefined,
       sections: body.sections,
+      form_config: body.form_config,
       published: body.published,
     });
     return NextResponse.json({ ok: true, item });

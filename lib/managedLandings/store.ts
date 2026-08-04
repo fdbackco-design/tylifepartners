@@ -1,5 +1,9 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
 import {
+  DEFAULT_FORM_CONFIG,
+  normalizeFormConfig,
+} from "@/lib/managedLandings/formConfig";
+import {
   normalizeLandingPath,
   normalizeSections,
   slugFromPath,
@@ -10,7 +14,7 @@ import {
 } from "@/lib/managedLandings/types";
 
 const SELECT_COLS =
-  "id, path, slug, title, custom_host, hero1_url, hero2_url, show_brochure, brochure_url, cta_position, sections, published, created_at, updated_at";
+  "id, path, slug, title, custom_host, hero1_url, hero2_url, show_brochure, brochure_url, cta_position, sections, form_config, published, created_at, updated_at";
 
 function mapRow(raw: Record<string, unknown>): ManagedLandingRow {
   return {
@@ -25,6 +29,7 @@ function mapRow(raw: Record<string, unknown>): ManagedLandingRow {
     brochure_url: raw.brochure_url != null ? String(raw.brochure_url) : null,
     cta_position: (raw.cta_position as ManagedCtaPosition) || "from_bottom",
     sections: normalizeSections(raw.sections),
+    form_config: normalizeFormConfig(raw.form_config ?? DEFAULT_FORM_CONFIG),
     published: Boolean(raw.published),
     created_at: String(raw.created_at),
     updated_at: String(raw.updated_at),
@@ -143,6 +148,7 @@ export async function createManagedLanding(
       brochure_url: input.show_brochure ? input.brochure_url?.trim() || null : null,
       cta_position: cta,
       sections: normalizeSections(input.sections ?? []),
+      form_config: normalizeFormConfig(input.form_config ?? DEFAULT_FORM_CONFIG),
       published: Boolean(input.published),
       updated_at: now,
     })
@@ -189,6 +195,7 @@ export async function updateManagedLanding(
     patch.cta_position = input.cta_position;
   }
   if (input.sections != null) patch.sections = normalizeSections(input.sections);
+  if (input.form_config != null) patch.form_config = normalizeFormConfig(input.form_config);
   if (input.published != null) patch.published = Boolean(input.published);
 
   if (patch.show_brochure === false) patch.brochure_url = null;
