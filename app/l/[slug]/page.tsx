@@ -21,6 +21,7 @@ export default async function ManagedLandingPublicPage({ params }: Props) {
       brochureUrl={landing.brochure_url}
       ctaPosition={landing.cta_position}
       sections={landing.sections}
+      formConfig={landing.form_config}
     />
   );
 }

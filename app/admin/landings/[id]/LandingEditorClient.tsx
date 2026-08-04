@@ -6,9 +6,11 @@ import ManagedLandingPage from "@/app/_components/ManagedLandingPage";
 import { formatYRatio, yRatio } from "@/lib/landingScrollMetrics";
 import type {
   ManagedCtaPosition,
+  ManagedFormConfig,
   ManagedLandingRow,
   ManagedLandingSection,
 } from "@/lib/managedLandings/types";
+import { DEFAULT_FORM_CONFIG } from "@/lib/managedLandings/formConfig";
 
 async function uploadFile(file: File): Promise<string> {
   const fd = new FormData();
@@ -35,6 +37,7 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
   const [brochureUrl, setBrochureUrl] = useState("");
   const [ctaPosition, setCtaPosition] = useState<ManagedCtaPosition>("from_bottom");
   const [published, setPublished] = useState(false);
+  const [formConfig, setFormConfig] = useState<ManagedFormConfig>(DEFAULT_FORM_CONFIG);
   const [sections, setSections] = useState<ManagedLandingSection[]>([]);
   const [sectionLabel, setSectionLabel] = useState("");
   const [yHint, setYHint] = useState("0.0000");
@@ -61,6 +64,7 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
       setBrochureUrl(it.brochure_url ?? "");
       setCtaPosition(it.cta_position);
       setPublished(it.published);
+      setFormConfig(it.form_config ?? DEFAULT_FORM_CONFIG);
       setSections(it.sections ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -110,6 +114,7 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
         brochure_url: showBrochure ? brochureUrl || null : null,
         cta_position: ctaPosition,
         published,
+        form_config: formConfig,
         sections,
         ...patch,
       };
@@ -196,9 +201,10 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
       brochureUrl: showBrochure ? brochureUrl || null : null,
       ctaPosition,
       sections,
+      formConfig,
       previewMode: true as const,
     };
-  }, [item, path, title, hero1, hero2, showBrochure, brochureUrl, ctaPosition, sections]);
+  }, [item, path, title, hero1, hero2, showBrochure, brochureUrl, ctaPosition, sections, formConfig]);
 
   if (loading) return <main style={{ padding: 24 }}>불러오는 중…</main>;
   if (!item) return <main style={{ padding: 24 }}>{error || "없음"}</main>;
@@ -291,6 +297,67 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
               onChange={(e) => setPublished(e.target.checked)}
             />
             공개 (게시)
+          </label>
+
+          <hr style={{ margin: "18px 0", border: 0, borderTop: "1px solid #eee" }} />
+          <h3 style={{ margin: "0 0 8px", fontSize: 15 }}>신청폼 양식</h3>
+
+          <Field label="상담가능시간">
+            <div style={{ display: "flex", gap: 16, fontSize: 14, marginTop: 4 }}>
+              <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input
+                  type="radio"
+                  name="includeAvailableTime"
+                  checked={formConfig.includeAvailableTime}
+                  onChange={() =>
+                    setFormConfig((c) => ({ ...c, includeAvailableTime: true }))
+                  }
+                />
+                포함
+              </label>
+              <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input
+                  type="radio"
+                  name="includeAvailableTime"
+                  checked={!formConfig.includeAvailableTime}
+                  onChange={() =>
+                    setFormConfig((c) => ({ ...c, includeAvailableTime: false }))
+                  }
+                />
+                불포함
+              </label>
+            </div>
+          </Field>
+
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={formConfig.allowRegionDetail}
+              onChange={(e) =>
+                setFormConfig((c) => ({ ...c, allowRegionDetail: e.target.checked }))
+              }
+            />
+            지역 상세(구/시) 입력 허용
+          </label>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={formConfig.includeAgeGroup}
+              onChange={(e) =>
+                setFormConfig((c) => ({ ...c, includeAgeGroup: e.target.checked }))
+              }
+            />
+            연령대 필드 포함
+          </label>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={formConfig.includeJob}
+              onChange={(e) =>
+                setFormConfig((c) => ({ ...c, includeJob: e.target.checked }))
+              }
+            />
+            직업/직급 필드 포함
           </label>
 
           <button

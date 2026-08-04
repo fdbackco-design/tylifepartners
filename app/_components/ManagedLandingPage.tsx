@@ -6,7 +6,13 @@ import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
 import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
 import { landingKeyForManaged } from "@/lib/managedLandings/types";
-import type { ManagedCtaPosition, ManagedLandingSection } from "@/lib/managedLandings/types";
+import type { ManagedCtaPosition, ManagedFormConfig, ManagedLandingSection } from "@/lib/managedLandings/types";
+import { DEFAULT_FORM_CONFIG } from "@/lib/managedLandings/formConfig";
+import {
+  BASE_REGIONS,
+  formatRegionValue,
+  getDistrictsForRegion,
+} from "@/lib/regions";
 import { useRouter } from "next/navigation";
 
 const HERO_FALLBACK = "/assets/hero_cc.png";
@@ -44,6 +50,7 @@ export type ManagedLandingPageProps = {
   brochureUrl: string | null;
   ctaPosition: ManagedCtaPosition;
   sections?: ManagedLandingSection[];
+  formConfig?: ManagedFormConfig;
   /** admin preview: force debug overlay host; form still works */
   previewMode?: boolean;
 };
@@ -59,6 +66,7 @@ export default function ManagedLandingPage({
   brochureUrl,
   ctaPosition,
   sections,
+  formConfig = DEFAULT_FORM_CONFIG,
   previewMode: _previewMode,
 }: ManagedLandingPageProps) {
   const router = useRouter();
@@ -71,6 +79,8 @@ export default function ManagedLandingPage({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [region, setRegion] = useState("");
+  const [regionDetailEnabled, setRegionDetailEnabled] = useState(false);
+  const [district, setDistrict] = useState("");
   const [availableTime, setAvailableTime] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
   const [job, setJob] = useState("");
@@ -151,15 +161,19 @@ export default function ManagedLandingPage({
       showToast("지역을 선택해주세요.", true);
       return;
     }
-    if (!availableTime) {
+    if (formConfig.allowRegionDetail && regionDetailEnabled && !district) {
+      showToast("상세 지역(구/시)을 선택해주세요.", true);
+      return;
+    }
+    if (formConfig.includeAvailableTime && !availableTime) {
       showToast("상담가능시간을 선택해주세요.", true);
       return;
     }
-    if (!ageGroup) {
+    if (formConfig.includeAgeGroup && !ageGroup) {
       showToast("연령대를 선택해주세요.", true);
       return;
     }
-    if (job === INSURANCE_DESIGNER_JOB && !jobRank) {
+    if (formConfig.includeJob && job === INSURANCE_DESIGNER_JOB && !jobRank) {
       showToast("직급을 선택해주세요.", true);
       return;
     }
@@ -183,11 +197,15 @@ export default function ManagedLandingPage({
           utm_content: utm.utm_content || null,
           utm_term: utm.utm_term || null,
           marketing_consent: marketingChecked ? 1 : null,
-          region,
-          available_time: availableTime,
-          age_group: ageGroup,
-          job: job || null,
-          job_rank: job === INSURANCE_DESIGNER_JOB ? jobRank : null,
+          region: formatRegionValue(
+            region,
+            formConfig.allowRegionDetail && regionDetailEnabled ? district : null
+          ),
+          available_time: formConfig.includeAvailableTime ? availableTime : null,
+          age_group: formConfig.includeAgeGroup ? ageGroup : null,
+          job: formConfig.includeJob ? job || null : null,
+          job_rank:
+            formConfig.includeJob && job === INSURANCE_DESIGNER_JOB ? jobRank : null,
           entry_page: path,
           landing_id: id,
           landing_path: path,
@@ -526,7 +544,10 @@ export default function ManagedLandingPage({
                   <select
                     id="lead-managed-region"
                     value={region}
-                    onChange={(e) => setRegion(e.target.value)}
+                    onChange={(e) => {
+                      setRegion(e.target.value);
+                      setDistrict("");
+                    }}
                     disabled={loading}
                     style={{
                       width: "100%",
@@ -539,19 +560,63 @@ export default function ManagedLandingPage({
                     }}
                   >
                     <option value="">선택하세요</option>
-                    <option value="서울">서울</option>
-                    <option value="경기">경기</option>
-                    <option value="인천">인천</option>
-                    <option value="강원">강원</option>
-                    <option value="충청">충청</option>
-                    <option value="경상">경상</option>
-                    <option value="전라">전라</option>
-                    <option value="대구">대구</option>
-                    <option value="울산">울산</option>
-                    <option value="제주">제주</option>
+                    {BASE_REGIONS.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
                   </select>
+                  {formConfig.allowRegionDetail && (
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginTop: 10,
+                        fontSize: 14,
+                        color: "var(--text-secondary)",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={regionDetailEnabled}
+                        onChange={(e) => {
+                          setRegionDetailEnabled(e.target.checked);
+                          if (!e.target.checked) setDistrict("");
+                        }}
+                        disabled={loading}
+                      />
+                      상세 지역(구/시) 입력
+                    </label>
+                  )}
+                  {formConfig.allowRegionDetail && regionDetailEnabled && (
+                    <select
+                      id="lead-managed-district"
+                      value={district}
+                      onChange={(e) => setDistrict(e.target.value)}
+                      disabled={loading || !region}
+                      style={{
+                        width: "100%",
+                        marginTop: 10,
+                        padding: "12px 14px",
+                        border: "1px solid var(--border)",
+                        borderRadius: 8,
+                        fontSize: 16,
+                        outline: "none",
+                        background: region ? "#fff" : "#f1f3f5",
+                      }}
+                    >
+                      <option value="">{region ? "구/시 선택" : "지역을 먼저 선택하세요"}</option>
+                      {getDistrictsForRegion(region).map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
+                {formConfig.includeAvailableTime && (
                 <div style={{ marginBottom: 16 }}>
                   <label
                     htmlFor="lead-managed-available-time"
@@ -579,7 +644,9 @@ export default function ManagedLandingPage({
                     <option value="오후">오후</option>
                   </select>
                 </div>
+                )}
 
+                {formConfig.includeAgeGroup && (
                 <div style={{ marginBottom: 16 }}>
                   <label
                     htmlFor="lead-managed-age-group"
@@ -610,7 +677,10 @@ export default function ManagedLandingPage({
                     <option value="60대 이상">60대 이상</option>
                   </select>
                 </div>
+                )}
 
+                {formConfig.includeJob && (
+                <>
                 <div style={{ marginBottom: 16 }}>
                   <label
                     htmlFor="lead-managed-job"
@@ -677,6 +747,8 @@ export default function ManagedLandingPage({
                     ))}
                   </select>
                 </div>
+                </>
+                )}
 
                 <p style={{ margin: "0 0 20px", fontSize: 12, color: "var(--text-secondary)" }}>
                   제출 시 상담 안내를 위해 연락드려요.
