@@ -12,13 +12,53 @@ import type {
 } from "@/lib/managedLandings/types";
 import { DEFAULT_FORM_CONFIG } from "@/lib/managedLandings/formConfig";
 
+async function parseJsonResponse(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  try {
+    return text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  } catch {
+    const snippet = text.replace(/\s+/g, " ").trim().slice(0, 160);
+    if (/request entity too large/i.test(snippet)) {
+      throw new Error("파일이 너무 큽니다. 15MB 이하로 올려 주세요.");
+    }
+    throw new Error(snippet || `업로드 실패 (HTTP ${res.status})`);
+  }
+}
+
 async function uploadFile(file: File): Promise<string> {
-  const fd = new FormData();
-  fd.append("file", file);
-  const res = await fetch("/api/admin/landings/upload", { method: "POST", body: fd });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.message || "업로드 실패");
-  return json.url as string;
+  const prepRes = await fetch("/api/admin/landings/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      filename: file.name,
+      contentType: file.type || "application/octet-stream",
+      size: file.size,
+    }),
+  });
+  const prep = await parseJsonResponse(prepRes);
+  if (!prepRes.ok) {
+    throw new Error(String(prep.message || "업로드 준비 실패"));
+  }
+
+  const signedUrl = String(prep.signedUrl || "");
+  const publicUrl = String(prep.publicUrl || "");
+  if (!signedUrl || !publicUrl) {
+    throw new Error("업로드 URL을 받지 못했습니다.");
+  }
+
+  const putRes = await fetch(signedUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": file.type || String(prep.contentType || "application/octet-stream"),
+    },
+    body: file,
+  });
+  if (!putRes.ok) {
+    const errText = (await putRes.text()).replace(/\s+/g, " ").trim().slice(0, 160);
+    throw new Error(errText || `파일 업로드 실패 (HTTP ${putRes.status})`);
+  }
+
+  return publicUrl;
 }
 
 export default function AdminLandingEditor({ landingId }: { landingId: string }) {
@@ -337,7 +377,7 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
                 setFormConfig((c) => ({ ...c, allowRegionDetail: e.target.checked }))
               }
             />
-            지역 상세(구/시) 입력 허용
+            지역 상세(구/시) 필수 입력
           </label>
           <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, fontSize: 14 }}>
             <input
