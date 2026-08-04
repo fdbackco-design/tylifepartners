@@ -161,7 +161,7 @@ export default function ManagedLandingPage({
       return;
     }
     if (formConfig.allowRegionDetail && !district) {
-      showToast("상세 지역(구/시)을 선택해주세요.", true);
+      showToast("상세 지역을 선택해주세요.", true);
       return;
     }
     if (formConfig.includeAvailableTime && !availableTime) {
@@ -584,7 +584,7 @@ export default function ManagedLandingPage({
                       }}
                     >
                       <option value="">
-                        {region ? "상세 지역(구/시) 선택 (필수)" : "지역을 먼저 선택하세요"}
+                        {region ? "상세 지역 선택 (필수)" : "지역을 먼저 선택하세요"}
                       </option>
                       {getDistrictsForRegion(region).map((d) => (
                         <option key={d} value={d}>
