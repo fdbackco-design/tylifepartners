@@ -79,7 +79,6 @@ export default function ManagedLandingPage({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [region, setRegion] = useState("");
-  const [regionDetailEnabled, setRegionDetailEnabled] = useState(false);
   const [district, setDistrict] = useState("");
   const [availableTime, setAvailableTime] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
@@ -161,7 +160,7 @@ export default function ManagedLandingPage({
       showToast("지역을 선택해주세요.", true);
       return;
     }
-    if (formConfig.allowRegionDetail && regionDetailEnabled && !district) {
+    if (formConfig.allowRegionDetail && !district) {
       showToast("상세 지역(구/시)을 선택해주세요.", true);
       return;
     }
@@ -199,7 +198,7 @@ export default function ManagedLandingPage({
           marketing_consent: marketingChecked ? 1 : null,
           region: formatRegionValue(
             region,
-            formConfig.allowRegionDetail && regionDetailEnabled ? district : null
+            formConfig.allowRegionDetail ? district : null
           ),
           available_time: formConfig.includeAvailableTime ? availableTime : null,
           age_group: formConfig.includeAgeGroup ? ageGroup : null,
@@ -567,34 +566,12 @@ export default function ManagedLandingPage({
                     ))}
                   </select>
                   {formConfig.allowRegionDetail && (
-                    <label
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        marginTop: 10,
-                        fontSize: 14,
-                        color: "var(--text-secondary)",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={regionDetailEnabled}
-                        onChange={(e) => {
-                          setRegionDetailEnabled(e.target.checked);
-                          if (!e.target.checked) setDistrict("");
-                        }}
-                        disabled={loading}
-                      />
-                      상세 지역(구/시) 입력
-                    </label>
-                  )}
-                  {formConfig.allowRegionDetail && regionDetailEnabled && (
                     <select
                       id="lead-managed-district"
                       value={district}
                       onChange={(e) => setDistrict(e.target.value)}
                       disabled={loading || !region}
+                      required
                       style={{
                         width: "100%",
                         marginTop: 10,
@@ -606,7 +583,9 @@ export default function ManagedLandingPage({
                         background: region ? "#fff" : "#f1f3f5",
                       }}
                     >
-                      <option value="">{region ? "구/시 선택" : "지역을 먼저 선택하세요"}</option>
+                      <option value="">
+                        {region ? "상세 지역(구/시) 선택 (필수)" : "지역을 먼저 선택하세요"}
+                      </option>
                       {getDistrictsForRegion(region).map((d) => (
                         <option key={d} value={d}>
                           {d}
