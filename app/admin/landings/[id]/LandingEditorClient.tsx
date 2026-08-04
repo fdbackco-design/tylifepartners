@@ -342,34 +342,17 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
           <hr style={{ margin: "18px 0", border: 0, borderTop: "1px solid #eee" }} />
           <h3 style={{ margin: "0 0 8px", fontSize: 15 }}>신청폼 양식</h3>
 
-          <Field label="상담가능시간">
-            <div style={{ display: "flex", gap: 16, fontSize: 14, marginTop: 4 }}>
-              <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <input
-                  type="radio"
-                  name="includeAvailableTime"
-                  checked={formConfig.includeAvailableTime}
-                  onChange={() =>
-                    setFormConfig((c) => ({ ...c, includeAvailableTime: true }))
-                  }
-                />
-                포함
-              </label>
-              <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <input
-                  type="radio"
-                  name="includeAvailableTime"
-                  checked={!formConfig.includeAvailableTime}
-                  onChange={() =>
-                    setFormConfig((c) => ({ ...c, includeAvailableTime: false }))
-                  }
-                />
-                불포함
-              </label>
-            </div>
-          </Field>
-
-          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, fontSize: 14 }}>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4, fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={formConfig.includeAvailableTime}
+              onChange={(e) =>
+                setFormConfig((c) => ({ ...c, includeAvailableTime: e.target.checked }))
+              }
+            />
+            상담가능시간 필드 포함
+          </label>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, fontSize: 14 }}>
             <input
               type="checkbox"
               checked={formConfig.allowRegionDetail}
