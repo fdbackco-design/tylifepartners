@@ -93,7 +93,7 @@ export default function SidejobLandingPage() {
       return;
     }
     if (regionDetailEnabled && !district) {
-      showToast("상세 지역(구/시)을 선택해주세요.", true);
+      showToast("상세 지역을 선택해주세요.", true);
       return;
     }
     if (!availableTime) {
@@ -452,7 +452,7 @@ export default function SidejobLandingPage() {
                       }}
                       disabled={loading}
                     />
-                    상세 지역(구/시) 입력
+                    상세 지역 입력
                   </label>
                   {regionDetailEnabled && (
                     <select

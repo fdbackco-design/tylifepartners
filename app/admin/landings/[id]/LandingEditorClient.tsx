@@ -360,7 +360,7 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
                 setFormConfig((c) => ({ ...c, allowRegionDetail: e.target.checked }))
               }
             />
-            지역 상세(구/시) 필수 입력
+            지역 상세 필수 입력
           </label>
           <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, fontSize: 14 }}>
             <input

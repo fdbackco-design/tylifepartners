@@ -1,7 +1,7 @@
 export type ManagedFormConfig = {
   /** 상담가능시간 필드 포함 여부 */
   includeAvailableTime: boolean;
-  /** 지역 상세(구/시) 필수 드롭다운 노출 */
+  /** 지역 상세 필수 드롭다운 노출 */
   allowRegionDetail: boolean;
   /** 연령대 필드 포함 */
   includeAgeGroup: boolean;
