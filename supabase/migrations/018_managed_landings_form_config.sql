@@ -8,4 +8,4 @@ ALTER TABLE public.managed_landings
   }'::jsonb;
 
 COMMENT ON COLUMN public.managed_landings.form_config IS
-  '상담 신청 폼 옵션: includeAvailableTime, allowRegionDetail, includeAgeGroup, includeJob';
+  '상담 신청 폼 옵션: includeRegion, allowedRegions, includeAvailableTime, allowRegionDetail, includeAgeGroup, includeJob';

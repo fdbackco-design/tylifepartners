@@ -7,9 +7,8 @@ import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
 import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
 import { landingKeyForManaged } from "@/lib/managedLandings/types";
 import type { ManagedCtaPosition, ManagedFormConfig, ManagedLandingSection } from "@/lib/managedLandings/types";
-import { DEFAULT_FORM_CONFIG } from "@/lib/managedLandings/formConfig";
+import { DEFAULT_FORM_CONFIG, normalizeFormConfig, resolveAllowedRegions } from "@/lib/managedLandings/formConfig";
 import {
-  BASE_REGIONS,
   formatRegionValue,
   getDistrictsForRegion,
 } from "@/lib/regions";
@@ -65,10 +64,12 @@ export default function ManagedLandingPage({
   brochureUrl,
   ctaPosition,
   sections,
-  formConfig = DEFAULT_FORM_CONFIG,
-  previewMode: _previewMode,
+  formConfig: formConfigProp = DEFAULT_FORM_CONFIG,
+  previewMode = false,
 }: ManagedLandingPageProps) {
   const router = useRouter();
+  const formConfig = normalizeFormConfig(formConfigProp);
+  const allowedRegions = resolveAllowedRegions(formConfig);
   const hero1SectionRef = useRef<HTMLElement>(null);
   const hero2SectionRef = useRef<HTMLElement>(null);
   const afterBottomSentinelRef = useRef<HTMLDivElement>(null);
@@ -165,11 +166,15 @@ export default function ManagedLandingPage({
       showToast("연락처를 확인해주세요. (숫자 10~11자리)", true);
       return;
     }
-    if (!region) {
+    if (formConfig.includeRegion && !region) {
       showToast("지역을 선택해주세요.", true);
       return;
     }
-    if (formConfig.allowRegionDetail && !district) {
+    if (formConfig.includeRegion && region && !allowedRegions.includes(region as (typeof allowedRegions)[number])) {
+      showToast("선택할 수 없는 지역입니다.", true);
+      return;
+    }
+    if (formConfig.includeRegion && formConfig.allowRegionDetail && !district) {
       showToast("상세 지역을 선택해주세요.", true);
       return;
     }
@@ -205,10 +210,9 @@ export default function ManagedLandingPage({
           utm_content: utm.utm_content || null,
           utm_term: utm.utm_term || null,
           marketing_consent: marketingChecked ? 1 : null,
-          region: formatRegionValue(
-            region,
-            formConfig.allowRegionDetail ? district : null
-          ),
+          region: formConfig.includeRegion
+            ? formatRegionValue(region, formConfig.allowRegionDetail ? district : null)
+            : null,
           available_time: formConfig.includeAvailableTime ? availableTime : null,
           age_group: formConfig.includeAgeGroup ? ageGroup : null,
           job: formConfig.includeJob ? job || null : null,
@@ -217,6 +221,7 @@ export default function ManagedLandingPage({
           entry_page: path,
           landing_id: id,
           landing_path: path,
+          ...(previewMode ? { form_config: formConfig } : {}),
           ...getSubmissionAnalyticsPayload(),
         }),
       });
@@ -550,6 +555,7 @@ export default function ManagedLandingPage({
                   />
                 </div>
 
+                {formConfig.includeRegion && (
                 <div style={{ marginBottom: 16 }}>
                   <label
                     htmlFor="lead-managed-region"
@@ -576,7 +582,7 @@ export default function ManagedLandingPage({
                     }}
                   >
                     <option value="">선택하세요</option>
-                    {BASE_REGIONS.map((r) => (
+                    {allowedRegions.map((r) => (
                       <option key={r} value={r}>
                         {r}
                       </option>
@@ -611,6 +617,7 @@ export default function ManagedLandingPage({
                     </select>
                   )}
                 </div>
+                )}
 
                 {formConfig.includeAvailableTime && (
                 <div style={{ marginBottom: 16 }}>

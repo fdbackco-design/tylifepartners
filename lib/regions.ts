@@ -159,3 +159,12 @@ export function formatRegionValue(region: string, district?: string | null): str
   if (!d) return r;
   return `${r} ${d}`;
 }
+
+/** "서울 강남구" / "서울" 에서 기본 지역 추출 */
+export function parseBaseRegion(regionValue: string): BaseRegion | null {
+  const t = regionValue.trim();
+  if (!t) return null;
+  if (isBaseRegion(t)) return t;
+  const first = t.split(/\s+/)[0] ?? "";
+  return isBaseRegion(first) ? first : null;
+}
