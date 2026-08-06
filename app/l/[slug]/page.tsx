@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import ManagedLandingPage from "@/app/_components/ManagedLandingPage";
 import { getManagedLandingBySlug } from "@/lib/managedLandings/store";
 
+export const dynamic = "force-dynamic";
+
 type Props = { params: Promise<{ slug: string }> };
 
 export default async function ManagedLandingPublicPage({ params }: Props) {

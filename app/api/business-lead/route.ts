@@ -8,6 +8,13 @@ import { formatPhoneKorean } from "@/lib/phone";
 import { isLeadSubmissionBlocked, maskPhoneForLog } from "@/lib/phoneBlacklist";
 import { runAfterResponse } from "@/lib/runAfterResponse";
 import { syncLeadToCrm } from "@/lib/crmSync";
+import {
+  DEFAULT_FORM_CONFIG,
+  normalizeFormConfig,
+  type ManagedFormConfig,
+} from "@/lib/managedLandings/formConfig";
+import { getManagedLandingById } from "@/lib/managedLandings/store";
+import { verifyAdminSession } from "@/lib/adminSession";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
 const ALLOWED_JOB_RANKS = new Set(["지점장 이상", "팀장 이상", "FC"]);
@@ -84,35 +91,6 @@ export async function POST(request: NextRequest) {
     }
 
     const phonePretty = formatPhoneKorean(phone);
-    if (!is0623Landing) {
-      if (!region) {
-        return NextResponse.json(
-          { ok: false, message: "지역을 선택해주세요." },
-          { status: 400 }
-        );
-      }
-      if (!availableTime) {
-        return NextResponse.json(
-          { ok: false, message: "상담가능시간을 선택해주세요." },
-          { status: 400 }
-        );
-      }
-      if (!ageGroup) {
-        return NextResponse.json(
-          { ok: false, message: "연령대를 선택해주세요." },
-          { status: 400 }
-        );
-      }
-    }
-
-    const jobRankForDb =
-      job === INSURANCE_DESIGNER_JOB && jobRankRaw && ALLOWED_JOB_RANKS.has(jobRankRaw) ? jobRankRaw : null;
-    if (!is0623Landing && job === INSURANCE_DESIGNER_JOB && !jobRankForDb) {
-      return NextResponse.json(
-        { ok: false, message: "보험설계사인 경우 직급을 선택해주세요." },
-        { status: 400 }
-      );
-    }
 
     const analytics = parseSubmissionAnalytics(body as Record<string, unknown>);
     const landingIdRaw = body.landing_id != null ? String(body.landing_id).trim() : "";
@@ -129,6 +107,62 @@ export async function POST(request: NextRequest) {
           ? entryPage
           : null;
 
+    // 관리형 랜딩: DB에 저장된 신청폼 양식 기준으로 필수 필드 판정
+    // (관리자 미리보기에서는 저장 전 로컬 설정을 body.form_config로 보낼 수 있음)
+    let formConfig: ManagedFormConfig = DEFAULT_FORM_CONFIG;
+    if (landingId) {
+      try {
+        const managed = await getManagedLandingById(landingId);
+        if (managed) formConfig = managed.form_config;
+      } catch (e) {
+        console.error("business-lead form_config lookup:", e);
+      }
+    }
+    if (body.form_config != null && (await verifyAdminSession())) {
+      formConfig = normalizeFormConfig(body.form_config);
+    }
+
+    if (!is0623Landing) {
+      if (formConfig.includeRegion && !region) {
+        return NextResponse.json(
+          { ok: false, message: "지역을 선택해주세요." },
+          { status: 400 }
+        );
+      }
+      if (formConfig.includeAvailableTime && !availableTime) {
+        return NextResponse.json(
+          { ok: false, message: "상담가능시간을 선택해주세요." },
+          { status: 400 }
+        );
+      }
+      if (formConfig.includeAgeGroup && !ageGroup) {
+        return NextResponse.json(
+          { ok: false, message: "연령대를 선택해주세요." },
+          { status: 400 }
+        );
+      }
+    }
+
+    const jobRankForDb =
+      job === INSURANCE_DESIGNER_JOB && jobRankRaw && ALLOWED_JOB_RANKS.has(jobRankRaw) ? jobRankRaw : null;
+    if (
+      !is0623Landing &&
+      formConfig.includeJob &&
+      job === INSURANCE_DESIGNER_JOB &&
+      !jobRankForDb
+    ) {
+      return NextResponse.json(
+        { ok: false, message: "보험설계사인 경우 직급을 선택해주세요." },
+        { status: 400 }
+      );
+    }
+
+    const regionForDb = formConfig.includeRegion ? region || null : null;
+    const availableTimeForDb = formConfig.includeAvailableTime ? availableTime || null : null;
+    const ageGroupForDb = formConfig.includeAgeGroup ? ageGroup || null : null;
+    const jobForDb = formConfig.includeJob ? job || null : null;
+    const jobRankStored = formConfig.includeJob ? jobRankForDb : null;
+
     const supabase = getSupabaseAdmin();
     const { data: insertedLead, error } = await supabase.from("tylife_b2b").insert({
       name,
@@ -143,11 +177,11 @@ export async function POST(request: NextRequest) {
       utm_content: utmContent || null,
       utm_term: utmTerm || null,
       marketing_consent: marketingConsent,
-      region: region || null,
-      available_time: availableTime || null,
-      age_group: ageGroup || null,
-      job: job || null,
-      job_rank: jobRankForDb,
+      region: regionForDb,
+      available_time: availableTimeForDb,
+      age_group: ageGroupForDb,
+      job: jobForDb,
+      job_rank: jobRankStored,
       analytics_session_id: analytics.analytics_session_id,
       max_scroll_depth: analytics.max_scroll_depth,
       last_section_name: analytics.last_section_name,
@@ -183,11 +217,11 @@ export async function POST(request: NextRequest) {
       utmCampaign,
       utmContent,
       entryPage,
-      region,
-      availableTime,
-      ageGroup,
-      job,
-      jobRankForDb,
+      region: regionForDb ?? "",
+      availableTime: availableTimeForDb ?? "",
+      ageGroup: ageGroupForDb ?? "",
+      job: jobForDb ?? "",
+      jobRankForDb: jobRankStored,
     });
 
     // FEED Life CRM 동기화 — 위 백그라운드 체인(구글 시트 → 담당자 분배 → 이메일)이 전부 끝난 뒤
@@ -205,9 +239,9 @@ export async function POST(request: NextRequest) {
               sourceTable: "tylife_b2b",
               customerName: name,
               phone, // 위에서 이미 replace(/\D/g, "") 처리된 숫자만의 값
-              region: region || null,
-              ageGroup: ageGroup || null,
-              occupation: job || null,
+              region: regionForDb,
+              ageGroup: ageGroupForDb,
+              occupation: jobForDb,
               inquiryType: null,
               message: null,
               // 필수 개인정보 동의에 체크하지 않으면 폼 제출 자체가 불가능한 구조

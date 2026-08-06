@@ -172,6 +172,7 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
       setItem(it);
       setPath(it.path);
       setSections(it.sections ?? []);
+      setFormConfig(it.form_config ?? DEFAULT_FORM_CONFIG);
       setMsg("저장되었습니다.");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -355,8 +356,32 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
 
           <hr style={{ margin: "18px 0", border: 0, borderTop: "1px solid #eee" }} />
           <h3 style={{ margin: "0 0 8px", fontSize: 15 }}>신청폼 양식</h3>
+          <p style={{ margin: "0 0 10px", fontSize: 12, color: "#868e96" }}>
+            체크 해제한 항목은 고객 상담폼에 노출·필수 검증되지 않습니다. 저장 후 공개 페이지에 반영됩니다.
+          </p>
 
           <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4, fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={formConfig.includeRegion}
+              onChange={(e) =>
+                setFormConfig((c) => ({ ...c, includeRegion: e.target.checked }))
+              }
+            />
+            지역 필드 포함
+          </label>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={formConfig.allowRegionDetail}
+              disabled={!formConfig.includeRegion}
+              onChange={(e) =>
+                setFormConfig((c) => ({ ...c, allowRegionDetail: e.target.checked }))
+              }
+            />
+            지역 상세(구/시) 필수 입력
+          </label>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, fontSize: 14 }}>
             <input
               type="checkbox"
               checked={formConfig.includeAvailableTime}
@@ -365,16 +390,6 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
               }
             />
             상담가능시간 필드 포함
-          </label>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, fontSize: 14 }}>
-            <input
-              type="checkbox"
-              checked={formConfig.allowRegionDetail}
-              onChange={(e) =>
-                setFormConfig((c) => ({ ...c, allowRegionDetail: e.target.checked }))
-              }
-            />
-            지역 상세 필수 입력
           </label>
           <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, fontSize: 14 }}>
             <input
@@ -512,7 +527,7 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
           >
             {previewProps && (
               <ManagedLandingPage
-                key={`${previewProps.hero1Url}|${previewProps.hero2Url}|${previewProps.showBrochure}|${previewProps.brochureUrl ?? ""}|${previewProps.ctaPosition}`}
+                key={`${previewProps.hero1Url}|${previewProps.hero2Url}|${previewProps.showBrochure}|${previewProps.brochureUrl ?? ""}|${previewProps.ctaPosition}|${JSON.stringify(previewProps.formConfig)}`}
                 {...previewProps}
               />
             )}
