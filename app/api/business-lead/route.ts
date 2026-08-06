@@ -11,10 +11,12 @@ import { syncLeadToCrm } from "@/lib/crmSync";
 import {
   DEFAULT_FORM_CONFIG,
   normalizeFormConfig,
+  resolveAllowedRegions,
   type ManagedFormConfig,
 } from "@/lib/managedLandings/formConfig";
 import { getManagedLandingById } from "@/lib/managedLandings/store";
 import { verifyAdminSession } from "@/lib/adminSession";
+import { parseBaseRegion } from "@/lib/regions";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
 const ALLOWED_JOB_RANKS = new Set(["지점장 이상", "팀장 이상", "FC"]);
@@ -128,6 +130,16 @@ export async function POST(request: NextRequest) {
           { ok: false, message: "지역을 선택해주세요." },
           { status: 400 }
         );
+      }
+      if (formConfig.includeRegion && region) {
+        const allowed = resolveAllowedRegions(formConfig);
+        const base = parseBaseRegion(region);
+        if (!base || !allowed.includes(base)) {
+          return NextResponse.json(
+            { ok: false, message: "선택할 수 없는 지역입니다." },
+            { status: 400 }
+          );
+        }
       }
       if (formConfig.includeAvailableTime && !availableTime) {
         return NextResponse.json(

@@ -7,9 +7,8 @@ import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
 import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
 import { landingKeyForManaged } from "@/lib/managedLandings/types";
 import type { ManagedCtaPosition, ManagedFormConfig, ManagedLandingSection } from "@/lib/managedLandings/types";
-import { DEFAULT_FORM_CONFIG, normalizeFormConfig } from "@/lib/managedLandings/formConfig";
+import { DEFAULT_FORM_CONFIG, normalizeFormConfig, resolveAllowedRegions } from "@/lib/managedLandings/formConfig";
 import {
-  BASE_REGIONS,
   formatRegionValue,
   getDistrictsForRegion,
 } from "@/lib/regions";
@@ -70,6 +69,7 @@ export default function ManagedLandingPage({
 }: ManagedLandingPageProps) {
   const router = useRouter();
   const formConfig = normalizeFormConfig(formConfigProp);
+  const allowedRegions = resolveAllowedRegions(formConfig);
   const hero1SectionRef = useRef<HTMLElement>(null);
   const hero2SectionRef = useRef<HTMLElement>(null);
   const afterBottomSentinelRef = useRef<HTMLDivElement>(null);
@@ -168,6 +168,10 @@ export default function ManagedLandingPage({
     }
     if (formConfig.includeRegion && !region) {
       showToast("지역을 선택해주세요.", true);
+      return;
+    }
+    if (formConfig.includeRegion && region && !allowedRegions.includes(region as (typeof allowedRegions)[number])) {
+      showToast("선택할 수 없는 지역입니다.", true);
       return;
     }
     if (formConfig.includeRegion && formConfig.allowRegionDetail && !district) {
@@ -578,7 +582,7 @@ export default function ManagedLandingPage({
                     }}
                   >
                     <option value="">선택하세요</option>
-                    {BASE_REGIONS.map((r) => (
+                    {allowedRegions.map((r) => (
                       <option key={r} value={r}>
                         {r}
                       </option>

@@ -11,6 +11,7 @@ import type {
   ManagedLandingSection,
 } from "@/lib/managedLandings/types";
 import { DEFAULT_FORM_CONFIG } from "@/lib/managedLandings/formConfig";
+import { BASE_REGIONS } from "@/lib/regions";
 
 async function parseJsonResponse(res: Response): Promise<Record<string, unknown>> {
   const text = await res.text();
@@ -370,6 +371,84 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
             />
             지역 필드 포함
           </label>
+          {formConfig.includeRegion && (
+            <div style={{ marginTop: 10 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 6,
+                }}
+              >
+                <span style={{ fontSize: 13, color: "#495057", fontWeight: 600 }}>
+                  노출할 지역(큰 단위) · 다중 선택
+                </span>
+                <span style={{ display: "flex", gap: 6 }}>
+                  <button
+                    type="button"
+                    style={{ ...btnSecondary, padding: "4px 8px", fontSize: 12 }}
+                    onClick={() =>
+                      setFormConfig((c) => ({ ...c, allowedRegions: [...BASE_REGIONS] }))
+                    }
+                  >
+                    전체
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...btnSecondary, padding: "4px 8px", fontSize: 12 }}
+                    onClick={() => setFormConfig((c) => ({ ...c, allowedRegions: [] }))}
+                  >
+                    해제
+                  </button>
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                  gap: 6,
+                  padding: 10,
+                  border: "1px solid #e9ecef",
+                  borderRadius: 8,
+                  background: "#f8f9fa",
+                  maxHeight: 220,
+                  overflowY: "auto",
+                }}
+              >
+                {BASE_REGIONS.map((r) => {
+                  const checked = formConfig.allowedRegions.includes(r);
+                  return (
+                    <label
+                      key={r}
+                      style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setFormConfig((c) => {
+                            const set = new Set(c.allowedRegions);
+                            if (set.has(r)) set.delete(r);
+                            else set.add(r);
+                            const next = BASE_REGIONS.filter((x) => set.has(x));
+                            return { ...c, allowedRegions: next };
+                          });
+                        }}
+                      />
+                      {r}
+                    </label>
+                  );
+                })}
+              </div>
+              {formConfig.allowedRegions.length === 0 && (
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#c92a2a" }}>
+                  하나 이상 선택하세요. (미선택 시 상담폼에 전체 지역이 표시됩니다)
+                </p>
+              )}
+            </div>
+          )}
           <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, fontSize: 14 }}>
             <input
               type="checkbox"
