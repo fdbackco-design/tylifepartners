@@ -1,12 +1,15 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import ManagedLandingPage from "@/app/_components/ManagedLandingPage";
 import { getManagedLandingBySlug } from "@/lib/managedLandings/store";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type Props = { params: Promise<{ slug: string }> };
 
 export default async function ManagedLandingPublicPage({ params }: Props) {
+  noStore();
   const { slug } = await params;
   const landing = await getManagedLandingBySlug(slug, { publishedOnly: true });
   if (!landing) notFound();
