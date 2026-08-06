@@ -292,11 +292,25 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
           </Field>
           <Field label="상단 이미지 URL">
             <input value={hero1} onChange={(e) => setHero1(e.target.value)} style={inputStyle} />
-            <FileUpload onUploaded={setHero1} accept="image/*" />
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
+              <FileUpload onUploaded={setHero1} accept="image/*" />
+              {hero1.trim() ? (
+                <button type="button" onClick={() => setHero1("")} style={btnSecondary}>
+                  비우기
+                </button>
+              ) : null}
+            </div>
           </Field>
           <Field label="하단 이미지 URL">
             <input value={hero2} onChange={(e) => setHero2(e.target.value)} style={inputStyle} />
-            <FileUpload onUploaded={setHero2} accept="image/*" />
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
+              <FileUpload onUploaded={setHero2} accept="image/*" />
+              {hero2.trim() ? (
+                <button type="button" onClick={() => setHero2("")} style={btnSecondary}>
+                  비우기
+                </button>
+              ) : null}
+            </div>
           </Field>
 
           <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, fontSize: 14 }}>

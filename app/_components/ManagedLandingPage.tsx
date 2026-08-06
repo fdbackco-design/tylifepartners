@@ -15,7 +15,6 @@ import {
 } from "@/lib/regions";
 import { useRouter } from "next/navigation";
 
-const HERO_FALLBACK = "/assets/hero_cc.png";
 const BROCHURE_ICON = "/assets/icon-brochure-download.png";
 const CONSULTATION_ICON = "/assets/icon-consultation-write.png";
 
@@ -70,6 +69,7 @@ export default function ManagedLandingPage({
   previewMode: _previewMode,
 }: ManagedLandingPageProps) {
   const router = useRouter();
+  const hero1SectionRef = useRef<HTMLElement>(null);
   const hero2SectionRef = useRef<HTMLElement>(null);
   const afterBottomSentinelRef = useRef<HTMLDivElement>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -92,8 +92,10 @@ export default function ManagedLandingPage({
   const utm = useUTM();
 
   const landingKey = landingKeyForManaged(slug);
+  const hero1Src = hero1Url.trim() && !img1Error ? hero1Url.trim() : null;
+  const hero2Src = hero2Url.trim() && !img2Error ? hero2Url.trim() : null;
 
-  // URL이 바뀌면 (관리자 미리보기 업로드 등) fallback 고정을 해제하고 새 이미지를 다시 로드
+  // URL이 바뀌면 (관리자 미리보기 업로드 등) error 고정을 해제하고 새 이미지를 다시 로드
   useEffect(() => {
     setImg1Error(false);
   }, [hero1Url]);
@@ -109,8 +111,12 @@ export default function ManagedLandingPage({
     }
 
     if (ctaPosition === "from_bottom") {
-      const el = hero2SectionRef.current;
-      if (!el) return;
+      // 하단 이미지가 있으면 그걸 기준으로, 없으면 상단 이미지부터 노출
+      const el = hero2Src ? hero2SectionRef.current : hero1SectionRef.current;
+      if (!el) {
+        setShowFixedCta(true);
+        return;
+      }
 
       const observer = new IntersectionObserver(
         ([entry]) => setShowFixedCta(entry.isIntersecting),
@@ -122,7 +128,10 @@ export default function ManagedLandingPage({
 
     if (ctaPosition === "after_bottom") {
       const el = afterBottomSentinelRef.current;
-      if (!el) return;
+      if (!el) {
+        setShowFixedCta(true);
+        return;
+      }
 
       const observer = new IntersectionObserver(
         ([entry]) => setShowFixedCta(entry.isIntersecting),
@@ -131,7 +140,7 @@ export default function ManagedLandingPage({
       observer.observe(el);
       return () => observer.disconnect();
     }
-  }, [ctaPosition]);
+  }, [ctaPosition, hero1Src, hero2Src]);
 
   const showToast = useCallback((msg: string, error?: boolean) => {
     setToast({ msg, error });
@@ -238,9 +247,6 @@ export default function ManagedLandingPage({
 
   const closeSheet = () => setSheetOpen(false);
 
-  const hero1Src = !hero1Url.trim() || img1Error ? HERO_FALLBACK : hero1Url.trim();
-  const hero2Src = !hero2Url.trim() || img2Error ? HERO_FALLBACK : hero2Url.trim();
-
   return (
     <main>
       <LandingAnalyticsTracker landingKey={landingKey} sections={sections} />
@@ -273,17 +279,28 @@ export default function ManagedLandingPage({
         <div style={{ width: 24 }} aria-hidden />
       </header>
 
-      <section style={{ margin: 0, lineHeight: 0, background: "#e9ecef" }}>
-        <img
-          key={`hero1-${hero1Url}`}
-          src={hero1Src}
-          alt=""
-          style={{ width: "100%", height: "auto", display: "block", verticalAlign: "bottom" }}
-          onError={() => {
-            if (hero1Url.trim()) setImg1Error(true);
+      {hero1Src && (
+        <section
+          ref={hero1SectionRef}
+          style={{
+            margin: 0,
+            lineHeight: 0,
+            background: "#e9ecef",
+            paddingBottom:
+              !hero2Src && ctaPosition === "from_bottom" && showFixedCta
+                ? "calc(80px + var(--safe-bottom))"
+                : 0,
           }}
-        />
-      </section>
+        >
+          <img
+            key={`hero1-${hero1Url}`}
+            src={hero1Src}
+            alt=""
+            style={{ width: "100%", height: "auto", display: "block", verticalAlign: "bottom" }}
+            onError={() => setImg1Error(true)}
+          />
+        </section>
+      )}
 
       {showBrochure && brochureUrl && (
         <div
@@ -341,26 +358,26 @@ export default function ManagedLandingPage({
         </div>
       )}
 
-      <section
-        ref={hero2SectionRef}
-        style={{
-          margin: 0,
-          lineHeight: 0,
-          background: "#e9ecef",
-          paddingBottom:
-            ctaPosition === "from_bottom" && showFixedCta ? "calc(80px + var(--safe-bottom))" : 0,
-        }}
-      >
-        <img
-          key={`hero2-${hero2Url}`}
-          src={hero2Src}
-          alt=""
-          style={{ width: "100%", height: "auto", display: "block", verticalAlign: "bottom" }}
-          onError={() => {
-            if (hero2Url.trim()) setImg2Error(true);
+      {hero2Src && (
+        <section
+          ref={hero2SectionRef}
+          style={{
+            margin: 0,
+            lineHeight: 0,
+            background: "#e9ecef",
+            paddingBottom:
+              ctaPosition === "from_bottom" && showFixedCta ? "calc(80px + var(--safe-bottom))" : 0,
           }}
-        />
-      </section>
+        >
+          <img
+            key={`hero2-${hero2Url}`}
+            src={hero2Src}
+            alt=""
+            style={{ width: "100%", height: "auto", display: "block", verticalAlign: "bottom" }}
+            onError={() => setImg2Error(true)}
+          />
+        </section>
+      )}
 
       {ctaPosition === "after_bottom" && (
         <div ref={afterBottomSentinelRef} aria-hidden style={{ height: 1 }} />
