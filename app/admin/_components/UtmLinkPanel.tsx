@@ -42,7 +42,7 @@ function emptyEditForm() {
 }
 
 export default function UtmLinkPanel() {
-  const [baseUrl, setBaseUrl] = useState("https://www.tylifepartners.com");
+  const [baseUrl, setBaseUrl] = useState("https://www.feed-life.com");
   const [path, setPath] = useState("/0715s");
   const [selectedValue, setSelectedValue] = useState("");
   const [items, setItems] = useState<UtmSourceRow[]>([]);
@@ -221,7 +221,7 @@ export default function UtmLinkPanel() {
           type="url"
           value={baseUrl}
           onChange={(e) => setBaseUrl(e.target.value)}
-          placeholder="https://www.tylifepartners.com"
+          placeholder="https://www.feed-life.com"
           style={inputStyle}
         />
       </div>

@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
       name,
       phone,
       createdAtIso: new Date().toISOString(),
-      adminUrl: "https://www.tylifepartners.com/admin",
+      adminUrl: "https://www.feed-life.com/admin",
       entry_page: entryPage,
       desired_date: desiredDate || null,
       desired_time: desiredTime || null,
