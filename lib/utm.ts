@@ -60,7 +60,7 @@ export function parseUTMFromUrl(search: string = ""): UTMParams {
 
 /**
  * 플랫폼별 UTM 링크 생성
- * @param baseUrl 사이트 기본 URL (예: https://www.tylifepartners.com)
+ * @param baseUrl 사이트 기본 URL (예: https://www.feed-life.com)
  * @param path 경로 (예: /, /me, /business)
  * @param platform 플랫폼 키
  * @param campaign 캠페인명 (선택)

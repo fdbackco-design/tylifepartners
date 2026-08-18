@@ -33,7 +33,7 @@ export async function processBusinessLeadSideEffects(
     name: input.name,
     phone: input.phone,
     createdAtIso: new Date().toISOString(),
-    adminUrl: "https://www.tylifepartners.com/admin",
+    adminUrl: "https://www.feed-life.com/admin",
     entry_page: input.entryPage,
     region: input.region || null,
     available_time: input.availableTime || null,
