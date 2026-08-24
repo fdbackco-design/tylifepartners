@@ -7,6 +7,7 @@ import { resolveSheetMediumFromUtmSource } from "@/lib/utmSourceMapping";
 import { formatPhoneKorean } from "@/lib/phone";
 import { isLeadSubmissionBlocked, maskPhoneForLog } from "@/lib/phoneBlacklist";
 import { runAfterResponse } from "@/lib/runAfterResponse";
+import { tryAutoAssignLead } from "@/lib/crm/assignment";
 import { syncLeadToCrm } from "@/lib/crmSync";
 
 /** 클라이언트에서 보낸 유입 경로 (예: /, /v2, /me). 잘못된 값은 무시 */
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest) {
     const analytics = parseSubmissionAnalytics(body as Record<string, unknown>);
 
     const supabase = getSupabaseAdmin();
+    const nowIso = new Date().toISOString();
     const { data: insertedLead, error } = await supabase.from("leads").insert({
       name,
       phone,
@@ -104,6 +106,12 @@ export async function POST(request: NextRequest) {
       max_scroll_depth: analytics.max_scroll_depth,
       last_section_name: analytics.last_section_name,
       last_section_label: analytics.last_section_label,
+      status: "배정전",
+      status_changed_at: nowIso,
+      region: location || region || null,
+      available_time: desiredTime || null,
+      age_group: ageGroup || null,
+      job: job || null,
     })
       // 저장되는 값·컬럼은 그대로. CRM 동기화용 submission_id/실제 접수 시각만 돌려받는다.
       .select("id, created_at")
@@ -122,6 +130,14 @@ export async function POST(request: NextRequest) {
             ? `저장 실패: ${error.message}`
             : "저장 중 오류가 발생했습니다.";
       return NextResponse.json({ ok: false, message: msg }, { status: 500 });
+    }
+
+    if (insertedLead?.id) {
+      await tryAutoAssignLead({
+        table: "leads",
+        leadId: insertedLead.id,
+        region: location || region || null,
+      });
     }
 
     // 구글 시트 기록 (실패해도 제출 성공은 유지)

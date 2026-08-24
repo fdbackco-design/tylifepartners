@@ -1,17 +1,9 @@
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
-
-/**
- * 관리자 세션: HttpOnly 쿠키 + JWT 서명
- *
- * [바꿔야 하는 곳 - ADMIN]
- * Vercel/로컬 .env.local에 설정:
- * - ADMIN_SESSION_SECRET: JWT 서명용 시크릿 (32자 이상 랜덤 문자열)
- * - ADMIN_ID, ADMIN_PASSWORD는 app/api/admin/login/route.ts에서 사용
- */
+import type { SessionUser } from "@/lib/crm/types";
 
 const COOKIE_NAME = "admin_session";
-// ADMIN_SESSION_SECRET이 없으면 빌드/런타임에서 에러
+
 const getSecret = () => {
   const secret = process.env.ADMIN_SESSION_SECRET;
   if (!secret || secret.length < 16) {
@@ -20,26 +12,69 @@ const getSecret = () => {
   return new TextEncoder().encode(secret);
 };
 
-export async function createAdminSession(): Promise<string> {
-  const token = await new SignJWT({ role: "admin" })
+export async function createSession(user: SessionUser): Promise<string> {
+  return new SignJWT({
+    rank: user.rank,
+    role: user.rank === "admin" ? "admin" : user.rank,
+    userId: user.userId,
+    name: user.name,
+    loginId: user.loginId,
+    region: user.region,
+    parentId: user.parentId,
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
     .sign(getSecret());
-  return token;
+}
+
+/** 기존 ENV 관리자 세션 (하위 호환) */
+export async function createAdminSession(): Promise<string> {
+  const adminId = process.env.ADMIN_ID ?? "admin";
+  return createSession({
+    rank: "admin",
+    userId: null,
+    name: "관리자",
+    loginId: adminId,
+    region: null,
+    parentId: null,
+  });
+}
+
+export async function getSession(): Promise<SessionUser | null> {
+  const cookieStore = await cookies();
+  const cookie = cookieStore.get(COOKIE_NAME);
+  if (!cookie?.value) return null;
+  try {
+    const { payload } = await jwtVerify(cookie.value, getSecret());
+    const rankRaw = String(payload.rank ?? payload.role ?? "admin");
+    const rank = rankRaw === "manager" || rankRaw === "sales" ? rankRaw : "admin";
+    return {
+      rank,
+      userId: payload.userId ? String(payload.userId) : null,
+      name: String(payload.name ?? (rank === "admin" ? "관리자" : "")),
+      loginId: String(payload.loginId ?? ""),
+      region: payload.region ? String(payload.region) : null,
+      parentId: payload.parentId ? String(payload.parentId) : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function verifyAdminSession(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const cookie = cookieStore.get(COOKIE_NAME);
-  if (!cookie?.value) return false;
+  return (await getSession()) != null;
+}
 
-  try {
-    await jwtVerify(cookie.value, getSecret());
-    return true;
-  } catch {
-    return false;
-  }
+export async function requireSession(): Promise<SessionUser | null> {
+  return getSession();
+}
+
+export async function requireRank(...ranks: SessionUser["rank"][]): Promise<SessionUser | null> {
+  const s = await getSession();
+  if (!s) return null;
+  if (!ranks.includes(s.rank)) return null;
+  return s;
 }
 
 export function getCookieConfig(token: string) {
@@ -51,6 +86,17 @@ export function getCookieConfig(token: string) {
     secure: isProd,
     sameSite: "lax" as const,
     path: "/",
-    maxAge: 60 * 60 * 24 * 7, // 7일
+    maxAge: 60 * 60 * 24 * 7,
+  };
+}
+
+export function sessionCookie(token: string) {
+  const config = getCookieConfig(token);
+  return {
+    httpOnly: config.httpOnly,
+    secure: config.secure,
+    sameSite: config.sameSite,
+    path: config.path,
+    maxAge: config.maxAge,
   };
 }
