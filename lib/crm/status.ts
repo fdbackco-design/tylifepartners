@@ -46,6 +46,7 @@ export function allowedStatusesFor(session: SessionUser, current: LeadStatus): L
 }
 
 export function rowBackground(status: LeadStatus): string | undefined {
+  if (status === "배정전") return "#fff4e6";
   if (status === "대기" || status === "부재(메신저완료)") return "#fffde7";
   if (status === "대면확정") return "#e8f5e9";
   if (status === "가입완료") return "#f3e5f5";
