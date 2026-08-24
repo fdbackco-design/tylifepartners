@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { loadStaffMaps } from "@/lib/crm/mapLead";
 import { parseLeadQuery, queryLeads } from "@/lib/crm/queryLeads";
-import { canSeeAdminStatus } from "@/lib/crm/scope";
+import { canSeeAdminStatus, visibleAssigneeIds } from "@/lib/crm/scope";
 import { allowedStatusesFor } from "@/lib/crm/status";
 import { LEAD_STATUSES } from "@/lib/crm/types";
 
@@ -19,6 +19,9 @@ export async function GET(request: NextRequest) {
     }
     const { items, total } = await queryLeads(session, q);
     const { staff } = await loadStaffMaps();
+    const scoped = await visibleAssigneeIds(session);
+    const visibleStaff =
+      scoped === "all" ? staff : staff.filter((s) => scoped.includes(s.id));
     const showAdmin = canSeeAdminStatus(session);
     const mapped = showAdmin ? items : items.map((row) => ({ ...row, admin_status: null }));
     const uniq = (key: "region" | "age_group" | "job" | "job_rank" | "entry_page" | "utm_source") =>
@@ -29,7 +32,7 @@ export async function GET(request: NextRequest) {
       items: mapped,
       total,
       session: { rank: session.rank, userId: session.userId, name: session.name },
-      staff: staff.map((s) => ({
+      staff: visibleStaff.map((s) => ({
         id: s.id,
         name: s.name,
         parent_id: s.parent_id,

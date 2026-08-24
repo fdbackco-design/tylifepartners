@@ -1,18 +1,42 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
 import type { SessionUser } from "@/lib/crm/types";
 
+/** parent_id 트리에서 root 본인 + 모든 산하 id */
+export function descendantAssigneeIds(
+  rootId: string,
+  staff: Array<{ id: string; parent_id: string | null }>
+): string[] {
+  const childrenByParent = new Map<string, string[]>();
+  for (const row of staff) {
+    if (!row.parent_id) continue;
+    const list = childrenByParent.get(row.parent_id) ?? [];
+    list.push(row.id);
+    childrenByParent.set(row.parent_id, list);
+  }
+  const ids = new Set<string>([rootId]);
+  const stack = [rootId];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    for (const child of childrenByParent.get(cur) ?? []) {
+      if (ids.has(child)) continue;
+      ids.add(child);
+      stack.push(child);
+    }
+  }
+  return Array.from(ids);
+}
+
 export async function visibleAssigneeIds(session: SessionUser): Promise<string[] | "all"> {
   if (session.rank === "admin") return "all";
   if (!session.userId) return [];
-  if (session.rank === "sales") return [session.userId];
 
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase.from("staff_users").select("id").eq("parent_id", session.userId);
+  const { data, error } = await supabase.from("staff_users").select("id, parent_id");
   if (error) {
     console.error("visibleAssigneeIds:", error);
     return [session.userId];
   }
-  return [session.userId, ...(data ?? []).map((r) => r.id as string)];
+  return descendantAssigneeIds(session.userId, data ?? []);
 }
 
 export function canManageAccounts(session: SessionUser): boolean {

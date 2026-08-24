@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatPhoneKorean } from "@/lib/phone";
+import { fromKstHourLocalInput, toKstHourLocalInput } from "@/lib/crm/kst";
 import { allowedStatusesFor, isMemoEditable, rowBackground } from "@/lib/crm/status";
 import { formatYmdDot } from "@/lib/crm/ui";
 import type { LeadCategory, LeadRow, LeadStatus, SessionUser } from "@/lib/crm/types";
@@ -10,6 +11,7 @@ import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
 import DateRangePicker from "@/app/admin/_components/crm/DateRangePicker";
 import FilterPopover, { type FilterGroup } from "@/app/admin/_components/crm/FilterPopover";
 import StatusBadgeMenu from "@/app/admin/_components/crm/StatusBadgeMenu";
+import { formatAssigneeWithTeam } from "@/lib/crm/assigneeHistoryFormat";
 
 type StaffOpt = { id: string; name: string; parent_id: string | null; rank?: string };
 
@@ -224,6 +226,7 @@ export default function LeadList({
     setMemoRow(row);
     memoSavedRef.current = row.memo ?? "";
     setMemoSaveStatus("idle");
+    setMemoLogs([]);
     const cat = row.type === "후보자" ? "candidates" : "consumers";
     const res = await fetch(`/api/admin/leads/${row.id}?category=${cat}`);
     const data = await res.json();
@@ -297,11 +300,22 @@ export default function LeadList({
 
   const salesStaff = staff.filter((s) => (s.rank ?? "sales") === "sales");
   const managers = staff.filter((s, _, arr) => arr.some((o) => o.parent_id === s.id) || s.parent_id == null);
-  const showAdmin = session?.rank === "admin" || session?.rank === "manager";
+  const isAdmin = session?.rank === "admin";
+  const showAdmin = isAdmin || session?.rank === "manager";
   const canExport = showAdmin;
   const canBulkAssign = needReassign && showAdmin;
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const allPageSelected = items.length > 0 && items.every((r) => selectedIds.has(r.id));
+
+  const formatMemoTime = (iso: string) =>
+    new Date(iso).toLocaleString("ko-KR", {
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
 
   const toggleSelect = (row: LeadRow) => {
     setSelectedIds((prev) => {
@@ -532,10 +546,13 @@ export default function LeadList({
             value={row.assignee_id}
             staff={staff}
             teamName={row.team_name}
+            history={isAdmin ? row.assignee_history : undefined}
             onChange={(id) => void patch(row, { assignee_id: id })}
           />
         ) : (
-          <span>{row.assignee_name || "-"}</span>
+          <div>
+            <div>{formatAssigneeWithTeam(row.assignee_name, row.team_name)}</div>
+          </div>
         )}
         {showAdmin && <div>{row.admin_status ? <span className="admin-tag">{row.admin_status.label}</span> : "-"}</div>}
         <StatusBadgeMenu
@@ -547,8 +564,9 @@ export default function LeadList({
           <input
             className="crm-input"
             type="datetime-local"
-            value={row.meeting_at ? row.meeting_at.slice(0, 16) : ""}
-            onChange={(e) => void patch(row, { meeting_at: e.target.value ? new Date(e.target.value).toISOString() : null })}
+            step={3600}
+            value={toKstHourLocalInput(row.meeting_at)}
+            onChange={(e) => void patch(row, { meeting_at: fromKstHourLocalInput(e.target.value) })}
             style={{ marginTop: 6, height: 32, fontSize: 12 }}
             aria-label="대면 일정"
           />
@@ -742,7 +760,7 @@ export default function LeadList({
                     <tr
                       key={row.id}
                       className={selectedId === row.id ? "is-selected" : undefined}
-                      style={{ background: rowBackground(row.status) }}
+                      style={{ background: rowBackground(row.status, row.admin_status?.key) }}
                       onClick={() => setSelectedId(row.id)}
                     >
                       {canBulkAssign && (
@@ -786,10 +804,13 @@ export default function LeadList({
                             value={row.assignee_id}
                             staff={staff}
                             teamName={row.team_name}
+                            history={isAdmin ? row.assignee_history : undefined}
                             onChange={(id) => void patch(row, { assignee_id: id })}
                           />
                         ) : (
-                          row.assignee_name || "-"
+                          <div>
+                            <div>{formatAssigneeWithTeam(row.assignee_name, row.team_name)}</div>
+                          </div>
                         )}
                       </td>
                       {showAdmin && (
@@ -807,9 +828,10 @@ export default function LeadList({
                           <input
                             className="crm-input"
                             type="datetime-local"
-                            value={row.meeting_at ? row.meeting_at.slice(0, 16) : ""}
+                            step={3600}
+                            value={toKstHourLocalInput(row.meeting_at)}
                             onChange={(e) =>
-                              void patch(row, { meeting_at: e.target.value ? new Date(e.target.value).toISOString() : null })
+                              void patch(row, { meeting_at: fromKstHourLocalInput(e.target.value) })
                             }
                             style={{ display: "block", marginTop: 6, height: 32, fontSize: 12, minWidth: 180 }}
                           />
@@ -840,7 +862,7 @@ export default function LeadList({
           {isMobile && (
             <div className="crm-cards">
               {items.map((row) => (
-                <article key={row.id} className="crm-card" style={{ background: rowBackground(row.status) || "#fff" }}>
+                <article key={row.id} className="crm-card" style={{ background: rowBackground(row.status, row.admin_status?.key) || "#fff" }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                     {canBulkAssign && (
                       <input
@@ -924,7 +946,7 @@ export default function LeadList({
                 {memoLogs.map((l) => (
                   <div key={l.id} style={{ fontSize: 12, borderTop: "1px solid var(--crm-border)", padding: "8px 0" }}>
                     <div style={{ color: "var(--crm-muted)" }}>
-                      {l.assignee_name || "미지정"} · {new Date(l.created_at).toLocaleString("ko-KR")}
+                      {isAdmin ? `${l.assignee_name || "미지정"} · ${formatMemoTime(l.created_at)}` : formatMemoTime(l.created_at)}
                     </div>
                     <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{l.memo || "-"}</div>
                   </div>

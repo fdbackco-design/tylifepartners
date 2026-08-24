@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -12,6 +13,7 @@ import {
   type ReactNode,
   type SelectHTMLAttributes,
 } from "react";
+import { createPortal } from "react-dom";
 
 export function CrmButton({
   variant = "secondary",
@@ -106,6 +108,36 @@ export function CrmSwitch({
       />
       <span className="crm-ui-switch-track" aria-hidden />
       {label ? <span className="crm-ui-switch-label">{label}</span> : null}
+    </label>
+  );
+}
+
+export function CrmCheckbox({
+  checked,
+  onChange,
+  disabled,
+  label,
+  id,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+  label?: ReactNode;
+  id?: string;
+}) {
+  const autoId = useId();
+  const checkId = id ?? autoId;
+  return (
+    <label className={`crm-ui-check ${disabled ? "is-disabled" : ""}`} htmlFor={checkId}>
+      <input
+        id={checkId}
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span className="crm-ui-check-box" aria-hidden />
+      {label ? <span className="crm-ui-check-label">{label}</span> : null}
     </label>
   );
 }
@@ -298,27 +330,63 @@ export function CrmMenu({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const root = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const placePanel = () => {
+    const btn = triggerRef.current;
+    const panel = panelRef.current;
+    if (!btn || !panel) return;
+    const r = btn.getBoundingClientRect();
+    const pw = panel.offsetWidth || 160;
+    const ph = panel.offsetHeight || 140;
+    const gap = 4;
+    const spaceBelow = window.innerHeight - r.bottom;
+    const openUp = spaceBelow < ph + gap && r.top > ph + gap;
+    let left = align === "right" ? r.right - pw : r.left;
+    left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+    const top = openUp ? r.top - ph - gap : r.bottom + gap;
+    setPos({ top, left });
+  };
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null);
+      return;
+    }
+    placePanel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- place when open/align changes
+  }, [open, align]);
 
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (root.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
+    const onReposition = () => placePanel();
     document.addEventListener("mousedown", onDoc);
     window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
     return () => {
       document.removeEventListener("mousedown", onDoc);
       window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
     };
-  }, [open]);
+  }, [open, align]);
 
   return (
     <div className="crm-ui-menu" ref={root}>
       <button
+        ref={triggerRef}
         type="button"
         className="crm-ui-menu-trigger"
         aria-haspopup="menu"
@@ -327,11 +395,19 @@ export function CrmMenu({
       >
         {trigger}
       </button>
-      {open ? (
-        <div className={`crm-ui-menu-panel crm-ui-menu-${align}`} role="menu">
-          <MenuContext.Provider value={{ close: () => setOpen(false) }}>{children}</MenuContext.Provider>
-        </div>
-      ) : null}
+      {open && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={panelRef}
+              className="crm-ui-menu-panel crm-ui-menu-portal"
+              role="menu"
+              style={pos ? { top: pos.top, left: pos.left } : { top: -9999, left: -9999 }}
+            >
+              <MenuContext.Provider value={{ close: () => setOpen(false) }}>{children}</MenuContext.Provider>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }

@@ -267,7 +267,13 @@ export default function ManagedLandingPage({
   }, [previewMode]);
 
   return (
-    <main>
+    <main
+      style={
+        previewMode
+          ? { position: "relative", minHeight: "100%", isolation: "isolate" }
+          : undefined
+      }
+    >
       <LandingAnalyticsTracker landingKey={landingKey} sections={sections} />
 
       {!hideTitleBar && (
@@ -374,7 +380,7 @@ export default function ManagedLandingPage({
                 maskPosition: "center",
               }}
             />
-            상품 소개서 받아보기
+            상품 소개서 받기
           </button>
         </div>
       )}
@@ -407,14 +413,14 @@ export default function ManagedLandingPage({
       {showFixedCta && (
         <div
           style={{
-            position: "fixed",
+            position: previewMode ? "sticky" : "fixed",
             bottom: 0,
             left: 0,
             right: 0,
             padding: "10px 16px",
             paddingBottom: `calc(10px + var(--safe-bottom))`,
             background: "var(--bg-page)",
-            maxWidth: 480,
+            maxWidth: previewMode ? "100%" : 480,
             margin: "0 auto",
             boxShadow: "0 -2px 10px rgba(0,0,0,0.06)",
             zIndex: 20,

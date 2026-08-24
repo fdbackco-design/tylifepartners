@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
+import { fromKstHourLocalInput, toKstHourLocalInput } from "@/lib/crm/kst";
 import { assigneeColor, formatYmdDot, maskCustomerName, todayYmdLocal } from "@/lib/crm/ui";
 
 type Meeting = {
@@ -395,8 +396,12 @@ export default function CalendarPage() {
                 <input
                   className="crm-input"
                   type="datetime-local"
-                  value={detail.meeting_at ? detail.meeting_at.slice(0, 16) : ""}
-                  onChange={(e) => setDetail({ ...detail, meeting_at: e.target.value ? new Date(e.target.value).toISOString() : detail.meeting_at })}
+                  step={3600}
+                  value={toKstHourLocalInput(detail.meeting_at)}
+                  onChange={(e) => {
+                    const next = fromKstHourLocalInput(e.target.value);
+                    if (next) setDetail({ ...detail, meeting_at: next });
+                  }}
                   style={{ width: "100%" }}
                 />
               </label>

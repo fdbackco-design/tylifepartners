@@ -37,7 +37,14 @@ export type StaffUser = {
 };
 
 export type AdminStatusInfo = {
-  key: "waiting_day" | "absent_day" | "done_day" | "need_reassign" | "need_recontact";
+  key:
+    | "waiting_day"
+    | "first_contact_day"
+    | "absent_day"
+    | "done_day"
+    | "need_assign"
+    | "need_reassign"
+    | "need_recontact";
   label: string;
   tone: "danger";
 };
@@ -67,6 +74,8 @@ export type LeadRow = {
   assignee_id: string | null;
   assignee_name: string;
   team_name: string;
+  /** 담당자 변경 체인 (이름), 예: ["김세영","이윤후","이찬호"] */
+  assignee_history: string[];
   assigned_at: string | null;
   status_changed_at: string | null;
   meeting_at: string | null;
