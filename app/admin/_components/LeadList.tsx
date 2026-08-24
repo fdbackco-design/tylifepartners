@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatPhoneKorean } from "@/lib/phone";
 import { allowedStatusesFor, isMemoEditable, rowBackground } from "@/lib/crm/status";
@@ -75,6 +75,9 @@ export default function LeadList({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [memoRow, setMemoRow] = useState<LeadRow | null>(null);
   const [memoLogs, setMemoLogs] = useState<{ id: string; assignee_name: string; memo: string; created_at: string }[]>([]);
+  const [memoSaveStatus, setMemoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const memoSavedRef = useRef<string>("");
+  const memoRowRef = useRef<LeadRow | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Map<string, "consumers" | "candidates">>(new Map());
@@ -204,7 +207,13 @@ export default function LeadList({
     const data = await res.json();
     if (data.ok && data.item) {
       setItems((prev) => prev.map((x) => (x.id === row.id ? data.item : x)));
-      if (memoRow?.id === row.id) setMemoRow(data.item);
+      if (memoRowRef.current?.id === row.id) {
+        if (body.memo != null) {
+          setMemoRow((prev) => (prev ? { ...data.item, memo: prev.memo } : data.item));
+        } else {
+          setMemoRow(data.item);
+        }
+      }
       return data.item as LeadRow;
     }
     alert(data.message || "저장 실패");
@@ -213,13 +222,69 @@ export default function LeadList({
 
   const openMemo = async (row: LeadRow) => {
     setMemoRow(row);
+    memoSavedRef.current = row.memo ?? "";
+    setMemoSaveStatus("idle");
     const cat = row.type === "후보자" ? "candidates" : "consumers";
     const res = await fetch(`/api/admin/leads/${row.id}?category=${cat}`);
     const data = await res.json();
     if (data.ok) {
       setMemoLogs(data.memo_logs ?? []);
-      if (data.item) setMemoRow(data.item);
+      if (data.item) {
+        setMemoRow(data.item);
+        memoSavedRef.current = data.item.memo ?? "";
+      }
     }
+  };
+
+  useEffect(() => {
+    memoRowRef.current = memoRow;
+  }, [memoRow]);
+
+  useEffect(() => {
+    if (!memoRow || !isMemoEditable(memoRow.status)) return;
+    if ((memoRow.memo ?? "") === memoSavedRef.current) return;
+
+    setMemoSaveStatus("saving");
+    const row = memoRow;
+    const memo = memoRow.memo ?? "";
+    const t = window.setTimeout(() => {
+      void (async () => {
+        const cat = row.type === "후보자" ? "candidates" : "consumers";
+        try {
+          const res = await fetch(`/api/admin/leads/${row.id}?category=${cat}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ memo }),
+          });
+          const data = await res.json();
+          if (!data.ok) {
+            setMemoSaveStatus("error");
+            return;
+          }
+          memoSavedRef.current = memo;
+          if (data.item) {
+            setItems((prev) => prev.map((x) => (x.id === row.id ? { ...data.item, memo: memoRowRef.current?.id === row.id ? memoRowRef.current.memo : data.item.memo } : x)));
+          }
+          if (memoRowRef.current?.id === row.id && (memoRowRef.current.memo ?? "") === memo) {
+            setMemoSaveStatus("saved");
+          }
+        } catch {
+          setMemoSaveStatus("error");
+        }
+      })();
+    }, 700);
+    return () => window.clearTimeout(t);
+  }, [memoRow?.id, memoRow?.memo, memoRow?.status]);
+
+  const closeMemo = async () => {
+    const row = memoRowRef.current;
+    if (row && isMemoEditable(row.status) && (row.memo ?? "") !== memoSavedRef.current) {
+      setMemoSaveStatus("saving");
+      await patch(row, { memo: row.memo ?? "" });
+      memoSavedRef.current = row.memo ?? "";
+    }
+    setMemoRow(null);
+    setMemoSaveStatus("idle");
   };
 
   const downloadExcel = () => {
@@ -822,23 +887,37 @@ export default function LeadList({
 
       {memoRow && (
         <>
-          <button type="button" className="crm-drawer-backdrop" aria-label="닫기" onClick={() => setMemoRow(null)} />
+          <button type="button" className="crm-drawer-backdrop" aria-label="닫기" onClick={() => void closeMemo()} />
           <aside className="crm-drawer" role="dialog" aria-label="메모 상세">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div>
                 <strong style={{ fontSize: 16 }}>{memoRow.name}</strong>
                 <div style={{ fontSize: 12, color: "var(--crm-muted)" }}>{formatPhoneKorean(memoRow.phone)}</div>
               </div>
-              <button type="button" className="crm-btn" onClick={() => setMemoRow(null)}>
+              <button type="button" className="crm-btn" onClick={() => void closeMemo()}>
                 닫기
               </button>
             </div>
             <textarea
               value={memoRow.memo}
               disabled={!isMemoEditable(memoRow.status)}
-              onChange={(e) => setMemoRow({ ...memoRow, memo: e.target.value })}
+              onChange={(e) => {
+                setMemoRow({ ...memoRow, memo: e.target.value });
+                setMemoSaveStatus("saving");
+              }}
               aria-label="메모 내용"
             />
+            <div style={{ marginTop: 8, fontSize: 12, color: "var(--crm-muted)", minHeight: 18 }}>
+              {!isMemoEditable(memoRow.status)
+                ? "배정전·대기 상태에서는 메모를 편집할 수 없습니다"
+                : memoSaveStatus === "saving"
+                  ? "저장 중…"
+                  : memoSaveStatus === "saved"
+                    ? "자동 저장됨"
+                    : memoSaveStatus === "error"
+                      ? "저장 실패 · 다시 입력하면 재시도됩니다"
+                      : "입력하면 자동 저장됩니다"}
+            </div>
             {memoLogs.length > 0 && (
               <div style={{ marginTop: 12, maxHeight: 160, overflow: "auto" }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "var(--crm-muted)", marginBottom: 6 }}>이전 담당자 메모</div>
@@ -852,21 +931,6 @@ export default function LeadList({
                 ))}
               </div>
             )}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-              <button type="button" className="crm-btn" onClick={() => setMemoRow(null)}>
-                취소
-              </button>
-              <button
-                type="button"
-                className="crm-btn crm-btn-primary"
-                disabled={!isMemoEditable(memoRow.status)}
-                onClick={() => {
-                  void patch(memoRow, { memo: memoRow.memo }).then(() => setMemoRow(null));
-                }}
-              >
-                저장
-              </button>
-            </div>
           </aside>
         </>
       )}

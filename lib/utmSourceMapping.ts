@@ -6,6 +6,7 @@ export type UtmSourceRow = {
   label: string;
   sheet_label: string;
   created_at: string;
+  is_active?: boolean;
 };
 
 /** URL·DB에 쓰이는 utm_source 값 → 구글 시트 C/G 표시명 */

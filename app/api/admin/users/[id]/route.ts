@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { credentialsFromPhone, hashPassword } from "@/lib/crm/password";
+import { isRegionZoneName } from "@/lib/crm/regionZones";
 import { canManageAccounts } from "@/lib/crm/scope";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -21,7 +22,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const body = await request.json();
   const patch: Record<string, unknown> = {};
   if (body.name != null) patch.name = String(body.name).trim();
-  if (body.region != null) patch.region = String(body.region).trim() || null;
+  if (body.region != null) {
+    const regionRaw = String(body.region).trim() || null;
+    if (regionRaw && !isRegionZoneName(regionRaw)) {
+      return NextResponse.json({ ok: false, message: "담당 권역을 목록에서 선택해 주세요." }, { status: 400 });
+    }
+    patch.region = regionRaw;
+  }
   if (body.is_active != null) patch.is_active = Boolean(body.is_active);
   if (body.parent_id !== undefined && session.rank === "admin") {
     patch.parent_id = body.parent_id ? String(body.parent_id) : null;

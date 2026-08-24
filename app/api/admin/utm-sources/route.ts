@@ -3,10 +3,6 @@ import { verifyAdminSession } from "@/lib/adminSession";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { parseUtmSourceInput, utmSourcesDbErrorMessage } from "@/lib/utmSourceMapping";
 
-/**
- * GET /api/admin/utm-sources — UTM source 목록
- * POST /api/admin/utm-sources — UTM source 추가
- */
 export async function GET() {
   const valid = await verifyAdminSession();
   if (!valid) {
@@ -17,18 +13,32 @@ export async function GET() {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("utm_sources")
-      .select("id, value, label, sheet_label, created_at")
+      .select("id, value, label, sheet_label, created_at, is_active")
       .order("label", { ascending: true });
 
     if (error) {
-      console.error("GET utm_sources error:", error);
-      return NextResponse.json(
-        { ok: false, message: utmSourcesDbErrorMessage(error, "조회") },
-        { status: 500 }
-      );
+      // is_active 컬럼 없을 때 폴백
+      const fallback = await supabase
+        .from("utm_sources")
+        .select("id, value, label, sheet_label, created_at")
+        .order("label", { ascending: true });
+      if (fallback.error) {
+        console.error("GET utm_sources error:", error);
+        return NextResponse.json(
+          { ok: false, message: utmSourcesDbErrorMessage(error, "조회") },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json({
+        ok: true,
+        items: (fallback.data ?? []).map((r) => ({ ...r, is_active: true })),
+      });
     }
 
-    return NextResponse.json({ ok: true, items: data ?? [] });
+    return NextResponse.json({
+      ok: true,
+      items: (data ?? []).map((r) => ({ ...r, is_active: r.is_active !== false })),
+    });
   } catch (e) {
     console.error("GET /api/admin/utm-sources error:", e);
     return NextResponse.json({ ok: false, message: "서버 오류가 발생했습니다." }, { status: 500 });
@@ -49,12 +59,11 @@ export async function POST(request: NextRequest) {
     }
 
     const { value, label, sheetLabel } = parsed.data;
-
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("utm_sources")
-      .insert({ value, label, sheet_label: sheetLabel })
-      .select("id, value, label, sheet_label, created_at")
+      .insert({ value, label, sheet_label: sheetLabel, is_active: true })
+      .select("id, value, label, sheet_label, created_at, is_active")
       .single();
 
     if (error) {
@@ -64,11 +73,26 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
-      console.error("POST utm_sources error:", error);
-      return NextResponse.json(
-        { ok: false, message: utmSourcesDbErrorMessage(error, "저장") },
-        { status: 500 }
-      );
+      // is_active 없이 재시도
+      const retry = await supabase
+        .from("utm_sources")
+        .insert({ value, label, sheet_label: sheetLabel })
+        .select("id, value, label, sheet_label, created_at")
+        .single();
+      if (retry.error) {
+        if (retry.error.code === "23505") {
+          return NextResponse.json(
+            { ok: false, message: "이미 등록된 utm_source 값입니다." },
+            { status: 409 }
+          );
+        }
+        console.error("POST utm_sources error:", error);
+        return NextResponse.json(
+          { ok: false, message: utmSourcesDbErrorMessage(error, "저장") },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json({ ok: true, item: { ...retry.data, is_active: true } });
     }
 
     return NextResponse.json({ ok: true, item: data });

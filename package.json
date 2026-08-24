@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "type-check": "tsc --noEmit",
+    "test": "tsx --test lib/crm/regionZones.test.ts",
     "start": "next start",
     "lint": "next lint"
   },
@@ -24,6 +25,7 @@
     "@types/nodemailer": "^8.0.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "tsx": "^4.23.12",
     "typescript": "^5"
   }
 }

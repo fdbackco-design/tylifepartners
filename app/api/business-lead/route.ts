@@ -9,6 +9,7 @@ import { isLeadSubmissionBlocked, maskPhoneForLog } from "@/lib/phoneBlacklist";
 import { runAfterResponse } from "@/lib/runAfterResponse";
 import { syncLeadToCrm } from "@/lib/crmSync";
 import { tryAutoAssignLead } from "@/lib/crm/assignment";
+import { resolveRegionZone } from "@/lib/crm/regionZones";
 import {
   DEFAULT_FORM_CONFIG,
   normalizeFormConfig,
@@ -202,6 +203,7 @@ export async function POST(request: NextRequest) {
       last_section_label: analytics.last_section_label,
       status: "배정전",
       status_changed_at: nowIso,
+      region_zone: resolveRegionZone(regionForDb),
     })
       // 저장되는 값·컬럼은 그대로. CRM 동기화용 submission_id/실제 접수 시각만 돌려받는다.
       .select("id, created_at")

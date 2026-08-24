@@ -1,61 +1,69 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { buildUtmLink, type UtmSourceRow } from "@/lib/utmSourceMapping";
+import {
+  CrmAlert,
+  CrmBadge,
+  CrmButton,
+  CrmDialog,
+  CrmEmptyState,
+  CrmField,
+  CrmInput,
+  CrmMenu,
+  CrmMenuItem,
+  CrmPageHeader,
+  CrmSelect,
+  CrmSheet,
+  CrmTable,
+  IconCheck,
+  IconCopy,
+  IconDots,
+  IconExternal,
+  IconPlus,
+  IconSearch,
+} from "@/app/admin/_components/crm/ui";
+import { buildUtmLink, normalizeUtmSourceValue, type UtmSourceRow } from "@/lib/utmSourceMapping";
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 14px",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  fontSize: 15,
-};
+type LandingOpt = { id: string; title: string; path: string };
 
-const cellInputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "7px 10px",
-  border: "1px solid var(--border)",
-  borderRadius: 6,
-  fontSize: 13,
-  boxSizing: "border-box",
-};
+function isValidHttpUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
-const btnSecondary: React.CSSProperties = {
-  padding: "8px 12px",
-  background: "#fff",
-  color: "#495057",
-  border: "1px solid var(--border)",
-  borderRadius: 6,
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const btnDanger: React.CSSProperties = {
-  ...btnSecondary,
-  color: "#c92a2a",
-  borderColor: "#ffc9c9",
-};
-
-function emptyEditForm() {
-  return { value: "", label: "", sheetLabel: "" };
+function isValidPath(raw: string): boolean {
+  const p = raw.trim() || "/";
+  return p.startsWith("/") && !/\s/.test(p);
 }
 
 export default function UtmLinkPanel() {
   const [baseUrl, setBaseUrl] = useState("https://www.feed-life.com");
   const [path, setPath] = useState("/0715s");
+  const [landingMode, setLandingMode] = useState<"pick" | "custom">("custom");
+  const [landings, setLandings] = useState<LandingOpt[]>([]);
+  const [selectedLandingId, setSelectedLandingId] = useState("");
+  const [landingSearch, setLandingSearch] = useState("");
+
   const [selectedValue, setSelectedValue] = useState("");
   const [items, setItems] = useState<UtmSourceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState(emptyEditForm);
   const [actionId, setActionId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
-  const [newValue, setNewValue] = useState("");
-  const [newLabel, setNewLabel] = useState("");
-  const [newSheetLabel, setNewSheetLabel] = useState("");
-  const [search, setSearch] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const [sourceSearch, setSourceSearch] = useState("");
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editItem, setEditItem] = useState<UtmSourceRow | null>(null);
+  const [formValue, setFormValue] = useState("");
+  const [formLabel, setFormLabel] = useState("");
+  const [formSheetLabel, setFormSheetLabel] = useState("");
+  const [formError, setFormError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<UtmSourceRow | null>(null);
 
   const showToast = useCallback((msg: string, error?: boolean) => {
     setToast({ msg, error });
@@ -68,10 +76,15 @@ export default function UtmLinkPanel() {
       const res = await fetch("/api/admin/utm-sources");
       const data = await res.json();
       if (data.ok) {
-        setItems(data.items ?? []);
+        const list: UtmSourceRow[] = (data.items ?? []).map((i: UtmSourceRow) => ({
+          ...i,
+          is_active: i.is_active !== false,
+        }));
+        setItems(list);
         setSelectedValue((prev) => {
-          if (prev && (data.items ?? []).some((i: UtmSourceRow) => i.value === prev)) return prev;
-          return data.items?.[0]?.value ?? "";
+          const active = list.filter((i) => i.is_active !== false);
+          if (prev && active.some((i) => i.value === prev)) return prev;
+          return active[0]?.value ?? "";
         });
       } else {
         showToast(data.message || "목록을 불러오지 못했습니다.", true);
@@ -84,92 +97,148 @@ export default function UtmLinkPanel() {
   }, [showToast]);
 
   useEffect(() => {
-    fetchItems();
+    void fetchItems();
+    fetch("/api/admin/landings")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok && Array.isArray(d.items)) {
+          setLandings(
+            d.items.map((it: { id: string; title: string; path: string }) => ({
+              id: it.id,
+              title: it.title,
+              path: it.path,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
   }, [fetchItems]);
 
-  const generatedLink = useMemo(() => {
-    if (!baseUrl.trim() || !selectedValue) return "";
-    return buildUtmLink(baseUrl.trim(), path.trim() || "/0715s", selectedValue);
-  }, [baseUrl, path, selectedValue]);
+  const activeSources = useMemo(() => items.filter((i) => i.is_active !== false), [items]);
+  const selectedItem = items.find((i) => i.value === selectedValue);
 
-  const filteredItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
+  const filteredLandings = useMemo(() => {
+    const q = landingSearch.trim().toLowerCase();
+    if (!q) return landings;
+    return landings.filter((l) => `${l.title} ${l.path}`.toLowerCase().includes(q));
+  }, [landings, landingSearch]);
+
+  const urlError = baseUrl.trim() && !isValidHttpUrl(baseUrl.trim()) ? "올바른 http(s) URL을 입력해 주세요." : "";
+  const pathError = path.trim() && !isValidPath(path) ? "경로는 /로 시작하고 공백이 없어야 합니다." : "";
+  const sourceError = !loading && activeSources.length === 0 ? "활성 UTM 소스가 없습니다." : !selectedValue ? "소스를 선택해 주세요." : "";
+
+  const canGenerate =
+    isValidHttpUrl(baseUrl.trim()) && isValidPath(path.trim() || "/") && !!selectedValue && !urlError && !pathError;
+
+  const generatedLink = useMemo(() => {
+    if (!canGenerate) return "";
+    try {
+      return buildUtmLink(baseUrl.trim(), path.trim() || "/", selectedValue);
+    } catch {
+      return "";
+    }
+  }, [baseUrl, path, selectedValue, canGenerate]);
+
+  const filteredSources = useMemo(() => {
+    const q = sourceSearch.trim().toLowerCase();
     if (!q) return items;
     return items.filter(
       (item) =>
-        item.label.toLowerCase().includes(q) || item.value.toLowerCase().includes(q)
+        item.label.toLowerCase().includes(q) ||
+        item.value.toLowerCase().includes(q) ||
+        item.sheet_label.toLowerCase().includes(q)
     );
-  }, [items, search]);
+  }, [items, sourceSearch]);
 
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (saving) return;
+  const applyLanding = (id: string) => {
+    setSelectedLandingId(id);
+    const hit = landings.find((l) => l.id === id);
+    if (hit) {
+      setPath(hit.path);
+      setLandingMode("pick");
+    }
+  };
+
+  const openCreateSource = () => {
+    setEditItem(null);
+    setFormValue("");
+    setFormLabel("");
+    setFormSheetLabel("");
+    setFormError("");
+    setSheetOpen(true);
+  };
+
+  const openEditSource = (item: UtmSourceRow) => {
+    setEditItem(item);
+    setFormValue(item.value);
+    setFormLabel(item.label);
+    setFormSheetLabel(item.sheet_label === item.label ? "" : item.sheet_label);
+    setFormError("");
+    setSheetOpen(true);
+  };
+
+  const valuePreview = normalizeUtmSourceValue(formValue);
+  const valueDup = !!valuePreview && items.some((i) => i.value === valuePreview && i.id !== editItem?.id);
+  const valueFieldError =
+    formValue && !valuePreview
+      ? "영문·숫자·하이픈·언더스코어만 사용할 수 있습니다."
+      : valueDup
+        ? "이미 등록된 utm_source 값입니다."
+        : "";
+
+  const saveSource = async () => {
+    setFormError("");
+    if (!formLabel.trim()) {
+      setFormError("표시 이름을 입력해 주세요.");
+      return;
+    }
+    if (!valuePreview || valueDup) {
+      setFormError(valueFieldError || "utm_source 값을 확인해 주세요.");
+      return;
+    }
     setSaving(true);
     try {
-      const res = await fetch("/api/admin/utm-sources", {
-        method: "POST",
+      const body = {
+        value: formValue,
+        label: formLabel,
+        sheet_label: formSheetLabel || formLabel,
+      };
+      const res = await fetch(editItem ? `/api/admin/utm-sources/${editItem.id}` : "/api/admin/utm-sources", {
+        method: editItem ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          value: newValue,
-          label: newLabel,
-          sheet_label: newSheetLabel || newLabel,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (data.ok) {
-        setNewValue("");
-        setNewLabel("");
-        setNewSheetLabel("");
-        setSelectedValue(data.item.value);
-        await fetchItems();
-        showToast("utm_source가 추가되었습니다.");
-      } else {
-        showToast(data.message || "추가에 실패했습니다.", true);
+      if (!data.ok) {
+        setFormError(data.message || "저장에 실패했습니다.");
+        return;
       }
+      setSelectedValue(data.item.value);
+      setSheetOpen(false);
+      await fetchItems();
+      showToast(editItem ? "소스가 수정되었습니다." : "소스가 추가되었습니다.");
     } catch {
-      showToast("네트워크 오류가 발생했습니다.", true);
+      setFormError("네트워크 오류가 발생했습니다.");
     } finally {
       setSaving(false);
     }
   };
 
-  const startEdit = (item: UtmSourceRow) => {
-    setEditingId(item.id);
-    setEditForm({
-      value: item.value,
-      label: item.label,
-      sheetLabel: item.sheet_label,
-    });
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditForm(emptyEditForm());
-  };
-
-  const handleUpdate = async (e: React.FormEvent, id: string) => {
-    e.preventDefault();
-    if (actionId) return;
-    setActionId(id);
+  const toggleActive = async (item: UtmSourceRow) => {
+    setActionId(item.id);
     try {
-      const res = await fetch(`/api/admin/utm-sources/${id}`, {
+      const res = await fetch(`/api/admin/utm-sources/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          value: editForm.value,
-          label: editForm.label,
-          sheet_label: editForm.sheetLabel || editForm.label,
-        }),
+        body: JSON.stringify({ is_active: item.is_active === false }),
       });
       const data = await res.json();
-      if (data.ok) {
-        setSelectedValue(data.item.value);
-        cancelEdit();
-        await fetchItems();
-        showToast("utm_source가 수정되었습니다.");
-      } else {
-        showToast(data.message || "수정에 실패했습니다.", true);
+      if (!data.ok) {
+        showToast(data.message || "상태 변경에 실패했습니다.", true);
+        return;
       }
+      await fetchItems();
+      showToast(item.is_active === false ? "소스를 활성화했습니다." : "소스를 비활성화했습니다.");
     } catch {
       showToast("네트워크 오류가 발생했습니다.", true);
     } finally {
@@ -177,23 +246,21 @@ export default function UtmLinkPanel() {
     }
   };
 
-  const handleDelete = async (item: UtmSourceRow) => {
-    if (actionId) return;
-    const ok = window.confirm(`「${item.label} (${item.value})」 utm_source를 삭제할까요?`);
-    if (!ok) return;
-
-    setActionId(item.id);
+  const deleteSource = async () => {
+    if (!confirmDelete) return;
+    setActionId(confirmDelete.id);
     try {
-      const res = await fetch(`/api/admin/utm-sources/${item.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/utm-sources/${confirmDelete.id}`, { method: "DELETE" });
       const data = await res.json();
-      if (data.ok) {
-        if (editingId === item.id) cancelEdit();
-        if (selectedValue === item.value) setSelectedValue("");
-        await fetchItems();
-        showToast("utm_source가 삭제되었습니다.");
-      } else {
+      if (!data.ok) {
         showToast(data.message || "삭제에 실패했습니다.", true);
+        setConfirmDelete(null);
+        return;
       }
+      if (selectedValue === confirmDelete.value) setSelectedValue("");
+      setConfirmDelete(null);
+      await fetchItems();
+      showToast("소스가 삭제되었습니다.");
     } catch {
       showToast("네트워크 오류가 발생했습니다.", true);
     } finally {
@@ -205,406 +272,339 @@ export default function UtmLinkPanel() {
     if (!generatedLink) return;
     try {
       await navigator.clipboard.writeText(generatedLink);
-      showToast("링크가 복사되었습니다.");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
     } catch {
       showToast("복사에 실패했습니다.", true);
     }
   };
 
-  const selectedItem = items.find((i) => i.value === selectedValue);
-
   return (
-    <div style={{ maxWidth: 640 }}>
-      <div style={{ marginBottom: 20 }}>
-        <label style={{ display: "block", marginBottom: 6, fontSize: 14, fontWeight: 500 }}>사이트 URL</label>
-        <input
-          type="url"
-          value={baseUrl}
-          onChange={(e) => setBaseUrl(e.target.value)}
-          placeholder="https://www.feed-life.com"
-          style={inputStyle}
-        />
-      </div>
+    <div className="crm-ui-content">
+      <CrmPageHeader
+        title="UTM 링크 생성기"
+        description="광고 및 영업자별 유입 링크를 생성합니다"
+      />
 
-      <div style={{ marginBottom: 20 }}>
-        <label style={{ display: "block", marginBottom: 6, fontSize: 14, fontWeight: 500 }}>경로</label>
-        <input
-          type="text"
-          value={path}
-          onChange={(e) => setPath(e.target.value)}
-          placeholder="/0715s"
-          style={inputStyle}
-        />
-      </div>
-
-      <div style={{ marginBottom: 24 }}>
-        <label style={{ display: "block", marginBottom: 6, fontSize: 14, fontWeight: 500 }}>utm_source</label>
-        {loading ? (
-          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>목록 불러오는 중...</div>
-        ) : (
-          <select
-            value={selectedValue}
-            onChange={(e) => setSelectedValue(e.target.value)}
-            style={inputStyle}
-          >
-            {items.length === 0 ? (
-              <option value="">등록된 utm_source 없음</option>
-            ) : (
-              items.map((item) => (
-                <option key={item.id} value={item.value}>
-                  {item.label} ({item.value})
-                </option>
-              ))
-            )}
-          </select>
-        )}
-        {selectedItem && (
-          <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
-            구글 시트 C열(유입매체)·G열(담당자) 표시: <strong>{selectedItem.sheet_label}</strong>
-            <span style={{ display: "block", marginTop: 4, fontWeight: 400 }}>
-              상담 신청 시 G열에 자동 입력되며 담당자 시트로 동기화됩니다.
-            </span>
-          </p>
-        )}
-      </div>
-
-      <div
-        style={{
-          background: "var(--bg-card)",
-          borderRadius: 8,
-          padding: 20,
-          border: "1px solid var(--border)",
-          marginBottom: 28,
-        }}
-      >
-        <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>생성된 UTM 링크</h3>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <input
-            type="text"
-            readOnly
-            value={generatedLink}
-            placeholder="utm_source를 선택해 주세요."
-            style={{
-              flex: 1,
-              minWidth: 200,
-              padding: "10px 12px",
-              fontSize: 14,
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              background: "#f8f9fa",
-            }}
-          />
-          <button
-            type="button"
-            onClick={copyLink}
-            disabled={!generatedLink}
-            style={{
-              padding: "10px 16px",
-              background: generatedLink ? "var(--cta-bg)" : "#adb5bd",
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: generatedLink ? "pointer" : "default",
-            }}
-          >
-            복사
-          </button>
+      {toast ? (
+        <div style={{ marginBottom: 12 }}>
+          <CrmAlert tone={toast.error ? "danger" : "success"}>{toast.msg}</CrmAlert>
         </div>
-      </div>
+      ) : null}
 
-      <div
-        style={{
-          background: "var(--bg-card)",
-          borderRadius: 8,
-          padding: 20,
-          border: "1px solid var(--border)",
-          marginBottom: 28,
-        }}
-      >
-        <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>utm_source 추가</h3>
-        <form onSubmit={handleAdd}>
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
-              utm_source 값 (URL·DB 저장)
-            </label>
-            <input
-              type="text"
-              value={newValue}
-              onChange={(e) => setNewValue(e.target.value)}
-              placeholder="예: member_id"
-              style={inputStyle}
-              disabled={saving}
-            />
-          </div>
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
-              표시 이름
-            </label>
-            <input
-              type="text"
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-              placeholder="예: 영업자 이름"
-              style={inputStyle}
-              disabled={saving}
-            />
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
-              구글 시트 표시명 — C열(유입매체)·G열(담당자)
-            </label>
-            <input
-              type="text"
-              value={newSheetLabel}
-              onChange={(e) => setNewSheetLabel(e.target.value)}
-              placeholder="비우면 표시 이름과 동일"
-              style={inputStyle}
-              disabled={saving}
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={saving}
-            style={{
-              padding: "10px 18px",
-              background: saving ? "#adb5bd" : "var(--cta-bg)",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: saving ? "default" : "pointer",
-            }}
-          >
-            {saving ? "저장 중..." : "추가하기"}
-          </button>
-        </form>
-      </div>
+      <div className="crm-ui-utm-grid">
+        <section className="crm-ui-panel">
+          <h2 className="crm-ui-section-title">링크 생성</h2>
 
-      <div
-        style={{
-          background: "var(--bg-card)",
-          borderRadius: 8,
-          padding: 20,
-          border: "1px solid var(--border)",
-          marginBottom: 28,
-        }}
-      >
-        <h3 style={{ margin: "0 0 16px", fontSize: 16, display: "flex", alignItems: "center", gap: 8 }}>
-          utm_source 관리
-          <span
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--cta-bg)",
-              background: "rgba(0,0,0,0.04)",
-              borderRadius: 999,
-              padding: "2px 10px",
-            }}
-          >
-            {items.length}개
-          </span>
-        </h3>
-        {loading ? (
-          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>목록 불러오는 중...</div>
-        ) : items.length === 0 ? (
-          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>등록된 utm_source가 없습니다.</div>
-        ) : (
-          <>
-          <div style={{ marginBottom: 14 }}>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="표시 이름 또는 utm_source 값으로 검색"
-              style={inputStyle}
-            />
-          </div>
-          {filteredItems.length === 0 ? (
-            <div style={{ fontSize: 14, color: "var(--text-secondary)", padding: "8px 0" }}>
-              「{search.trim()}」 검색 결과가 없습니다.
-            </div>
-          ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: 14,
-                tableLayout: "fixed",
-              }}
-            >
-              <colgroup>
-                <col style={{ width: "22%" }} />
-                <col style={{ width: "24%" }} />
-                <col style={{ width: "26%" }} />
-                <col style={{ width: "28%" }} />
-              </colgroup>
-              <thead>
-                <tr style={{ borderBottom: "2px solid var(--border)" }}>
-                  {["표시 이름", "utm_source 값", "구글 시트 표시명", "관리"].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        textAlign: "left",
-                        padding: "10px 8px",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: "var(--text-secondary)",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {h}
-                    </th>
+          <div className="crm-ui-section-block">
+            <h3 className="crm-ui-section-subtitle">랜딩페이지</h3>
+            {landings.length > 0 && (
+              <CrmField label="등록된 랜딩 선택" hint="목록에서 고르거나 아래에서 URL을 직접 입력할 수 있습니다.">
+                <CrmInput
+                  value={landingSearch}
+                  onChange={(e) => setLandingSearch(e.target.value)}
+                  placeholder="랜딩 이름·경로 검색"
+                  aria-label="랜딩 검색"
+                />
+                <CrmSelect
+                  value={selectedLandingId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    if (!id) {
+                      setSelectedLandingId("");
+                      setLandingMode("custom");
+                      return;
+                    }
+                    applyLanding(id);
+                  }}
+                  aria-label="랜딩페이지 선택"
+                  style={{ marginTop: 8 }}
+                >
+                  <option value="">직접 입력</option>
+                  {filteredLandings.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.title} ({l.path})
+                    </option>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredItems.map((item) => {
-                  const editing = editingId === item.id;
-                  const busy = actionId === item.id;
-                  return (
-                    <tr
-                      key={item.id}
-                      style={{
-                        borderBottom: "1px solid var(--border)",
-                        background: editing ? "#f8f9fa" : "transparent",
-                      }}
-                    >
-                      {editing ? (
-                        <>
-                          <td style={{ padding: "10px 8px", verticalAlign: "top" }}>
-                            <input
-                              type="text"
-                              value={editForm.label}
-                              onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))}
-                              style={cellInputStyle}
-                              disabled={busy}
-                            />
-                          </td>
-                          <td style={{ padding: "10px 8px", verticalAlign: "top" }}>
-                            <input
-                              type="text"
-                              value={editForm.value}
-                              onChange={(e) => setEditForm((f) => ({ ...f, value: e.target.value }))}
-                              style={cellInputStyle}
-                              disabled={busy}
-                            />
-                          </td>
-                          <td style={{ padding: "10px 8px", verticalAlign: "top" }}>
-                            <input
-                              type="text"
-                              value={editForm.sheetLabel}
-                              onChange={(e) => setEditForm((f) => ({ ...f, sheetLabel: e.target.value }))}
-                              style={cellInputStyle}
-                              disabled={busy}
-                            />
-                          </td>
-                          <td style={{ padding: "10px 8px", verticalAlign: "top" }}>
-                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                              <button
-                                type="button"
-                                onClick={(e) => handleUpdate(e, item.id)}
-                                disabled={busy}
-                                style={{
-                                  padding: "6px 12px",
-                                  background: busy ? "#adb5bd" : "var(--cta-bg)",
-                                  color: "#fff",
-                                  border: "none",
-                                  borderRadius: 6,
-                                  fontSize: 13,
-                                  fontWeight: 600,
-                                  cursor: busy ? "default" : "pointer",
-                                }}
-                              >
-                                {busy ? "저장 중..." : "저장"}
-                              </button>
-                              <button type="button" onClick={cancelEdit} style={btnSecondary} disabled={busy}>
-                                취소
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td style={{ padding: "12px 8px", fontWeight: 600, wordBreak: "break-word" }}>
-                            {item.label}
-                          </td>
-                          <td
-                            style={{
-                              padding: "12px 8px",
-                              color: "var(--text-secondary)",
-                              fontFamily: "monospace",
-                              wordBreak: "break-word",
-                            }}
-                          >
-                            {item.value}
-                          </td>
-                          <td
-                            style={{
-                              padding: "12px 8px",
-                              color: "var(--text-secondary)",
-                              wordBreak: "break-word",
-                            }}
-                          >
-                            {item.sheet_label}
-                          </td>
-                          <td style={{ padding: "12px 8px" }}>
-                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                              <button
-                                type="button"
-                                onClick={() => startEdit(item)}
-                                style={btnSecondary}
-                                disabled={!!actionId}
-                              >
-                                수정
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(item)}
-                                style={btnDanger}
-                                disabled={!!actionId}
-                              >
-                                {busy ? "삭제 중..." : "삭제"}
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                </CrmSelect>
+              </CrmField>
+            )}
+            <CrmField label="사이트 URL" htmlFor="utm-base" hint="예: https://www.feed-life.com" error={urlError || undefined}>
+              <CrmInput
+                id="utm-base"
+                type="url"
+                value={baseUrl}
+                onChange={(e) => {
+                  setBaseUrl(e.target.value);
+                  setLandingMode("custom");
+                }}
+                placeholder="https://www.feed-life.com"
+              />
+            </CrmField>
+            <CrmField label="경로" htmlFor="utm-path" hint="예: /0715s 또는 /promo-a" error={pathError || undefined}>
+              <CrmInput
+                id="utm-path"
+                value={path}
+                onChange={(e) => {
+                  setPath(e.target.value);
+                  setSelectedLandingId("");
+                  setLandingMode("custom");
+                }}
+                placeholder="/0715s"
+              />
+            </CrmField>
           </div>
+
+          <div className="crm-ui-section-block">
+            <h3 className="crm-ui-section-subtitle">유입 정보</h3>
+            <CrmField
+              label="유입 담당자 또는 소스"
+              htmlFor="utm-source"
+              hint="(utm_source)"
+              error={sourceError || undefined}
+            >
+              {loading ? (
+                <div className="crm-ui-hint">목록 불러오는 중…</div>
+              ) : (
+                <CrmSelect
+                  id="utm-source"
+                  value={selectedValue}
+                  onChange={(e) => setSelectedValue(e.target.value)}
+                >
+                  {activeSources.length === 0 ? (
+                    <option value="">등록된 활성 소스 없음</option>
+                  ) : (
+                    activeSources.map((item) => (
+                      <option key={item.id} value={item.value}>
+                        {item.label} · {item.value}
+                      </option>
+                    ))
+                  )}
+                </CrmSelect>
+              )}
+            </CrmField>
+            {selectedItem && (
+              <CrmAlert tone="info">
+                구글 시트 표시명: <strong>{selectedItem.sheet_label}</strong>
+                <span style={{ display: "block", marginTop: 4 }}>
+                  상담 신청 시 유입매체·담당자 열에 반영됩니다.
+                </span>
+              </CrmAlert>
+            )}
+          </div>
+        </section>
+
+        <aside className="crm-ui-panel crm-ui-utm-result">
+          <h2 className="crm-ui-section-title">생성 결과</h2>
+          {!generatedLink ? (
+            <CrmEmptyState title="필수 정보를 입력하면 링크가 생성됩니다" description="사이트 URL, 경로, 유입 소스를 확인해 주세요." />
+          ) : (
+            <>
+              <div className="crm-ui-utm-url-row">
+                <div className="crm-ui-utm-url" tabIndex={0} aria-label="생성된 UTM URL">
+                  {generatedLink}
+                </div>
+                <CrmButton variant="primary" onClick={() => void copyLink()} aria-label="URL 복사">
+                  {copied ? (
+                    <>
+                      <IconCheck /> 복사됨
+                    </>
+                  ) : (
+                    <>
+                      <IconCopy /> 복사
+                    </>
+                  )}
+                </CrmButton>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <a
+                  className="crm-ui-btn crm-ui-btn-secondary crm-ui-btn-md"
+                  href={generatedLink}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <IconExternal /> 링크 열기
+                </a>
+              </div>
+              <div className="crm-ui-utm-summary">
+                <div>
+                  <span>랜딩</span>
+                  <strong>
+                    {landingMode === "pick" && selectedLandingId
+                      ? landings.find((l) => l.id === selectedLandingId)?.title || path
+                      : path}
+                  </strong>
+                </div>
+                <div>
+                  <span>표시 이름</span>
+                  <strong>{selectedItem?.label || "—"}</strong>
+                </div>
+                <div>
+                  <span>utm_source</span>
+                  <strong style={{ fontFamily: "ui-monospace, monospace" }}>{selectedValue}</strong>
+                </div>
+              </div>
+            </>
           )}
-          </>
-        )}
+        </aside>
       </div>
 
-      {toast && (
-        <div
-          role="status"
-          style={{
-            position: "fixed",
-            bottom: 24,
-            left: "50%",
-            transform: "translateX(-50%)",
-            padding: "12px 20px",
-            borderRadius: 8,
-            background: toast.error ? "#fa5252" : "#212529",
-            color: "#fff",
-            fontSize: 14,
-            zIndex: 300,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-          }}
-        >
-          {toast.msg}
+      <section className="crm-ui-panel" style={{ marginTop: 16 }}>
+        <div className="crm-ui-page-header-main" style={{ marginBottom: 12 }}>
+          <div>
+            <h2 className="crm-ui-section-title" style={{ margin: 0 }}>
+              UTM 소스 관리
+            </h2>
+            <p className="crm-page-desc">링크 생성에 쓰는 유입 소스를 등록·수정합니다.</p>
+          </div>
+          <CrmButton variant="primary" onClick={openCreateSource}>
+            <IconPlus /> 새 소스 추가
+          </CrmButton>
         </div>
-      )}
+
+        <div className="crm-ui-toolbar">
+          <div className="crm-ui-search">
+            <span className="crm-ui-search-icon">
+              <IconSearch />
+            </span>
+            <CrmInput
+              value={sourceSearch}
+              onChange={(e) => setSourceSearch(e.target.value)}
+              placeholder="이름 또는 값 검색"
+              aria-label="소스 검색"
+            />
+          </div>
+          <CrmBadge tone="primary">{items.length}개 등록</CrmBadge>
+        </div>
+
+        {loading ? (
+          <div className="crm-skeleton" style={{ height: 160 }} />
+        ) : items.length === 0 ? (
+          <CrmEmptyState
+            title="등록된 UTM 소스가 없습니다"
+            description="영업자·채널별 유입을 구분할 첫 소스를 추가하세요."
+            action={
+              <CrmButton variant="primary" onClick={openCreateSource}>
+                <IconPlus /> 첫 UTM 소스 추가
+              </CrmButton>
+            }
+          />
+        ) : filteredSources.length === 0 ? (
+          <CrmEmptyState title="검색 결과가 없습니다" description="다른 검색어를 입력해 보세요." />
+        ) : (
+          <CrmTable>
+            <thead>
+              <tr>
+                <th>이름</th>
+                <th>실제 값</th>
+                <th>구글 시트 표시명</th>
+                <th>상태</th>
+                <th>작업</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredSources.map((item) => (
+                <tr key={item.id}>
+                  <td style={{ fontWeight: 600 }}>{item.label}</td>
+                  <td style={{ fontFamily: "ui-monospace, monospace", color: "var(--crm-muted)" }}>{item.value}</td>
+                  <td>{item.sheet_label}</td>
+                  <td>
+                    {item.is_active === false ? (
+                      <CrmBadge tone="neutral">비활성</CrmBadge>
+                    ) : (
+                      <CrmBadge tone="success">활성</CrmBadge>
+                    )}
+                  </td>
+                  <td>
+                    <CrmMenu trigger={<IconDots />} align="right">
+                      <CrmMenuItem onClick={() => openEditSource(item)} disabled={!!actionId}>
+                        수정
+                      </CrmMenuItem>
+                      <CrmMenuItem onClick={() => void toggleActive(item)} disabled={actionId === item.id}>
+                        {item.is_active === false ? "활성화" : "비활성화"}
+                      </CrmMenuItem>
+                      <CrmMenuItem tone="danger" onClick={() => setConfirmDelete(item)} disabled={!!actionId}>
+                        삭제
+                      </CrmMenuItem>
+                    </CrmMenu>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </CrmTable>
+        )}
+      </section>
+
+      <CrmSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title={editItem ? "소스 수정" : "새 소스 추가"}
+        footer={
+          <>
+            <CrmButton variant="secondary" onClick={() => setSheetOpen(false)}>
+              취소
+            </CrmButton>
+            <CrmButton variant="primary" disabled={saving} onClick={() => void saveSource()}>
+              {saving ? "저장 중…" : "저장"}
+            </CrmButton>
+          </>
+        }
+      >
+        <CrmField label="표시 이름" htmlFor="src-label" hint="예: 김영업, 유튜브 광고">
+          <CrmInput id="src-label" value={formLabel} onChange={(e) => setFormLabel(e.target.value)} placeholder="김영업" />
+        </CrmField>
+        <CrmField
+          label="실제 utm_source 값"
+          htmlFor="src-value"
+          hint="예: kim_sales, youtube_ads — 영문·숫자·-·_ 만"
+          error={valueFieldError || undefined}
+        >
+          <CrmInput
+            id="src-value"
+            value={formValue}
+            onChange={(e) => setFormValue(e.target.value)}
+            placeholder="kim_sales"
+            autoCapitalize="off"
+            spellCheck={false}
+          />
+        </CrmField>
+        <CrmField
+          label="구글 시트 표시명"
+          htmlFor="src-sheet"
+          hint="비우면 표시 이름이 사용됩니다. 시트 C/G열에 들어갑니다."
+        >
+          <CrmInput
+            id="src-sheet"
+            value={formSheetLabel}
+            onChange={(e) => setFormSheetLabel(e.target.value)}
+            placeholder="표시 이름과 동일"
+          />
+        </CrmField>
+        {formError ? <CrmAlert tone="danger">{formError}</CrmAlert> : null}
+      </CrmSheet>
+
+      <CrmDialog
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        title="소스 삭제"
+        footer={
+          <>
+            <CrmButton variant="secondary" onClick={() => setConfirmDelete(null)}>
+              취소
+            </CrmButton>
+            <CrmButton variant="danger" disabled={!!actionId} onClick={() => void deleteSource()}>
+              삭제
+            </CrmButton>
+          </>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
+          <strong>
+            {confirmDelete?.label} ({confirmDelete?.value})
+          </strong>
+          을(를) 삭제할까요? 고객 데이터에서 사용 중이면 삭제되지 않으며, 비활성화를 안내합니다.
+        </p>
+      </CrmDialog>
     </div>
   );
 }
-

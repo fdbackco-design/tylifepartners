@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
-import { credentialsFromPhone, hashPassword } from "@/lib/crm/password";
+import { credentialsFromPhone, hashPassword, verifyPassword } from "@/lib/crm/password";
+import { isRegionZoneName } from "@/lib/crm/regionZones";
 import { canManageAccounts } from "@/lib/crm/scope";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -11,7 +12,7 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   let query = supabase
     .from("staff_users")
-    .select("id, name, phone, region, rank, login_id, parent_id, is_active, created_at")
+    .select("id, name, phone, region, rank, login_id, parent_id, is_active, created_at, password_hash")
     .order("created_at", { ascending: false });
 
   if (session.rank === "sales") {
@@ -31,10 +32,20 @@ export async function GET() {
   const { data: parents } = await supabase.from("staff_users").select("id, name").eq("rank", "manager");
   for (const p of parents ?? []) byId.set(p.id, p.name);
 
-  const items = (data ?? []).map((u) => ({
-    ...u,
-    parent_name: u.parent_id ? byId.get(u.parent_id) ?? null : null,
-  }));
+  const items = (data ?? []).map((u) => {
+    const { password_hash, ...rest } = u as typeof u & { password_hash?: string };
+    let account_status: "active" | "invite_pending" | "inactive" = "active";
+    if (!rest.is_active) account_status = "inactive";
+    else if (password_hash && verifyPassword(credentialsFromPhone(String(rest.phone ?? "")), password_hash)) {
+      account_status = "invite_pending";
+    }
+    return {
+      ...rest,
+      parent_name: rest.parent_id ? byId.get(rest.parent_id) ?? null : null,
+      account_status,
+      last_login_at: null as string | null,
+    };
+  });
   return NextResponse.json({ ok: true, items });
 }
 
@@ -48,7 +59,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const name = String(body.name ?? "").trim();
     const phone = String(body.phone ?? "").replace(/\D/g, "");
-    const region = String(body.region ?? "").trim() || null;
+    const regionRaw = String(body.region ?? "").trim() || null;
+    if (regionRaw && !isRegionZoneName(regionRaw)) {
+      return NextResponse.json({ ok: false, message: "담당 권역을 목록에서 선택해 주세요." }, { status: 400 });
+    }
+    const region = regionRaw;
     let rank = String(body.rank ?? "").trim();
     let parentId = body.parent_id ? String(body.parent_id) : null;
 
@@ -63,6 +78,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, message: "직급은 매니저 또는 영업자만 가능합니다." }, { status: 400 });
     }
     if (rank === "manager") parentId = null;
+
+    if (rank === "sales" && !region) {
+      return NextResponse.json({ ok: false, message: "영업자의 담당 권역을 선택해 주세요." }, { status: 400 });
+    }
 
     const loginId = credentialsFromPhone(phone);
     if (loginId.length < 8) {
