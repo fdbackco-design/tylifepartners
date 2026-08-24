@@ -1,11 +1,12 @@
 "use client";
+
+import { Suspense } from "react";
 import LeadList from "@/app/admin/_components/LeadList";
 
 export default function ConsumersPage() {
   return (
-    <div>
-      <h1 style={{ marginTop: 0 }}>소비자 DB</h1>
-      <LeadList category="consumers" />
-    </div>
+    <Suspense fallback={<div style={{ padding: 24, color: "var(--crm-muted)" }}>로딩 중...</div>}>
+      <LeadList category="consumers" title="소비자 DB" />
+    </Suspense>
   );
 }

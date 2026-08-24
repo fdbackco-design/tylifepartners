@@ -45,8 +45,8 @@ export default function AssignmentPage() {
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>지역 자동배정</h1>
-      <p style={{ color: "var(--text-secondary)" }}>
+      <h1 className="crm-page-title">지역 자동배정</h1>
+      <p className="crm-page-desc">
         고객 지역 키워드에 맞는 영업자에게 자동으로 담당자를 붙입니다. 가중치가 높을수록 더 많이 배정됩니다. 기본값은 켜짐입니다.
       </p>
       <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>

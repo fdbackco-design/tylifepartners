@@ -60,8 +60,8 @@ export default function AccountsPage() {
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>계정 발급</h1>
-      <p style={{ color: "var(--text-secondary)" }}>
+      <h1 className="crm-page-title">계정 발급</h1>
+      <p className="crm-page-desc">
         초기 아이디/비밀번호는 휴대폰번호에서 010을 뺀 8자리입니다. 매니저는 하위 영업자만 발급할 수 있습니다.
       </p>
       <div style={{ display: "grid", gap: 8, maxWidth: 420, marginBottom: 24 }}>

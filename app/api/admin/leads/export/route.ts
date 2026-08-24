@@ -28,12 +28,20 @@ const HEADERS = [
   "마케팅동의",
 ];
 
+function asciiFilename(label: string, stamp: string, ext: string): string {
+  const safe = label.replace(/[^a-zA-Z0-9_-]+/g, "_") || "leads";
+  return `tylife_${safe}_${stamp}.${ext}`;
+}
+
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
 
   try {
     const q = parseLeadQuery(request.nextUrl.searchParams);
+    if (q.needReassign && session.rank === "sales") {
+      return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
+    }
     q.limit = 5000;
     q.offset = 0;
     const { items } = await queryLeads(session, q);
@@ -64,21 +72,29 @@ export async function GET(request: NextRequest) {
 
     const format = request.nextUrl.searchParams.get("format") === "csv" ? "csv" : "xls";
     const stamp = new Date().toISOString().slice(0, 10);
-    const label = q.recontact ? "재컨택" : q.category === "candidates" ? "후보자" : "소비자";
+    const labelKey = q.needReassign
+      ? "need_reassign"
+      : q.category === "candidates"
+        ? "candidates"
+        : q.category === "all"
+          ? "all"
+          : "consumers";
+    const sheetName =
+      q.needReassign ? "need_reassign" : q.category === "candidates" ? "candidates" : q.category === "all" ? "all" : "consumers";
 
     if (format === "csv") {
       return new NextResponse(toCsv(HEADERS, rows), {
         headers: {
           "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="tylife_${label}_${stamp}.csv"`,
+          "Content-Disposition": `attachment; filename="${asciiFilename(labelKey, stamp, "csv")}"`,
         },
       });
     }
 
-    return new NextResponse(toExcelXml(label, HEADERS, rows), {
+    return new NextResponse(toExcelXml(sheetName, HEADERS, rows), {
       headers: {
         "Content-Type": "application/vnd.ms-excel; charset=utf-8",
-        "Content-Disposition": `attachment; filename="tylife_${label}_${stamp}.xls"`,
+        "Content-Disposition": `attachment; filename="${asciiFilename(labelKey, stamp, "xls")}"`,
       },
     });
   } catch (e) {

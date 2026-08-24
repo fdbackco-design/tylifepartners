@@ -14,6 +14,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const q = parseLeadQuery(request.nextUrl.searchParams);
+    if (q.needReassign && session.rank === "sales") {
+      return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
+    }
     const { items, total } = await queryLeads(session, q);
     const { staff } = await loadStaffMaps();
     const showAdmin = canSeeAdminStatus(session);
@@ -26,7 +29,13 @@ export async function GET(request: NextRequest) {
       items: mapped,
       total,
       session: { rank: session.rank, userId: session.userId, name: session.name },
-      staff: staff.map((s) => ({ id: s.id, name: s.name, parent_id: s.parent_id })),
+      staff: staff.map((s) => ({
+        id: s.id,
+        name: s.name,
+        parent_id: s.parent_id,
+        rank: (s as { rank?: string }).rank ?? "sales",
+        is_active: (s as { is_active?: boolean }).is_active !== false,
+      })),
       statuses: [...LEAD_STATUSES],
       allowed_statuses: allowedStatusesFor(session, "대기"),
       options: {
