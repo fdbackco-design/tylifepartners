@@ -1,138 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSession } from "@/lib/adminSession";
-import { getSupabaseAdmin } from "@/lib/supabase";
+import { getSession } from "@/lib/adminSession";
+import { loadStaffMaps } from "@/lib/crm/mapLead";
+import { parseLeadQuery, queryLeads } from "@/lib/crm/queryLeads";
+import { canSeeAdminStatus } from "@/lib/crm/scope";
+import { allowedStatusesFor } from "@/lib/crm/status";
+import { LEAD_STATUSES } from "@/lib/crm/types";
 
-/**
- * GET /api/admin/leads
- * 관리자 인증 후 리드 목록 조회 (search, limit, offset)
- * [환경변수] SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_SESSION_SECRET
- */
 export async function GET(request: NextRequest) {
-  const valid = await verifyAdminSession();
-  if (!valid) {
-    return NextResponse.json(
-      { ok: false, message: "인증이 필요합니다." },
-      { status: 401 }
-    );
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
 
   try {
-    const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search")?.trim() ?? "";
-    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") ?? "50", 10), 1), 100);
-    const offset = Math.max(parseInt(searchParams.get("offset") ?? "0", 10), 0);
-    const category = searchParams.get("category") === "b2b" ? "b2b" : "b2c";
-    const supabase = getSupabaseAdmin();
-    const b2cSelect =
-      "id, name, phone, created_at, status, memo, desired_date, desired_time, location, entry_page, utm_source, utm_medium, utm_campaign, utm_content";
-    const b2bSelect =
-      "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, region, available_time, age_group, job, job_rank";
-
-    let query =
-      category === "b2b"
-        ? supabase
-            .from("tylife_b2b")
-            .select(b2bSelect, { count: "exact" })
-            .order("created_at", { ascending: false })
-            .range(offset, offset + limit - 1)
-        : supabase
-            .from("leads")
-            .select(b2cSelect, { count: "exact" })
-            .order("created_at", { ascending: false })
-            .range(offset, offset + limit - 1);
-
-    let pendingQuery =
-      category === "b2b"
-        ? supabase.from("tylife_b2b").select("id", { count: "exact", head: true }).eq("status", "대기")
-        : supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "대기");
-
-    if (search) {
-      const safe = search.replace(/,/g, "");
-      const term = `%${safe}%`;
-      query = query.or(`name.ilike.${term},phone.ilike.${term}`);
-      pendingQuery = pendingQuery.or(`name.ilike.${term},phone.ilike.${term}`);
-    }
-
-    const [{ data, error, count }, pendingRes] = await Promise.all([query, pendingQuery]);
-
-    const pendingTotal = pendingRes.error ? 0 : pendingRes.count ?? 0;
-    if (pendingRes.error) {
-      console.error("Supabase pending count error:", pendingRes.error);
-    }
-
-    if (error) {
-      console.error("Supabase leads fetch error:", error);
-      return NextResponse.json(
-        { ok: false, message: "조회 중 오류가 발생했습니다." },
-        { status: 500 }
-      );
-    }
-
-    type LeadRow = {
-      id: string;
-      name: string;
-      phone: string;
-      created_at: string | null;
-      status?: string;
-      memo?: string | null;
-      desired_date?: string | null;
-      desired_time?: string | null;
-      location?: string | null;
-      utm_source?: string | null;
-      utm_medium?: string | null;
-      utm_campaign?: string | null;
-      utm_content?: string | null;
-      entry_page?: string | null;
-      region?: string | null;
-      available_time?: string | null;
-      age_group?: string | null;
-      job?: string | null;
-      job_rank?: string | null;
-    };
-    const rows = (data ?? []) as unknown as LeadRow[];
-    const items = rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      phone: row.phone,
-      created_at: row.created_at
-        ? new Date(row.created_at).toLocaleString("ko-KR", {
-            timeZone: "Asia/Seoul",
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })
-        : "",
-      status: row.status ?? "대기",
-      memo: row.memo ?? "",
-      desired_date: row.desired_date ?? "",
-      desired_time: row.desired_time ?? "",
-      location: row.location ?? "",
-      utm_source: row.utm_source ?? "",
-      utm_medium: row.utm_medium ?? "",
-      utm_campaign: row.utm_campaign ?? "",
-      utm_content: row.utm_content ?? "",
-      entry_page: row.entry_page ?? "",
-      region: row.region ?? "",
-      available_time: row.available_time ?? "",
-      age_group: row.age_group ?? "",
-      job: row.job ?? "",
-      job_rank: row.job_rank ?? "",
-    }));
+    const q = parseLeadQuery(request.nextUrl.searchParams);
+    const { items, total } = await queryLeads(session, q);
+    const { staff } = await loadStaffMaps();
+    const showAdmin = canSeeAdminStatus(session);
+    const mapped = showAdmin ? items : items.map((row) => ({ ...row, admin_status: null }));
+    const uniq = (key: "region" | "age_group" | "job" | "job_rank" | "entry_page" | "utm_source") =>
+      Array.from(new Set(mapped.map((i) => String(i[key] ?? "")).filter(Boolean))).sort();
 
     return NextResponse.json({
       ok: true,
-      items,
-      total: count ?? items.length,
-      pending_total: pendingTotal,
+      items: mapped,
+      total,
+      session: { rank: session.rank, userId: session.userId, name: session.name },
+      staff: staff.map((s) => ({ id: s.id, name: s.name, parent_id: s.parent_id })),
+      statuses: [...LEAD_STATUSES],
+      allowed_statuses: allowedStatusesFor(session, "대기"),
+      options: {
+        regions: uniq("region"),
+        age_groups: uniq("age_group"),
+        jobs: uniq("job"),
+        job_ranks: uniq("job_rank"),
+        entry_pages: uniq("entry_page"),
+        utm_sources: uniq("utm_source"),
+      },
     });
   } catch (e) {
-    console.error("GET /api/admin/leads error:", e);
-    return NextResponse.json(
-      { ok: false, message: "서버 오류가 발생했습니다." },
-      { status: 500 }
-    );
+    console.error("GET /api/admin/leads:", e);
+    return NextResponse.json({ ok: false, message: "조회 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

@@ -8,6 +8,7 @@ import { formatPhoneKorean } from "@/lib/phone";
 import { isLeadSubmissionBlocked, maskPhoneForLog } from "@/lib/phoneBlacklist";
 import { runAfterResponse } from "@/lib/runAfterResponse";
 import { syncLeadToCrm } from "@/lib/crmSync";
+import { tryAutoAssignLead } from "@/lib/crm/assignment";
 import {
   DEFAULT_FORM_CONFIG,
   normalizeFormConfig,
@@ -176,6 +177,7 @@ export async function POST(request: NextRequest) {
     const jobRankStored = formConfig.includeJob ? jobRankForDb : null;
 
     const supabase = getSupabaseAdmin();
+    const nowIso = new Date().toISOString();
     const { data: insertedLead, error } = await supabase.from("tylife_b2b").insert({
       name,
       phone,
@@ -198,6 +200,8 @@ export async function POST(request: NextRequest) {
       max_scroll_depth: analytics.max_scroll_depth,
       last_section_name: analytics.last_section_name,
       last_section_label: analytics.last_section_label,
+      status: "배정전",
+      status_changed_at: nowIso,
     })
       // 저장되는 값·컬럼은 그대로. CRM 동기화용 submission_id/실제 접수 시각만 돌려받는다.
       .select("id, created_at")
@@ -215,6 +219,14 @@ export async function POST(request: NextRequest) {
             ? `저장 실패: ${error.message}`
             : "저장 중 오류가 발생했습니다.";
       return NextResponse.json({ ok: false, message: msg }, { status: 500 });
+    }
+
+    if (insertedLead?.id) {
+      await tryAutoAssignLead({
+        table: "tylife_b2b",
+        leadId: insertedLead.id,
+        region: regionForDb,
+      });
     }
 
     // 구글 시트·담당자 동기화·이메일은 응답 후 백그라운드 처리
