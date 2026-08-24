@@ -45,7 +45,7 @@ function isValidMobile(digits: string): boolean {
 function statusBadge(status: User["account_status"], isActive: boolean) {
   const key = status ?? (isActive ? "active" : "inactive");
   if (key === "inactive") return <CrmBadge tone="neutral">비활성</CrmBadge>;
-  if (key === "invite_pending") return <CrmBadge tone="warning">초대 대기</CrmBadge>;
+  if (key === "invite_pending") return <CrmBadge tone="warning">비밀번호 미변경</CrmBadge>;
   return <CrmBadge tone="success">활성</CrmBadge>;
 }
 
@@ -298,7 +298,7 @@ export default function AccountsPage() {
         <CrmSelect value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} aria-label="상태 필터" style={{ width: 140 }}>
           <option value="all">상태 전체</option>
           <option value="active">활성</option>
-          <option value="invite_pending">초대 대기</option>
+          <option value="invite_pending">비밀번호 미변경</option>
           <option value="inactive">비활성</option>
         </CrmSelect>
       </div>

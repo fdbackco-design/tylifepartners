@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "type-check": "tsc --noEmit",
-    "test": "tsx --test lib/crm/regionZones.test.ts",
+    "test": "tsx --test lib/crm/regionZones.test.ts lib/crm/scope.test.ts",
     "start": "next start",
     "lint": "next lint"
   },

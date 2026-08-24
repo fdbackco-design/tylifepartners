@@ -47,11 +47,19 @@ export async function getSession(): Promise<SessionUser | null> {
   if (!cookie?.value) return null;
   try {
     const { payload } = await jwtVerify(cookie.value, getSecret());
-    const rankRaw = String(payload.rank ?? payload.role ?? "admin");
-    const rank = rankRaw === "manager" || rankRaw === "sales" ? rankRaw : "admin";
+    const rankRaw = String(payload.rank ?? payload.role ?? "");
+    const userId = payload.userId ? String(payload.userId) : null;
+    // staff 세션(userId 있음)은 절대 admin으로 승격되지 않음
+    const rank: SessionUser["rank"] = userId
+      ? rankRaw === "manager"
+        ? "manager"
+        : "sales"
+      : rankRaw === "manager" || rankRaw === "sales"
+        ? rankRaw
+        : "admin";
     return {
       rank,
-      userId: payload.userId ? String(payload.userId) : null,
+      userId,
       name: String(payload.name ?? (rank === "admin" ? "관리자" : "")),
       loginId: String(payload.loginId ?? ""),
       region: payload.region ? String(payload.region) : null,

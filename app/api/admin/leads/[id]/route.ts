@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { appendStatusMemo } from "@/lib/crm/memo";
 import { changeLeadAssignee } from "@/lib/crm/assignLead";
+import { attachAssigneeHistories } from "@/lib/crm/assigneeHistory";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
 import { visibleAssigneeIds } from "@/lib/crm/scope";
 import { allowedStatusesFor, isLeadStatus, isMemoEditable, normalizeStatus, tableForCategory } from "@/lib/crm/status";
@@ -26,12 +27,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const scoped = await visibleAssigneeIds(session);
   const assigneeId = (data as { assignee_id?: string | null }).assignee_id ?? null;
-  if (scoped !== "all" && session.rank === "sales" && assigneeId !== session.userId) {
+  if (scoped !== "all" && (!assigneeId || !scoped.includes(assigneeId))) {
     return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
   }
 
   const { staffById, parentNameById } = await loadStaffMaps();
   const item = mapLeadRow(data as Record<string, unknown>, category, staffById, parentNameById);
+  const [withHistory] = await attachAssigneeHistories([item]);
 
   const [{ data: assignLogs }, { data: memoLogs }, { data: statusLogs }] = await Promise.all([
     supabase
@@ -61,8 +63,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   return NextResponse.json({
     ok: true,
-    item,
-    allowed_statuses: allowedStatusesFor(session, item.status),
+    item: withHistory,
+    allowed_statuses: allowedStatusesFor(session, withHistory.status),
     assignment_logs: (assignLogs ?? []).map((l) => ({
       id: l.id,
       from_assignee_name: nameOf(l.from_assignee_id),
@@ -92,7 +94,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const scoped = await visibleAssigneeIds(session);
   const curAssignee = (current as { assignee_id?: string | null }).assignee_id ?? null;
-  if (scoped !== "all" && session.rank === "sales" && curAssignee !== session.userId) {
+  if (scoped !== "all" && (!curAssignee || !scoped.includes(curAssignee))) {
     return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
   }
 
@@ -181,5 +183,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { data: fresh } = await (supabase.from(table) as any).select(select).eq("id", id).maybeSingle();
   const { staffById, parentNameById } = await loadStaffMaps();
   const item = mapLeadRow((fresh ?? current) as Record<string, unknown>, category, staffById, parentNameById);
-  return NextResponse.json({ ok: true, item, allowed_statuses: allowedStatusesFor(session, item.status) });
+  const [withHistory] = await attachAssigneeHistories([item]);
+  return NextResponse.json({ ok: true, item: withHistory, allowed_statuses: allowedStatusesFor(session, withHistory.status) });
 }

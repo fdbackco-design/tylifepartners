@@ -31,23 +31,28 @@ export async function isAutoAssignEnabled(): Promise<boolean> {
   return true;
 }
 
-/** @deprecated 키워드 매칭 — 테스트·하위호환용. 배정은 resolveRegionZone 사용 */
+/** 포함 지역 키워드 우선 매칭 → 없으면 고정 권역 정규화 폴백 */
 export function matchRule(region: string | null | undefined, rules: AssignmentRule[]): AssignmentRule | null {
-  const zone = resolveRegionZone(region);
-  if (zone) {
-    const byZone = rules.find((r) => r.enabled && r.region_group === zone);
-    if (byZone) return byZone;
-  }
+  const enabled = rules.filter((r) => r.enabled);
   const text = String(region ?? "").replace(/\s/g, "");
-  if (!text) return null;
-  for (const rule of rules) {
-    if (!rule.enabled) continue;
-    for (const kw of rule.region_keywords ?? []) {
-      const k = String(kw).replace(/\s/g, "");
-      if (k && text.includes(k)) return rule;
+  let best: AssignmentRule | null = null;
+  let bestLen = 0;
+  if (text) {
+    for (const rule of enabled) {
+      for (const kw of rule.region_keywords ?? []) {
+        const k = String(kw).replace(/\s/g, "");
+        if (k && text.includes(k) && k.length > bestLen) {
+          best = rule;
+          bestLen = k.length;
+        }
+      }
     }
   }
-  return null;
+  if (best) return best;
+
+  const zone = resolveRegionZone(region);
+  if (!zone) return null;
+  return enabled.find((r) => r.region_group === zone) ?? null;
 }
 
 export function pickWeightedMember(members: AssignmentMember[]): AssignmentMember | null {
@@ -65,7 +70,7 @@ export function pickWeightedMember(members: AssignmentMember[]): AssignmentMembe
   return best;
 }
 
-/** 6개 고정 권역 규칙이 DB에 있는지 보장 (기존 enabled는 유지) */
+/** 6개 기본 권역 규칙이 DB에 있는지 보장 (기존 enabled·keywords는 유지) */
 export async function ensureFixedAssignmentRules(): Promise<void> {
   const supabase = getSupabaseAdmin();
   const { data: existing } = await supabase
@@ -83,19 +88,25 @@ export async function ensureFixedAssignmentRules(): Promise<void> {
   }
 }
 
+function sortRules<T extends { region_group: string; created_at?: string }>(rows: T[]): T[] {
+  const fixedOrder = new Map<string, number>(REGION_ZONE_NAMES.map((n, i) => [n, i]));
+  return [...rows].sort((a, b) => {
+    const ai = fixedOrder.has(a.region_group) ? fixedOrder.get(a.region_group)! : 1000;
+    const bi = fixedOrder.has(b.region_group) ? fixedOrder.get(b.region_group)! : 1000;
+    if (ai !== bi) return ai - bi;
+    return String(a.region_group).localeCompare(String(b.region_group), "ko");
+  });
+}
+
 export async function loadAssignmentRules(): Promise<AssignmentRule[]> {
   await ensureFixedAssignmentRules();
   const supabase = getSupabaseAdmin();
   const { data: rules, error } = await supabase
     .from("assignment_rules")
-    .select("id, region_group, region_keywords, enabled")
-    .in("region_group", [...REGION_ZONE_NAMES]);
+    .select("id, region_group, region_keywords, enabled, created_at");
   if (error) throw error;
 
-  const ordered = REGION_ZONE_NAMES.map((name) => (rules ?? []).find((r) => r.region_group === name)).filter(
-    Boolean
-  ) as { id: string; region_group: string; region_keywords: string[]; enabled: boolean }[];
-
+  const ordered = sortRules(rules ?? []);
   const ids = ordered.map((r) => r.id);
   const { data: members } = ids.length
     ? await supabase
@@ -131,29 +142,27 @@ export async function tryAutoAssignLead(opts: {
 }): Promise<void> {
   try {
     const supabase = getSupabaseAdmin();
-    const zone = resolveRegionZone(opts.region);
-
-    // 원본 region은 유지하고 정규화 권역만 별도 저장
-    if (zone) {
-      await supabase.from(opts.table).update({ region_zone: zone }).eq("id", opts.leadId);
-    } else {
-      await supabase.from(opts.table).update({ region_zone: null }).eq("id", opts.leadId);
-      return;
-    }
-
     const enabled = await isAutoAssignEnabled();
-    if (!enabled) return;
-
     const rules = await loadAssignmentRules();
-    const rule = rules.find((r) => r.region_group === zone && r.enabled);
-    if (!rule) return;
+    const rule = matchRule(opts.region, rules);
+    const zone = rule?.region_group ?? resolveRegionZone(opts.region);
+
+    await supabase
+      .from(opts.table)
+      .update({ region_zone: zone ?? null })
+      .eq("id", opts.leadId);
+
+    if (!enabled || !rule) return;
+
+    const memberIds = rule.members.map((m) => m.staff_user_id).filter(Boolean);
+    if (!memberIds.length) return;
 
     const { data: staffRows } = await supabase
       .from("staff_users")
-      .select("id, region, rank, is_active")
+      .select("id, rank, is_active")
       .eq("is_active", true)
-      .eq("rank", "sales")
-      .eq("region", zone);
+      .in("rank", ["sales", "manager"])
+      .in("id", memberIds);
 
     const allowed = new Set((staffRows ?? []).map((s) => s.id as string));
     const eligible = rule.members.filter((m) => allowed.has(m.staff_user_id));
@@ -168,7 +177,7 @@ export async function tryAutoAssignLead(opts: {
         assigned_at: now,
         status: "대기",
         status_changed_at: now,
-        region_zone: zone,
+        region_zone: rule.region_group,
       })
       .eq("id", opts.leadId)
       .is("assignee_id", null);
@@ -195,4 +204,17 @@ export async function tryAutoAssignLead(opts: {
 
 export function zoneOfRule(regionGroup: string): RegionZoneName | null {
   return REGION_ZONE_NAMES.includes(regionGroup as RegionZoneName) ? (regionGroup as RegionZoneName) : null;
+}
+
+export function normalizeKeywords(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const v of raw) {
+    const s = String(v ?? "").trim();
+    if (!s || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
 }

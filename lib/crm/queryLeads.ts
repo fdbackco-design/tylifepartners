@@ -1,4 +1,5 @@
 import { startOfKstDayIso, startOfNextKstDayIso } from "@/lib/crm/kst";
+import { attachAssigneeHistories } from "@/lib/crm/assigneeHistory";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
 import { visibleAssigneeIds } from "@/lib/crm/scope";
 import { getAdminStatus } from "@/lib/crm/status";
@@ -57,6 +58,8 @@ export function parseLeadQuery(sp: URLSearchParams): LeadQueryInput {
   };
 }
 
+const NO_MATCH_ID = "00000000-0000-0000-0000-000000000000";
+
 function applyCommonFilters(
   query: any,
   q: LeadQueryInput,
@@ -69,17 +72,27 @@ function applyCommonFilters(
   }
   let assigneeFilter = [...(q.assigneeIds ?? [])];
   if (scopedIds !== "all") {
-    assigneeFilter = assigneeFilter.length ? assigneeFilter.filter((id) => scopedIds.includes(id)) : [...scopedIds];
+    if (!scopedIds.length) {
+      return query.eq("id", NO_MATCH_ID);
+    }
+    assigneeFilter = assigneeFilter.length
+      ? assigneeFilter.filter((id) => scopedIds.includes(id))
+      : [...scopedIds];
+    // 스코프 밖만 고르면 빈 배열이 되어 필터가 빠지던 문제 → 결과 없음으로 닫음
+    if (!assigneeFilter.length) {
+      return query.eq("id", NO_MATCH_ID);
+    }
   }
   if (q.unassigned) {
+    // 미배정은 전체 관리자만
+    if (rank !== "admin") {
+      return query.eq("id", NO_MATCH_ID);
+    }
     query = query.is("assignee_id", null);
   } else if (assigneeFilter.length) {
-    const includeUnassigned = rank === "manager" && !q.assigneeIds?.length;
-    if (includeUnassigned) {
-      query = query.or(`assignee_id.in.(${assigneeFilter.join(",")}),assignee_id.is.null`);
-    } else {
-      query = query.in("assignee_id", assigneeFilter);
-    }
+    query = query.in("assignee_id", assigneeFilter);
+  } else if (scopedIds !== "all") {
+    return query.eq("id", NO_MATCH_ID);
   }
   if (q.statuses?.length) query = query.in("status", q.statuses);
   if (q.jobRanks?.length) query = query.in("job_rank", q.jobRanks);
@@ -123,14 +136,13 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
       .order("created_at", { ascending: false });
     query = applyCommonFilters(query, q, scoped, session.rank);
     if (teamAssigneeIds) {
-      query = query.in(
-        "assignee_id",
-        teamAssigneeIds.length ? teamAssigneeIds : ["00000000-0000-0000-0000-000000000000"]
-      );
+      let ids = teamAssigneeIds;
+      if (scoped !== "all") ids = ids.filter((id) => scoped.includes(id));
+      query = query.in("assignee_id", ids.length ? ids : [NO_MATCH_ID]);
     }
     query = applyRegionFilter(query, q.regions, kind === "consumers");
     if (q.needReassign) {
-      query = query.in("status", ["대기", "부재(메신저완료)"]);
+      query = query.in("status", ["대기", "1차컨택", "부재(메신저완료)"]);
     }
     if (q.category !== "all") {
       query = query.range(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50) - 1);
@@ -147,20 +159,21 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
 
   const isNeedReassign = (i: LeadRow) =>
     i.admin_status?.key === "need_reassign" ||
-    getAdminStatus(i.status, i.status_changed_at, i.created_at_iso)?.key === "need_reassign";
+    getAdminStatus(i.status, i.status_changed_at, i.created_at_iso, i.assignee_id)?.key === "need_reassign";
 
   if (q.category === "all") {
     const [a, b] = await Promise.all([fetchTable("consumers"), fetchTable("candidates")]);
     let items = [...a.items, ...b.items].sort((x, y) => (x.created_at_iso < y.created_at_iso ? 1 : -1));
     if (q.needReassign) items = items.filter(isNeedReassign);
     const total = items.length;
-    return { items: items.slice(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50)), total };
+    const page = items.slice(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50));
+    return { items: await attachAssigneeHistories(page), total };
   }
 
   const result = await fetchTable(q.category);
   if (q.needReassign) {
     const items = result.items.filter(isNeedReassign);
-    return { items, total: items.length };
+    return { items: await attachAssigneeHistories(items), total: items.length };
   }
-  return result;
+  return { items: await attachAssigneeHistories(result.items), total: result.total };
 }

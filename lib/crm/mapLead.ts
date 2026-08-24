@@ -15,7 +15,7 @@ export function mapLeadRow(
   const createdIso = String(row.created_at ?? "");
   const assigneeId = row.assignee_id ? String(row.assignee_id) : null;
   const staff = assigneeId ? staffById.get(assigneeId) : undefined;
-  const teamName = staff?.parent_id ? parentNameById.get(staff.parent_id) ?? "" : staff?.name ?? "";
+  const teamName = staff?.parent_id ? parentNameById.get(staff.parent_id) ?? "" : "";
   const status = normalizeStatus(row.status as string);
   const statusChanged = row.status_changed_at ? String(row.status_changed_at) : null;
   const region = String(row.region ?? row.location ?? "");
@@ -47,10 +47,11 @@ export function mapLeadRow(
     assignee_id: assigneeId,
     assignee_name: staff?.name ?? "",
     team_name: teamName,
+    assignee_history: [],
     assigned_at: row.assigned_at ? String(row.assigned_at) : null,
     status_changed_at: statusChanged,
     meeting_at: row.meeting_at ? String(row.meeting_at) : null,
-    admin_status: getAdminStatus(status, statusChanged, createdIso),
+    admin_status: getAdminStatus(status, statusChanged, createdIso, assigneeId),
   };
 }
 

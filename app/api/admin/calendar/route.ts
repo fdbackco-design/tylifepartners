@@ -25,8 +25,14 @@ export async function GET(request: NextRequest) {
       .lt("meeting_at", startOfKstDayIso(nextMonth))
       .not("meeting_at", "is", null)
       .order("meeting_at", { ascending: true });
-    if (scoped !== "all") q = q.in("assignee_id", scoped);
-    if (assigneeId) q = q.eq("assignee_id", assigneeId);
+    if (scoped !== "all") {
+      if (!scoped.length) return [];
+      q = q.in("assignee_id", scoped);
+    }
+    if (assigneeId) {
+      if (scoped !== "all" && !scoped.includes(assigneeId)) return [];
+      q = q.eq("assignee_id", assigneeId);
+    }
     const { data, error } = await q;
     if (error) {
       console.error("calendar", table, error);
@@ -51,6 +57,6 @@ export async function GET(request: NextRequest) {
     ok: true,
     month,
     items,
-    staff: session.rank === "sales" ? staff.filter((s) => s.id === session.userId) : staff,
+    staff: scoped === "all" ? staff : staff.filter((s) => scoped.includes(s.id)),
   });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatAssigneeWithTeam } from "@/lib/crm/assigneeHistoryFormat";
 
 type Staff = { id: string; name: string; parent_id: string | null };
 
@@ -8,15 +9,19 @@ type Props = {
   value: string | null;
   staff: Staff[];
   teamName?: string;
+  history?: string[];
   onChange: (id: string | null) => void;
   disabled?: boolean;
 };
 
-export default function AssigneePicker({ value, staff, teamName, onChange, disabled }: Props) {
+export default function AssigneePicker({ value, staff, teamName, history, onChange, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const root = useRef<HTMLDivElement>(null);
   const current = staff.find((s) => s.id === value);
+  const label = formatAssigneeWithTeam(current?.name || "", teamName);
+  const historyText =
+    history && history.length >= 2 ? history.join(" -> ") : "";
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -44,13 +49,22 @@ export default function AssigneePicker({ value, staff, teamName, onChange, disab
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
-          <span>{current?.name || "미배정"}</span>
-          {(teamName || current?.parent_id) && (
-            <span style={{ fontSize: 11, fontWeight: 500, color: "var(--crm-muted)" }}>{teamName || ""}</span>
-          )}
-        </span>
+        <span style={{ textAlign: "left", lineHeight: 1.3 }}>{value ? label : "미배정"}</span>
       </button>
+      {historyText ? (
+        <div
+          style={{
+            marginTop: 4,
+            fontSize: 11,
+            lineHeight: 1.35,
+            color: "var(--crm-muted)",
+            wordBreak: "keep-all",
+          }}
+          title={historyText}
+        >
+          {historyText}
+        </div>
+      ) : null}
       {open && (
         <div className="crm-popover" role="listbox" style={{ minWidth: 220 }}>
           <input

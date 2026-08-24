@@ -16,12 +16,12 @@ import {
   CrmSwitch,
   IconPlus,
 } from "@/app/admin/_components/crm/ui";
-import { ZONE_BASE_LABELS, type RegionZoneName } from "@/lib/crm/regionZones";
+import { REGION_ZONE_NAMES } from "@/lib/crm/regionZones";
 
 type Member = { id?: string; staff_user_id: string; weight: number; assigned_count?: number };
 type Rule = {
   id: string;
-  region_group: RegionZoneName | string;
+  region_group: string;
   region_keywords: string[];
   enabled: boolean;
   members: Member[];
@@ -42,16 +42,82 @@ function ratios(members: Member[]): string[] {
   return members.map((m) => `${(((Math.max(0, Number(m.weight) || 0) / total) * 1000) | 0) / 10}%`);
 }
 
+function staffLabel(s: Staff): string {
+  const rank = s.rank === "manager" ? "매니저" : "영업자";
+  const region = s.region ? ` · ${s.region}` : "";
+  return `${s.name} (${rank}${region})`;
+}
+
+function KeywordEditor({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+
+  const add = () => {
+    const parts = draft
+      .split(/[,，\n]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!parts.length) return;
+    const set = new Set(value);
+    for (const p of parts) set.add(p);
+    onChange(Array.from(set));
+    setDraft("");
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+        {value.length ? (
+          value.map((kw) => (
+            <CrmChip key={kw} onRemove={() => onChange(value.filter((x) => x !== kw))}>
+              {kw}
+            </CrmChip>
+          ))
+        ) : (
+          <span className="crm-ui-hint">포함 지역이 없습니다.</span>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <CrmInput
+          value={draft}
+          placeholder="예: 서울, 인천 (쉼표로 여러 개)"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+        />
+        <CrmButton type="button" size="sm" variant="secondary" onClick={add}>
+          추가
+        </CrmButton>
+      </div>
+    </div>
+  );
+}
+
 export default function AssignmentPage() {
-  const [enabled, setEnabled] = useState(true);
   const [rules, setRules] = useState<Rule[]>([]);
-  const [baseline, setBaseline] = useState<{ enabled: boolean; rules: Rule[] } | null>(null);
+  const [baseline, setBaseline] = useState<Rule[] | null>(null);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [applyingSheet, setApplyingSheet] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const [sheetRuleId, setSheetRuleId] = useState<string | null>(null);
   const [draftMembers, setDraftMembers] = useState<Member[]>([]);
+  const [draftKeywords, setDraftKeywords] = useState<string[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addingZone, setAddingZone] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [newZoneName, setNewZoneName] = useState("");
+  const [newZoneKeywords, setNewZoneKeywords] = useState<string[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -62,11 +128,9 @@ export default function AssignmentPage() {
         setMessage({ tone: "danger", text: d.message || "불러오기 실패" });
         return;
       }
-      const nextEnabled = d.auto_assign_enabled !== false;
       const nextRules: Rule[] = d.rules ?? [];
-      setEnabled(nextEnabled);
       setRules(nextRules);
-      setBaseline({ enabled: nextEnabled, rules: cloneRules(nextRules) });
+      setBaseline(cloneRules(nextRules));
       setStaff(d.staff ?? []);
       setMessage(null);
     } catch {
@@ -82,10 +146,14 @@ export default function AssignmentPage() {
 
   const dirty = useMemo(() => {
     if (!baseline) return false;
-    return JSON.stringify({ enabled, rules }) !== JSON.stringify(baseline);
-  }, [enabled, rules, baseline]);
+    return JSON.stringify(rules) !== JSON.stringify(baseline);
+  }, [rules, baseline]);
 
-  const salesStaff = staff.filter((s) => (s.rank ?? "sales") === "sales");
+  const assignableStaff = staff.filter((s) => {
+    const rank = s.rank ?? "sales";
+    return rank === "sales" || rank === "manager";
+  });
+
   const activeRules = rules.filter((r) => r.enabled);
   const assigneeCount = new Set(
     activeRules.flatMap((r) => r.members.map((m) => m.staff_user_id).filter(Boolean))
@@ -95,43 +163,144 @@ export default function AssignmentPage() {
 
   const openSettings = (rule: Rule) => {
     setSheetRuleId(rule.id);
+    setDraftKeywords([...(rule.region_keywords ?? [])]);
     setDraftMembers(rule.members.length ? rule.members.map((m) => ({ ...m })) : [{ staff_user_id: "", weight: 1 }]);
   };
 
-  const salesForZone = (zone: string) => salesStaff.filter((s) => (s.region || "") === zone);
-
-  const applySheet = () => {
-    if (!sheetRuleId) return;
-    const cleaned = draftMembers.filter((m) => m.staff_user_id && Number(m.weight) > 0);
-    setRules((prev) => prev.map((r) => (r.id === sheetRuleId ? { ...r, members: cleaned } : r)));
-    setSheetRuleId(null);
+  const staffOptionsForZone = (zone: string) => {
+    const preferred = assignableStaff.filter((s) => (s.region || "") === zone);
+    const others = assignableStaff.filter((s) => (s.region || "") !== zone);
+    return [...preferred, ...others];
   };
 
-  const save = async () => {
-    for (const r of rules) {
+  const persistRules = async (nextRules: Rule[], successMsg: string) => {
+    for (const r of nextRules) {
+      if (!(r.region_keywords?.length > 0)) {
+        setMessage({ tone: "danger", text: `"${r.region_group}" 포함 지역을 하나 이상 설정해 주세요.` });
+        return false;
+      }
       for (const m of r.members) {
         if (!(Number(m.weight) > 0)) {
           setMessage({ tone: "danger", text: `"${r.region_group}" 가중치는 1 이상이어야 합니다.` });
-          return;
+          return false;
         }
       }
     }
-    setSaving(true);
     try {
       const res = await fetch("/api/admin/assignment", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auto_assign_enabled: enabled, rules }),
+        body: JSON.stringify({ rules: nextRules }),
       });
       const data = await res.json();
       if (!data.ok) {
         setMessage({ tone: "danger", text: data.message || "저장 실패" });
-        return;
+        return false;
       }
-      setMessage({ tone: "success", text: "저장되었습니다." });
       await load();
+      setMessage({ tone: "success", text: successMsg });
+      return true;
     } catch {
       setMessage({ tone: "danger", text: "네트워크 오류가 발생했습니다." });
+      return false;
+    }
+  };
+
+  const applySheet = async () => {
+    if (!sheetRuleId) return;
+    if (!draftKeywords.length) {
+      setMessage({ tone: "danger", text: "포함 지역을 하나 이상 입력해 주세요." });
+      return;
+    }
+    const cleaned = draftMembers.filter((m) => m.staff_user_id && Number(m.weight) > 0);
+    const nextRules = rules.map((r) =>
+      r.id === sheetRuleId ? { ...r, region_keywords: [...draftKeywords], members: cleaned } : r
+    );
+    setApplyingSheet(true);
+    setRules(nextRules);
+    try {
+      const ok = await persistRules(nextRules, "담당자 설정이 저장되었습니다.");
+      if (ok) setSheetRuleId(null);
+    } finally {
+      setApplyingSheet(false);
+    }
+  };
+
+  const addZone = async () => {
+    const name = newZoneName.trim();
+    if (!name) {
+      setMessage({ tone: "danger", text: "권역 이름을 입력해 주세요." });
+      return;
+    }
+    if (rules.some((r) => r.region_group === name)) {
+      setMessage({ tone: "danger", text: `"${name}" 권역이 이미 있습니다.` });
+      return;
+    }
+    if (!newZoneKeywords.length) {
+      setMessage({ tone: "danger", text: "포함 지역을 하나 이상 입력해 주세요." });
+      return;
+    }
+    setAddingZone(true);
+    try {
+      const res = await fetch("/api/admin/assignment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          region_group: name,
+          region_keywords: newZoneKeywords,
+          enabled: true,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setMessage({ tone: "danger", text: data.message || "권역 추가에 실패했습니다." });
+        return;
+      }
+      setAddOpen(false);
+      setNewZoneName("");
+      setNewZoneKeywords([]);
+      await load();
+      setMessage({ tone: "success", text: `"${name}" 권역이 추가되었습니다.` });
+    } catch {
+      setMessage({ tone: "danger", text: "네트워크 오류가 발생했습니다." });
+    } finally {
+      setAddingZone(false);
+    }
+  };
+
+  const deleteZone = async (rule: Rule) => {
+    const isFixed = REGION_ZONE_NAMES.includes(rule.region_group as (typeof REGION_ZONE_NAMES)[number]);
+    if (isFixed) {
+      setMessage({ tone: "danger", text: "기본 권역은 삭제할 수 없습니다." });
+      return;
+    }
+    if (!window.confirm(`"${rule.region_group}" 권역을 삭제할까요? 담당자 배정 설정도 함께 삭제됩니다.`)) {
+      return;
+    }
+    setDeletingId(rule.id);
+    try {
+      const res = await fetch(`/api/admin/assignment?id=${encodeURIComponent(rule.id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setMessage({ tone: "danger", text: data.message || "권역 삭제에 실패했습니다." });
+        return;
+      }
+      if (sheetRuleId === rule.id) setSheetRuleId(null);
+      await load();
+      setMessage({ tone: "success", text: `"${rule.region_group}" 권역을 삭제했습니다.` });
+    } catch {
+      setMessage({ tone: "danger", text: "네트워크 오류가 발생했습니다." });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await persistRules(rules, "저장되었습니다.");
     } finally {
       setSaving(false);
     }
@@ -139,8 +308,7 @@ export default function AssignmentPage() {
 
   const cancelChanges = () => {
     if (!baseline) return;
-    setEnabled(baseline.enabled);
-    setRules(cloneRules(baseline.rules));
+    setRules(cloneRules(baseline));
     setMessage(null);
   };
 
@@ -150,12 +318,21 @@ export default function AssignmentPage() {
         title="자동 분배 설정"
         description="고객의 지역에 따라 담당자를 자동으로 배정합니다. 가중치가 높을수록 더 많이 배정됩니다."
         actions={
-          <CrmSwitch checked={enabled} onChange={setEnabled} label={enabled ? "자동 배정 On" : "자동 배정 Off"} />
+          <CrmButton
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setAddOpen(true);
+              setNewZoneName("");
+              setNewZoneKeywords([]);
+            }}
+          >
+            <IconPlus /> 권역 추가
+          </CrmButton>
         }
         meta={
           <CrmStatRow
             items={[
-              { label: "자동 배정", value: enabled ? "사용 중" : "중지" },
               { label: "활성 권역", value: activeRules.length },
               { label: "배정 대상자", value: assigneeCount },
             ]}
@@ -169,16 +346,18 @@ export default function AssignmentPage() {
         </div>
       ) : null}
 
-      {!enabled ? (
-        <div style={{ marginBottom: 12 }}>
-          <CrmAlert tone="info">자동 배정이 꺼져 있으면 신규 상담은 배정전으로 유지됩니다.</CrmAlert>
-        </div>
-      ) : null}
-
       {loading ? (
         <div className="crm-skeleton" style={{ height: 240 }} />
       ) : rules.length === 0 ? (
-        <CrmEmptyState title="권역 규칙을 불러오지 못했습니다" description="잠시 후 다시 시도해 주세요." />
+        <CrmEmptyState
+          title="권역 규칙이 없습니다"
+          description="권역을 추가해 자동 배정을 시작하세요."
+          action={
+            <CrmButton variant="primary" onClick={() => setAddOpen(true)}>
+              <IconPlus /> 권역 추가
+            </CrmButton>
+          }
+        />
       ) : (
         <div className="crm-ui-table-shell">
           <table className="crm-ui-table">
@@ -186,7 +365,7 @@ export default function AssignmentPage() {
               <tr>
                 <th>권역</th>
                 <th>포함 지역</th>
-                <th>담당 영업자</th>
+                <th>담당자</th>
                 <th>가중치</th>
                 <th>예상 비율</th>
                 <th>상태</th>
@@ -195,20 +374,29 @@ export default function AssignmentPage() {
             </thead>
             <tbody>
               {rules.map((rule) => {
-                const zone = rule.region_group as RegionZoneName;
-                const bases = ZONE_BASE_LABELS[zone] ?? rule.region_keywords ?? [];
+                const bases = rule.region_keywords?.length
+                  ? rule.region_keywords
+                  : [];
                 const names = rule.members
-                  .map((m) => salesStaff.find((s) => s.id === m.staff_user_id)?.name || staff.find((s) => s.id === m.staff_user_id)?.name)
+                  .map((m) => assignableStaff.find((s) => s.id === m.staff_user_id)?.name || staff.find((s) => s.id === m.staff_user_id)?.name)
                   .filter(Boolean);
                 const memberRatios = ratios(rule.members);
+                const isFixed = REGION_ZONE_NAMES.includes(rule.region_group as (typeof REGION_ZONE_NAMES)[number]);
                 return (
-                  <tr key={rule.id} style={!enabled || !rule.enabled ? { opacity: 0.55 } : undefined}>
-                    <td style={{ fontWeight: 700 }}>{rule.region_group}</td>
+                  <tr key={rule.id} style={!rule.enabled ? { opacity: 0.55 } : undefined}>
+                    <td style={{ fontWeight: 700 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        {rule.region_group}
+                        {!isFixed ? <CrmBadge tone="primary">추가</CrmBadge> : null}
+                      </div>
+                    </td>
                     <td>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                        {bases.map((b) => (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, maxWidth: 320 }}>
+                        {bases.slice(0, 8).map((b) => (
                           <CrmChip key={b}>{b}</CrmChip>
                         ))}
+                        {bases.length > 8 ? <CrmChip>+{bases.length - 8}</CrmChip> : null}
+                        {!bases.length ? <span className="crm-ui-hint">—</span> : null}
                       </div>
                     </td>
                     <td style={{ fontSize: 13 }}>{names.join(", ") || "—"}</td>
@@ -217,15 +405,26 @@ export default function AssignmentPage() {
                     <td>
                       <CrmSwitch
                         checked={rule.enabled}
-                        disabled={!enabled}
                         onChange={(v) => setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, enabled: v } : r)))}
                         label={rule.enabled ? "활성" : "비활성"}
                       />
                     </td>
                     <td>
-                      <CrmButton size="sm" variant="secondary" onClick={() => openSettings(rule)} disabled={!enabled}>
-                        설정
-                      </CrmButton>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <CrmButton size="sm" variant="secondary" onClick={() => openSettings(rule)}>
+                          설정
+                        </CrmButton>
+                        {!isFixed ? (
+                          <CrmButton
+                            size="sm"
+                            variant="ghost"
+                            disabled={deletingId === rule.id}
+                            onClick={() => void deleteZone(rule)}
+                          >
+                            {deletingId === rule.id ? "삭제 중…" : "삭제"}
+                          </CrmButton>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -248,31 +447,41 @@ export default function AssignmentPage() {
 
       <CrmSheet
         open={!!sheetRule}
-        onClose={() => setSheetRuleId(null)}
-        title={`${sheetRule?.region_group ?? ""} 담당자 설정`}
+        onClose={() => !applyingSheet && setSheetRuleId(null)}
+        title={`${sheetRule?.region_group ?? ""} 설정`}
         footer={
           <>
-            <CrmButton variant="secondary" onClick={() => setSheetRuleId(null)}>
+            <CrmButton variant="secondary" onClick={() => setSheetRuleId(null)} disabled={applyingSheet}>
               취소
             </CrmButton>
-            <CrmButton variant="primary" onClick={applySheet}>
-              적용
+            <CrmButton variant="primary" onClick={() => void applySheet()} disabled={applyingSheet}>
+              {applyingSheet ? "저장 중…" : "적용 및 저장"}
             </CrmButton>
           </>
         }
       >
         {sheetRule && (
           <>
-            <CrmAlert tone="info">
-              포함 지역: {(ZONE_BASE_LABELS[sheetRule.region_group as RegionZoneName] ?? []).join(", ")} (수정 불가)
-            </CrmAlert>
-            <CrmField label="담당 영업자 · 가중치" hint="해당 권역이 설정된 영업자만 선택할 수 있습니다.">
+            <CrmField
+              label="포함 지역"
+              hint="고객 지역 문자열에 포함되면 이 권역으로 매칭됩니다. 여러 개는 쉼표로 추가하세요."
+            >
+              <KeywordEditor value={draftKeywords} onChange={setDraftKeywords} />
+            </CrmField>
+
+            <CrmField
+              label="담당자 · 가중치"
+              hint="영업자와 매니저를 선택할 수 있습니다. 규칙에 추가된 담당자에게 자동 배정됩니다."
+            >
               <div style={{ display: "grid", gap: 8 }}>
                 {draftMembers.map((m, mi) => {
                   const ratio = ratios(draftMembers)[mi];
-                  const options = salesForZone(sheetRule.region_group);
+                  const options = staffOptionsForZone(sheetRule.region_group);
                   return (
-                    <div key={mi} style={{ display: "grid", gridTemplateColumns: "1fr 88px 72px auto", gap: 8, alignItems: "center" }}>
+                    <div
+                      key={mi}
+                      style={{ display: "grid", gridTemplateColumns: "1fr 88px 72px auto", gap: 8, alignItems: "center" }}
+                    >
                       <CrmSelect
                         value={m.staff_user_id}
                         onChange={(e) =>
@@ -281,10 +490,10 @@ export default function AssignmentPage() {
                           )
                         }
                       >
-                        <option value="">영업자 선택</option>
+                        <option value="">담당자 선택</option>
                         {options.map((s) => (
                           <option key={s.id} value={s.id}>
-                            {s.name}
+                            {staffLabel(s)}
                           </option>
                         ))}
                       </CrmSelect>
@@ -317,13 +526,40 @@ export default function AssignmentPage() {
                 >
                   <IconPlus /> 담당자 추가
                 </CrmButton>
-                {salesForZone(sheetRule.region_group).length === 0 ? (
-                  <p className="crm-ui-hint">이 권역으로 설정된 영업자가 없습니다. 계정 관리에서 담당 권역을 지정해 주세요.</p>
+                {assignableStaff.length === 0 ? (
+                  <p className="crm-ui-hint">활성 영업자·매니저가 없습니다. 계정 관리에서 계정을 확인해 주세요.</p>
                 ) : null}
               </div>
             </CrmField>
           </>
         )}
+      </CrmSheet>
+
+      <CrmSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        title="권역 추가"
+        footer={
+          <>
+            <CrmButton variant="secondary" onClick={() => setAddOpen(false)} disabled={addingZone}>
+              취소
+            </CrmButton>
+            <CrmButton variant="primary" onClick={() => void addZone()} disabled={addingZone}>
+              {addingZone ? "추가 중…" : "추가"}
+            </CrmButton>
+          </>
+        }
+      >
+        <CrmField label="권역 이름">
+          <CrmInput
+            value={newZoneName}
+            onChange={(e) => setNewZoneName(e.target.value)}
+            placeholder="예: 해외권"
+          />
+        </CrmField>
+        <CrmField label="포함 지역" hint="이 키워드가 고객 지역에 포함되면 해당 권역으로 배정합니다.">
+          <KeywordEditor value={newZoneKeywords} onChange={setNewZoneKeywords} />
+        </CrmField>
       </CrmSheet>
     </div>
   );

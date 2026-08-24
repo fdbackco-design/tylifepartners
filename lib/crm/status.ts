@@ -16,13 +16,29 @@ export function normalizeStatus(raw: string | null | undefined): LeadStatus {
 export function getAdminStatus(
   status: string,
   statusChangedAt: string | null | undefined,
-  createdAt: string
+  createdAt: string,
+  assigneeId?: string | null
 ): AdminStatusInfo | null {
   const st = normalizeStatus(status);
+
+  // 담당자 미배정 → 항상 담당자 지정 필요
+  if (!assigneeId) {
+    return { key: "need_assign", label: "담당자 지정 필요", tone: "danger" };
+  }
+
   const days = calendarDaysInclusive(statusChangedAt || createdAt);
+
+  if (st === "배정전") {
+    // 담당자는 있는데 상태가 아직 배정전인 경우에도 지정 필요로 두지 않고 대기 취급
+    return { key: "waiting_day", label: "대기 1일차", tone: "danger" };
+  }
   if (st === "대기") {
     if (days >= 3) return { key: "need_reassign", label: "담당자 변경 필요", tone: "danger" };
     return { key: "waiting_day", label: `대기 ${days}일차`, tone: "danger" };
+  }
+  if (st === "1차컨택") {
+    if (days >= 3) return { key: "need_reassign", label: "담당자 변경 필요", tone: "danger" };
+    return { key: "first_contact_day", label: `1차컨택 ${days}일차`, tone: "danger" };
   }
   if (st === "부재(메신저완료)") {
     if (days >= 3) return { key: "need_reassign", label: "담당자 변경 필요", tone: "danger" };
@@ -51,11 +67,14 @@ export function isMemoEditable(status: LeadStatus): boolean {
   return status !== "배정전" && status !== "대기";
 }
 
-export function rowBackground(status: LeadStatus): string | undefined {
+export function rowBackground(
+  status: LeadStatus,
+  adminStatusKey?: AdminStatusInfo["key"] | null
+): string | undefined {
+  if (adminStatusKey === "need_assign") return "#ffebee";
   if (status === "배정전") return "#fff4e6";
   if (status === "대기" || status === "부재(메신저완료)") return "#fffde7";
   if (status === "대면확정") return "#e8f5e9";
-  if (status === "가입완료") return "#f3e5f5";
   return undefined;
 }
 

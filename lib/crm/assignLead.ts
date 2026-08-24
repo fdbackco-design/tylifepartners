@@ -59,7 +59,25 @@ export async function changeLeadAssignee(opts: {
     reason: "manual",
   });
 
-  if (nextStatus === "배정전" && nextAssignee) {
+  if (nextAssignee && !curAssignee && (nextStatus === "배정전" || nextStatus === "대기")) {
+    // 미배정 → 담당자 지정: 대기로 두고 대기 일차를 오늘부터 시작
+    if (nextStatus === "배정전") {
+      nextMemo = appendStatusMemo(nextMemo, "대기", now);
+      patch.memo = nextMemo;
+    }
+    nextStatus = "대기";
+    patch.status = "대기";
+    patch.status_changed_at = nowIso;
+    await supabase.from("lead_status_logs").insert({
+      lead_table: table,
+      lead_id: opts.id,
+      from_status: currentStatus,
+      to_status: "대기",
+      assignee_id: nextAssignee,
+      changed_at: nowIso,
+      changed_by_name: opts.session.name,
+    });
+  } else if (nextAssignee && nextStatus === "배정전") {
     nextMemo = appendStatusMemo(nextMemo, "대기", now);
     nextStatus = "대기";
     patch.status = "대기";
