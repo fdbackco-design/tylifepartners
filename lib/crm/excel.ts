@@ -1,9 +1,17 @@
 function xmlEscape(value: unknown): string {
   return String(value ?? "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function safeSheetName(name: string): string {
+  const cleaned = String(name || "Sheet1")
+    .replace(/[\\/*?:\[\]]/g, "")
+    .slice(0, 31);
+  return cleaned || "Sheet1";
 }
 
 export function toExcelXml(sheetName: string, headers: string[], rows: unknown[][]): string {
@@ -18,7 +26,7 @@ export function toExcelXml(sheetName: string, headers: string[], rows: unknown[]
 <?mso-application progid="Excel.Sheet"?>
 <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-<Worksheet ss:Name="${xmlEscape(sheetName)}">
+<Worksheet ss:Name="${xmlEscape(safeSheetName(sheetName))}">
 <Table>
 <Row>${header}</Row>
 ${body}

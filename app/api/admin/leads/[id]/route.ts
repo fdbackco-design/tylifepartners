@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { appendStatusMemo } from "@/lib/crm/memo";
+import { changeLeadAssignee } from "@/lib/crm/assignLead";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
-import { canChangeAssignee, visibleAssigneeIds } from "@/lib/crm/scope";
-import { allowedStatusesFor, isLeadStatus, normalizeStatus, tableForCategory } from "@/lib/crm/status";
+import { visibleAssigneeIds } from "@/lib/crm/scope";
+import { allowedStatusesFor, isLeadStatus, isMemoEditable, normalizeStatus, tableForCategory } from "@/lib/crm/status";
 import type { LeadCategory } from "@/lib/crm/types";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -102,50 +103,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   let nextMemo = String((current as { memo?: string | null }).memo ?? "");
   const currentStatus = normalizeStatus((current as { status?: string }).status);
   let nextStatus = currentStatus;
+  let assigneeChanged = false;
 
   if (body.assignee_id !== undefined) {
-    if (!canChangeAssignee(session)) {
-      return NextResponse.json({ ok: false, message: "담당자를 변경할 권한이 없습니다." }, { status: 403 });
-    }
     const nextAssignee = body.assignee_id ? String(body.assignee_id) : null;
-    if (nextAssignee !== curAssignee) {
-      const { staffById } = await loadStaffMaps();
-      await supabase.from("lead_memo_logs").insert({
-        lead_table: table,
-        lead_id: id,
-        assignee_id: curAssignee,
-        assignee_name: curAssignee ? staffById.get(curAssignee)?.name ?? "" : "",
-        memo: nextMemo,
-      });
-      await supabase.from("lead_assignment_logs").insert({
-        lead_table: table,
-        lead_id: id,
-        from_assignee_id: curAssignee,
-        to_assignee_id: nextAssignee,
-        assigned_at: nowIso,
-        changed_by: session.userId,
-        changed_by_name: session.name,
-        reason: "manual",
-      });
-      patch.assignee_id = nextAssignee;
-      patch.assigned_at = nowIso;
-      if (nextStatus === "배정전" && nextAssignee) {
-        nextMemo = appendStatusMemo(nextMemo, "대기", now);
-        nextStatus = "대기";
-        patch.status = "대기";
-        patch.status_changed_at = nowIso;
-        patch.memo = nextMemo;
-        await supabase.from("lead_status_logs").insert({
-          lead_table: table,
-          lead_id: id,
-          from_status: currentStatus,
-          to_status: "대기",
-          assignee_id: nextAssignee,
-          changed_at: nowIso,
-          changed_by_name: session.name,
-        });
-      }
+    const assignResult = await changeLeadAssignee({
+      session,
+      id,
+      category,
+      assigneeId: nextAssignee,
+    });
+    if (!assignResult.ok) {
+      return NextResponse.json({ ok: false, message: assignResult.message }, { status: assignResult.status });
     }
+    assigneeChanged = true;
+    const { data: refreshed } = await (supabase.from(table) as any).select(select).eq("id", id).maybeSingle();
+    if (refreshed) Object.assign(current, refreshed);
+    nextMemo = String((current as { memo?: string | null }).memo ?? "");
+    nextStatus = normalizeStatus((current as { status?: string }).status);
   }
 
   if (body.status != null) {
@@ -162,12 +137,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       patch.status = requested;
       patch.status_changed_at = nowIso;
       patch.memo = nextMemo;
+      const assigneeForLog =
+        (current as { assignee_id?: string | null }).assignee_id ?? curAssignee;
       await supabase.from("lead_status_logs").insert({
         lead_table: table,
         lead_id: id,
         from_status: nextStatus,
         to_status: requested,
-        assignee_id: (patch.assignee_id as string | null | undefined) ?? curAssignee,
+        assignee_id: assigneeForLog,
         changed_at: nowIso,
         changed_by_name: session.name,
       });
@@ -176,8 +153,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   if (body.memo != null && body.status == null) {
-    if (nextStatus === "대기") {
-      return NextResponse.json({ ok: false, message: "대기 상태에서는 메모를 수정할 수 없습니다." }, { status: 400 });
+    if (!isMemoEditable(nextStatus)) {
+      return NextResponse.json({ ok: false, message: "배정전·대기 상태에서는 메모를 수정할 수 없습니다." }, { status: 400 });
     }
     patch.memo = String(body.memo);
   }
@@ -189,14 +166,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     patch.meeting_at = body.meeting_at ? String(body.meeting_at) : null;
   }
 
-  if (Object.keys(patch).length === 0) {
+  if (Object.keys(patch).length === 0 && !assigneeChanged) {
     return NextResponse.json({ ok: false, message: "수정할 내용이 없습니다." }, { status: 400 });
   }
 
-  const { error: updErr } = await supabase.from(table).update(patch).eq("id", id);
-  if (updErr) {
-    console.error("PATCH lead:", updErr);
-    return NextResponse.json({ ok: false, message: "저장 중 오류가 발생했습니다." }, { status: 500 });
+  if (Object.keys(patch).length > 0) {
+    const { error: updErr } = await supabase.from(table).update(patch).eq("id", id);
+    if (updErr) {
+      console.error("PATCH lead:", updErr);
+      return NextResponse.json({ ok: false, message: "저장 중 오류가 발생했습니다." }, { status: 500 });
+    }
   }
 
   const { data: fresh } = await (supabase.from(table) as any).select(select).eq("id", id).maybeSingle();

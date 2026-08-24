@@ -1,4 +1,5 @@
 import { landingPreviewSrc } from "@/lib/crm/landingPreview";
+import { formatKstDateTime } from "@/lib/crm/kst";
 import { getAdminStatus, normalizeStatus } from "@/lib/crm/status";
 import type { LeadRow } from "@/lib/crm/types";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -24,17 +25,7 @@ export function mapLeadRow(
   return {
     id: String(row.id),
     type: kind === "candidates" ? "후보자" : "소비자",
-    created_at: createdIso
-      ? new Date(createdIso).toLocaleString("ko-KR", {
-          timeZone: "Asia/Seoul",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        })
-      : "",
+    created_at: createdIso ? formatKstDateTime(new Date(createdIso)) : "",
     created_at_iso: createdIso,
     name: String(row.name ?? ""),
     phone: String(row.phone ?? ""),
@@ -64,10 +55,10 @@ export function mapLeadRow(
 }
 
 export const CONSUMER_SELECT =
-  "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent, region, available_time, age_group, job, job_rank, location, desired_time, assignee_id, assigned_at, status_changed_at, meeting_at";
+  "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, location, desired_time, assignee_id, assigned_at, status_changed_at, meeting_at";
 
 export const CANDIDATE_SELECT =
-  "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent, region, available_time, age_group, job, job_rank, assignee_id, assigned_at, status_changed_at, meeting_at";
+  "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, assignee_id, assigned_at, status_changed_at, meeting_at";
 
 export async function loadStaffMaps() {
   const supabase = getSupabaseAdmin();
@@ -78,10 +69,10 @@ export async function loadStaffMaps() {
     staffById.set(r.id, r);
     parentNameById.set(r.id, r.name);
   }
-  const { data: all } = await supabase.from("staff_users").select("id, name, parent_id");
+  const { data: all } = await supabase.from("staff_users").select("id, name, parent_id, rank, is_active");
   for (const r of all ?? []) {
     parentNameById.set(r.id, r.name);
-    if (!staffById.has(r.id)) staffById.set(r.id, r);
+    if (!staffById.has(r.id)) staffById.set(r.id, { id: r.id, name: r.name, parent_id: r.parent_id });
   }
   return { staffById, parentNameById, staff: all ?? [] };
 }

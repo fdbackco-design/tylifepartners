@@ -8,6 +8,7 @@ import { formatPhoneKorean } from "@/lib/phone";
 import { isLeadSubmissionBlocked, maskPhoneForLog } from "@/lib/phoneBlacklist";
 import { runAfterResponse } from "@/lib/runAfterResponse";
 import { tryAutoAssignLead } from "@/lib/crm/assignment";
+import { resolveRegionZone } from "@/lib/crm/regionZones";
 import { syncLeadToCrm } from "@/lib/crmSync";
 
 /** 클라이언트에서 보낸 유입 경로 (예: /, /v2, /me). 잘못된 값은 무시 */
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
     const analytics = parseSubmissionAnalytics(body as Record<string, unknown>);
 
     const supabase = getSupabaseAdmin();
+    const regionRaw = location || region || null;
     const nowIso = new Date().toISOString();
     const { data: insertedLead, error } = await supabase.from("leads").insert({
       name,
@@ -108,7 +110,8 @@ export async function POST(request: NextRequest) {
       last_section_label: analytics.last_section_label,
       status: "배정전",
       status_changed_at: nowIso,
-      region: location || region || null,
+      region: regionRaw,
+      region_zone: resolveRegionZone(regionRaw),
       available_time: desiredTime || null,
       age_group: ageGroup || null,
       job: job || null,
@@ -136,7 +139,7 @@ export async function POST(request: NextRequest) {
       await tryAutoAssignLead({
         table: "leads",
         leadId: insertedLead.id,
-        region: location || region || null,
+        region: regionRaw,
       });
     }
 

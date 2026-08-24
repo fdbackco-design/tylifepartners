@@ -252,10 +252,25 @@ export default function ManagedLandingPage({
 
   const closeSheet = () => setSheetOpen(false);
 
+  const [hideTitleBar, setHideTitleBar] = useState(previewMode);
+  useEffect(() => {
+    if (previewMode) {
+      setHideTitleBar(true);
+      return;
+    }
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      setHideTitleBar(sp.get("adminPreview") === "1");
+    } catch {
+      setHideTitleBar(false);
+    }
+  }, [previewMode]);
+
   return (
     <main>
       <LandingAnalyticsTracker landingKey={landingKey} sections={sections} />
 
+      {!hideTitleBar && (
       <header
         style={{
           position: "sticky",
@@ -283,6 +298,7 @@ export default function ManagedLandingPage({
         </h1>
         <div style={{ width: 24 }} aria-hidden />
       </header>
+      )}
 
       {hero1Src && (
         <section

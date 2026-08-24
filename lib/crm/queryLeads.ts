@@ -1,4 +1,4 @@
-import { addDaysYmd, kstYmd, startOfKstDayIso, startOfNextKstDayIso } from "@/lib/crm/kst";
+import { startOfKstDayIso, startOfNextKstDayIso } from "@/lib/crm/kst";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
 import { visibleAssigneeIds } from "@/lib/crm/scope";
 import { getAdminStatus } from "@/lib/crm/status";
@@ -19,7 +19,7 @@ export type LeadQueryInput = {
   utmSources?: string[];
   dateFrom?: string;
   dateTo?: string;
-  recontact?: boolean;
+  needReassign?: boolean;
   unassigned?: boolean;
   limit?: number;
   offset?: number;
@@ -50,7 +50,7 @@ export function parseLeadQuery(sp: URLSearchParams): LeadQueryInput {
     utmSources: csv(sp.get("utm_sources")),
     dateFrom: sp.get("date_from") || undefined,
     dateTo: sp.get("date_to") || undefined,
-    recontact: sp.get("recontact") === "1",
+    needReassign: sp.get("need_reassign") === "1" || sp.get("recontact") === "1",
     unassigned: sp.get("unassigned") === "1",
     limit: Math.min(Math.max(Number(sp.get("limit") || 50), 1), 5000),
     offset: Math.max(Number(sp.get("offset") || 0), 0),
@@ -129,9 +129,8 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
       );
     }
     query = applyRegionFilter(query, q.regions, kind === "consumers");
-    if (q.recontact) {
-      const cutoff = startOfKstDayIso(addDaysYmd(kstYmd(), -6));
-      query = query.in("status", ["상담완료", "상담 완료"]).lt("status_changed_at", cutoff);
+    if (q.needReassign) {
+      query = query.in("status", ["대기", "부재(메신저완료)"]);
     }
     if (q.category !== "all") {
       query = query.range(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50) - 1);
@@ -146,21 +145,21 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
     return { items, total: count ?? items.length };
   };
 
+  const isNeedReassign = (i: LeadRow) =>
+    i.admin_status?.key === "need_reassign" ||
+    getAdminStatus(i.status, i.status_changed_at, i.created_at_iso)?.key === "need_reassign";
+
   if (q.category === "all") {
     const [a, b] = await Promise.all([fetchTable("consumers"), fetchTable("candidates")]);
     let items = [...a.items, ...b.items].sort((x, y) => (x.created_at_iso < y.created_at_iso ? 1 : -1));
-    if (q.recontact) items = items.filter((i) => i.admin_status?.key === "need_recontact");
+    if (q.needReassign) items = items.filter(isNeedReassign);
     const total = items.length;
     return { items: items.slice(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50)), total };
   }
 
   const result = await fetchTable(q.category);
-  if (q.recontact) {
-    const items = result.items.filter(
-      (i: LeadRow) =>
-        i.admin_status?.key === "need_recontact" ||
-        getAdminStatus(i.status, i.status_changed_at, i.created_at_iso)?.key === "need_recontact"
-    );
+  if (q.needReassign) {
+    const items = result.items.filter(isNeedReassign);
     return { items, total: items.length };
   }
   return result;

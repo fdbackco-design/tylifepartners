@@ -10,8 +10,7 @@ export function normalizeStatus(raw: string | null | undefined): LeadStatus {
   const s = String(raw ?? "").trim();
   if (s === "상담 완료") return "상담완료";
   if (isLeadStatus(s)) return s;
-  if (s === "대기") return "대기";
-  return "대기";
+  return "배정전";
 }
 
 export function getAdminStatus(
@@ -36,13 +35,20 @@ export function getAdminStatus(
   return null;
 }
 
-export function allowedStatusesFor(session: SessionUser, current: LeadStatus): LeadStatus[] {
-  if (session.rank === "admin" || session.rank === "manager") {
-    return [...LEAD_STATUSES];
-  }
+/**
+ * 상담상태 선택지:
+ * - 배정전: 배정전만
+ * - 대기: 대기, 1차컨택만
+ * - 1차컨택 이후: 1차컨택, 부재(메신저완료), 상담완료, 대면확정, 가입완료
+ */
+export function allowedStatusesFor(_session: SessionUser, current: LeadStatus): LeadStatus[] {
   if (current === "배정전") return ["배정전"];
   if (current === "대기") return ["대기", "1차컨택"];
   return ["1차컨택", "부재(메신저완료)", "상담완료", "대면확정", "가입완료"];
+}
+
+export function isMemoEditable(status: LeadStatus): boolean {
+  return status !== "배정전" && status !== "대기";
 }
 
 export function rowBackground(status: LeadStatus): string | undefined {

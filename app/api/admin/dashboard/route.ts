@@ -7,6 +7,9 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
+  if (session.rank !== "admin") {
+    return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
+  }
 
   const sp = request.nextUrl.searchParams;
   const from = sp.get("date_from") || kstYmd();
