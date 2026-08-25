@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { processBusinessLeadSideEffects } from "@/lib/businessLeadSideEffects";
 import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
+import { linkLandingSessionToLead } from "@/lib/landing-analytics/linkSession";
 import { isLanding0623EntryPage, normalizeLanding0623EntryPage } from "@/lib/landing0623";
 import { isLanding0715EntryPage, normalizeLanding0715EntryPage } from "@/lib/landing0715";
 import { formatPhoneKorean } from "@/lib/phone";
@@ -210,6 +211,24 @@ export async function POST(request: NextRequest) {
         meta_campaign_id: metaIds.meta_campaign_id,
         receivedAtIso: nowIso,
       });
+      await supabase
+        .from("tylife_b2b")
+        .update({
+          analytics_session_id: analytics.analytics_session_id,
+          analytics_visitor_id: analytics.analytics_visitor_id,
+          max_scroll_depth: analytics.max_scroll_depth,
+          last_section_name: analytics.last_section_name,
+          last_section_label: analytics.last_section_label,
+        })
+        .eq("id", samePerson.id);
+      await linkLandingSessionToLead({
+        leadTable: "tylife_b2b",
+        leadId: samePerson.id,
+        sessionId: analytics.analytics_session_id,
+        visitorId: analytics.analytics_visitor_id,
+        landingKey: entryPage,
+        pageUrl: entryPage,
+      });
       if (!samePerson.assignee_id) {
         await tryAutoAssignLead({
           table: "tylife_b2b",
@@ -263,6 +282,7 @@ export async function POST(request: NextRequest) {
       job: jobForDb,
       job_rank: jobRankStored,
       analytics_session_id: analytics.analytics_session_id,
+      analytics_visitor_id: analytics.analytics_visitor_id,
       max_scroll_depth: analytics.max_scroll_depth,
       last_section_name: analytics.last_section_name,
       last_section_label: analytics.last_section_label,
@@ -290,6 +310,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (insertedLead?.id) {
+      await linkLandingSessionToLead({
+        leadTable: "tylife_b2b",
+        leadId: insertedLead.id,
+        sessionId: analytics.analytics_session_id,
+        visitorId: analytics.analytics_visitor_id,
+        landingKey: entryPage,
+        pageUrl: entryPage,
+      });
       await tryAutoAssignLead({
         table: "tylife_b2b",
         leadId: insertedLead.id,

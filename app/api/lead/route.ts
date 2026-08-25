@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendLeadEmailNotification } from "@/lib/email";
 import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
 import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
+import { linkLandingSessionToLead } from "@/lib/landing-analytics/linkSession";
 import { resolveSheetMediumFromUtmSource } from "@/lib/utmSourceMapping";
 import { formatPhoneKorean } from "@/lib/phone";
 import { isLeadSubmissionBlockedAsync, maskPhoneForLog } from "@/lib/phoneBlacklist";
@@ -126,6 +127,24 @@ export async function POST(request: NextRequest) {
         console.error("reinquiry attach failed:", attached.message);
       } else {
         console.info("[lead] reinquiry attached to existing lead", samePerson.id);
+        await supabase
+          .from("leads")
+          .update({
+            analytics_session_id: analytics.analytics_session_id,
+            analytics_visitor_id: analytics.analytics_visitor_id,
+            max_scroll_depth: analytics.max_scroll_depth,
+            last_section_name: analytics.last_section_name,
+            last_section_label: analytics.last_section_label,
+          })
+          .eq("id", samePerson.id);
+        await linkLandingSessionToLead({
+          leadTable: "leads",
+          leadId: samePerson.id,
+          sessionId: analytics.analytics_session_id,
+          visitorId: analytics.analytics_visitor_id,
+          landingKey: entryPage,
+          pageUrl: entryPage,
+        });
         if (!samePerson.assignee_id) {
           await tryAutoAssignLead({
             table: "leads",
@@ -222,6 +241,7 @@ export async function POST(request: NextRequest) {
       marketing_consent: marketingConsent,
       entry_page: entryPage,
       analytics_session_id: analytics.analytics_session_id,
+      analytics_visitor_id: analytics.analytics_visitor_id,
       max_scroll_depth: analytics.max_scroll_depth,
       last_section_name: analytics.last_section_name,
       last_section_label: analytics.last_section_label,
@@ -254,6 +274,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (insertedLead?.id) {
+      await linkLandingSessionToLead({
+        leadTable: "leads",
+        leadId: insertedLead.id,
+        sessionId: analytics.analytics_session_id,
+        visitorId: analytics.analytics_visitor_id,
+        landingKey: entryPage,
+        pageUrl: entryPage,
+      });
       await tryAutoAssignLead({
         table: "leads",
         leadId: insertedLead.id,

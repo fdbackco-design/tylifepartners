@@ -3,6 +3,7 @@ const UUID_RE =
 
 export type ParsedSubmissionAnalytics = {
   analytics_session_id: string | null;
+  analytics_visitor_id: string | null;
   max_scroll_depth: number | null;
   last_section_name: string | null;
   last_section_label: string | null;
@@ -12,6 +13,10 @@ export function parseSubmissionAnalytics(body: Record<string, unknown>): ParsedS
   const rawId = body.analytics_session_id;
   const analytics_session_id =
     typeof rawId === "string" && UUID_RE.test(rawId) ? rawId : null;
+
+  const rawVisitor = body.analytics_visitor_id;
+  const analytics_visitor_id =
+    typeof rawVisitor === "string" && UUID_RE.test(rawVisitor) ? rawVisitor : null;
 
   const rawDepth = body.max_scroll_depth;
   let max_scroll_depth: number | null = null;
@@ -25,6 +30,7 @@ export function parseSubmissionAnalytics(body: Record<string, unknown>): ParsedS
 
   return {
     analytics_session_id,
+    analytics_visitor_id,
     max_scroll_depth,
     last_section_name,
     last_section_label,

@@ -167,7 +167,7 @@ export function aggregateLandingAnalytics(
 
   const clickCounts = new Map<string, { label: string; count: number }>();
   for (const ev of events) {
-    if (ev.event_type !== "click" || !ev.section_name) continue;
+    if ((ev.event_type !== "click" && ev.event_type !== "cta_click") || !ev.section_name) continue;
     const cur = clickCounts.get(ev.section_name) ?? {
       label: ev.section_label ?? ev.section_name,
       count: 0,
@@ -230,7 +230,7 @@ export function aggregateLandingAnalytics(
 
   const yClickBuckets = new Map<number, number>();
   for (const ev of events) {
-    if (ev.event_type !== "click" || ev.y_ratio == null) continue;
+    if ((ev.event_type !== "click" && ev.event_type !== "cta_click") || ev.y_ratio == null) continue;
     const bucket = Math.min(9, Math.floor(ev.y_ratio * 10));
     yClickBuckets.set(bucket, (yClickBuckets.get(bucket) ?? 0) + 1);
   }
