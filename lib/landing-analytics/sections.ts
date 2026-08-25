@@ -201,3 +201,22 @@ export const LANDING_KEY_LABELS: Record<LandingKey, string> = {
   landing_0715: "/0715",
   landing_0715s: "/0715s",
 };
+
+/** entry_page → landing_key (히트맵 페이지 딥링크용) */
+export function landingKeyFromEntryPage(entryPage: string | null | undefined): string | null {
+  const raw = String(entryPage ?? "").trim();
+  if (!raw) return null;
+  const path = raw.startsWith("/") ? raw : `/${raw}`;
+  const normalized = path.replace(/\/+$/, "") || "/";
+
+  for (const key of LANDING_KEYS) {
+    const labelPath = LANDING_KEY_LABELS[key].split(" ")[0];
+    if (labelPath === normalized) return key;
+    if (key === "parent_main" && (normalized === "/" || normalized === "")) return key;
+  }
+
+  // managed_slug
+  const slug = normalized.replace(/^\//, "");
+  if (slug && !slug.includes("/")) return `managed_${slug}`;
+  return null;
+}

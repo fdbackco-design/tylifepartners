@@ -4,6 +4,28 @@ import { canChangeAssignee } from "@/lib/crm/scope";
 import { normalizeStatus, tableForCategory } from "@/lib/crm/status";
 import type { LeadCategory, SessionUser } from "@/lib/crm/types";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { notifyAssigneeAssigned } from "@/lib/webPush";
+
+async function notifyAssigneeForLead(
+  table: "leads" | "tylife_b2b",
+  leadId: string,
+  assigneeId: string
+): Promise<void> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase.from(table).select("name, phone").eq("id", leadId).maybeSingle();
+    if (!data?.name) return;
+    await notifyAssigneeAssigned({
+      assigneeId,
+      kind: table === "tylife_b2b" ? "candidates" : "consumers",
+      name: String(data.name),
+      phone: String(data.phone ?? ""),
+      leadId,
+    });
+  } catch (e) {
+    console.warn("[webPush] assignee notify:", e instanceof Error ? e.message : e);
+  }
+}
 
 type LeadAssigneeSnapshot = {
   id: string;
@@ -142,5 +164,10 @@ export async function changeLeadAssignee(opts: {
       return { ok: false, message: "저장 중 오류가 발생했습니다.", status: 500 };
     }
   }
+
+  if (nextAssignee) {
+    void notifyAssigneeForLead(table, opts.id, nextAssignee);
+  }
+
   return { ok: true };
 }

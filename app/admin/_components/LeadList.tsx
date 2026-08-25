@@ -12,7 +12,8 @@ import DateRangePicker from "@/app/admin/_components/crm/DateRangePicker";
 import FilterPopover, { type FilterGroup } from "@/app/admin/_components/crm/FilterPopover";
 import StatusBadgeMenu from "@/app/admin/_components/crm/StatusBadgeMenu";
 import { formatAssigneeWithTeam } from "@/lib/crm/assigneeHistoryFormat";
-import LeadBehaviorPanel from "@/app/admin/_components/LeadBehaviorPanel";
+import { landingKeyFromEntryPage } from "@/lib/landing-analytics/sections";
+import Link from "next/link";
 
 type StaffOpt = { id: string; name: string; parent_id: string | null; rank?: string };
 
@@ -1146,12 +1147,28 @@ export default function LeadList({
                 ))}
               </div>
             )}
-            <LeadBehaviorPanel
-              leadId={memoRow.id}
-              category={memoRow.type === "후보자" ? "candidates" : "consumers"}
-              customerName={memoRow.name}
-              customerPhone={memoRow.phone}
-            />
+            <div className="crm-behavior-panel">
+              <div className="crm-behavior-panel-head">
+                <strong>행동 분석</strong>
+              </div>
+              <p className="crm-behavior-muted" style={{ marginBottom: 10 }}>
+                고객별 스크롤·체류는 스크롤 히트맵 페이지에서 확인합니다.
+                {memoRow.entry_page ? ` (유입: ${memoRow.entry_page})` : ""}
+              </p>
+              <Link
+                href={(() => {
+                  const key = landingKeyFromEntryPage(memoRow.entry_page);
+                  const qs = new URLSearchParams();
+                  if (key) qs.set("landing_key", key);
+                  const q = qs.toString();
+                  return q ? `/admin/landing-analytics?${q}` : "/admin/landing-analytics";
+                })()}
+                className="crm-btn crm-btn-primary"
+                style={{ display: "inline-flex", textDecoration: "none" }}
+              >
+                스크롤 히트맵 열기
+              </Link>
+            </div>
           </aside>
         </>
       )}

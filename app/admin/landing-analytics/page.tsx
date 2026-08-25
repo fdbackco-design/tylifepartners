@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   LANDING_KEYS,
   LANDING_KEY_LABELS,
@@ -23,15 +24,28 @@ function defaultToDate() {
 }
 
 export default function LandingAnalyticsAdminPage() {
+  const searchParams = useSearchParams();
+  const initialKey = searchParams.get("landing_key")?.trim() || "landing_0715s";
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
-  const [landingKey, setLandingKey] = useState<string>("landing_0715s");
+  const [landingKey, setLandingKey] = useState<string>(initialKey);
   const [managedOptions, setManagedOptions] = useState<{ key: string; label: string }[]>([]);
-  const [fromDate, setFromDate] = useState(defaultFromDate);
-  const [toDate, setToDate] = useState(defaultToDate);
+  const [fromDate, setFromDate] = useState(
+    () => searchParams.get("from")?.trim() || defaultFromDate()
+  );
+  const [toDate, setToDate] = useState(() => searchParams.get("to")?.trim() || defaultToDate());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [report, setReport] = useState<LandingAnalyticsReport | null>(null);
   const [meta, setMeta] = useState<{ event_count: number; truncated: boolean } | null>(null);
+
+  useEffect(() => {
+    const key = searchParams.get("landing_key")?.trim();
+    if (key) setLandingKey(key);
+    const from = searchParams.get("from")?.trim();
+    const to = searchParams.get("to")?.trim();
+    if (from) setFromDate(from);
+    if (to) setToDate(to);
+  }, [searchParams]);
 
   const checkAuth = useCallback(async () => {
     const res = await fetch("/api/admin/leads?limit=1");
