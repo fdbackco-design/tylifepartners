@@ -130,12 +130,22 @@ describe("assignment & memo merge", () => {
       memo: "이전 메모",
     });
     const once = mergeMemos(primary, [src]);
-    assert.ok(once.includes("원본 고객 ID: s"));
+    assert.ok(!once.includes("원본 고객 ID"));
+    assert.ok(once.includes("[중복 고객 병합 · 유입일: 2026-01-01]"));
     assert.ok(once.includes("이전 메모"));
     const twice = mergeMemos({ ...primary, memo: once }, [src]);
     assert.equal(twice, once);
-    assert.equal(memoAlreadyMerged(once, "s", "이전 메모"), true);
-    assert.ok(formatMergedMemoBlock({ sourceId: "s", receivedAt: "t", memo: "x" }).includes("s"));
+    assert.equal(memoAlreadyMerged(once, "s", "이전 메모", "2026-01-01T00:00:00.000Z"), true);
+    assert.ok(
+      formatMergedMemoBlock({ sourceId: "s", receivedAt: "2026-05-09T23:52:56.35636+00:00", memo: "x" }).includes(
+        "유입일: 2026-05-10"
+      )
+    );
+    assert.ok(
+      !formatMergedMemoBlock({ sourceId: "s", receivedAt: "2026-05-09T23:52:56.35636+00:00", memo: "x" }).includes(
+        "원본 고객 ID"
+      )
+    );
   });
 });
 

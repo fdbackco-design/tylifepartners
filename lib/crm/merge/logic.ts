@@ -128,13 +128,40 @@ export function classifyDuplicateGroup(leads: MergeLeadCandidate[]): {
   };
 }
 
-/** 메모 블록이 이미 포함되어 있는지 (원본 ID + 본문) */
-export function memoAlreadyMerged(existingMemo: string, sourceId: string, sourceMemo: string): boolean {
-  const marker = `[중복 고객 병합 · 원본 고객 ID: ${sourceId}`;
-  if (!existingMemo.includes(marker)) return false;
-  const body = sourceMemo.trim();
-  if (!body) return existingMemo.includes(marker);
-  return existingMemo.includes(body);
+/** 메모 블록이 이미 포함되어 있는지 (유입일 + 본문, 레거시 ID 형식도 인식) */
+export function memoAlreadyMerged(
+  existingMemo: string,
+  sourceId: string,
+  sourceMemo: string,
+  receivedAt?: string
+): boolean {
+  const body = sourceMemo.trim() || "(메모 없음)";
+  if (receivedAt) {
+    const block = formatMergedMemoBlock({ sourceId, receivedAt, memo: sourceMemo });
+    if (existingMemo.includes(block)) return true;
+  }
+  // 레거시: 원본 고객 ID 포함 형식
+  const legacyMarker = `[중복 고객 병합 · 원본 고객 ID: ${sourceId}`;
+  if (existingMemo.includes(legacyMarker)) {
+    if (!sourceMemo.trim()) return true;
+    return existingMemo.includes(sourceMemo.trim());
+  }
+  return false;
+}
+
+/** 유입일시를 KST YYYY-MM-DD로 */
+export function receivedAtToYmd(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    const m = String(iso).match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : String(iso).slice(0, 10);
+  }
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
 export function formatMergedMemoBlock(opts: {
@@ -143,7 +170,8 @@ export function formatMergedMemoBlock(opts: {
   memo: string;
 }): string {
   const body = opts.memo.trim() || "(메모 없음)";
-  return `[중복 고객 병합 · 원본 고객 ID: ${opts.sourceId} · 유입일시: ${opts.receivedAt}]\n${body}`;
+  const ymd = receivedAtToYmd(opts.receivedAt);
+  return `[중복 고객 병합 · 유입일: ${ymd}]\n${body}`;
 }
 
 export function mergeMemos(primary: MergeLeadCandidate, sources: MergeLeadCandidate[]): string {
@@ -151,10 +179,11 @@ export function mergeMemos(primary: MergeLeadCandidate, sources: MergeLeadCandid
   const ordered = [...sources].sort((a, b) => leadReceivedAt(a).localeCompare(leadReceivedAt(b)));
   for (const src of ordered) {
     const srcMemo = String(src.memo ?? "");
-    if (memoAlreadyMerged(memo, src.id, srcMemo)) continue;
+    const receivedAt = leadReceivedAt(src);
+    if (memoAlreadyMerged(memo, src.id, srcMemo, receivedAt)) continue;
     const block = formatMergedMemoBlock({
       sourceId: src.id,
-      receivedAt: leadReceivedAt(src),
+      receivedAt,
       memo: srcMemo,
     });
     memo = memo ? `${memo}\n\n${block}` : block;

@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { matchStaffByLabel } from "@/lib/crm/excelImport/logic";
 import {
   keywordsForZone,
   REGION_ZONE_NAMES,
@@ -135,24 +136,137 @@ export async function loadAssignmentRules(): Promise<AssignmentRule[]> {
   }));
 }
 
+/**
+ * 등록된 utm_source → 표시명(label/sheet_label)으로 활성 staff 매칭.
+ * 플랫폼 소스(youtube 등)처럼 담당자가 없으면 null.
+ */
+export async function resolveAssigneeIdFromUtmSource(
+  utmSource: string | null | undefined
+): Promise<{ staffId: string; staffName: string; utmLabel: string } | null> {
+  const raw = String(utmSource ?? "").trim();
+  if (!raw) return null;
+  const supabase = getSupabaseAdmin();
+  let utm: { value?: string; label?: string | null; sheet_label?: string | null; is_active?: boolean | null } | null =
+    null;
+  {
+    const { data, error } = await supabase
+      .from("utm_sources")
+      .select("value, label, sheet_label, is_active")
+      .eq("value", raw)
+      .maybeSingle();
+    if (error) {
+      const fb = await supabase
+        .from("utm_sources")
+        .select("value, label, sheet_label")
+        .eq("value", raw)
+        .maybeSingle();
+      if (fb.error) {
+        console.error("resolveAssigneeIdFromUtmSource:", error.message);
+        return null;
+      }
+      utm = fb.data ? { ...fb.data, is_active: true } : null;
+    } else {
+      utm = data;
+    }
+  }
+  if (!utm || utm.is_active === false) return null;
+
+  const { data: staffRows } = await supabase
+    .from("staff_users")
+    .select("id, name")
+    .eq("is_active", true)
+    .in("rank", ["sales", "manager"]);
+  const staff = (staffRows ?? []).map((s) => ({ id: s.id as string, name: String(s.name ?? "") }));
+  if (!staff.length) return null;
+
+  const candidates = [String(utm.label ?? "").trim(), String(utm.sheet_label ?? "").trim()].filter(Boolean);
+  for (const label of candidates) {
+    const hit = matchStaffByLabel(label, staff).staff;
+    if (hit) return { staffId: hit.id, staffName: hit.name, utmLabel: label };
+  }
+  return null;
+}
+
+async function assignLeadToStaff(opts: {
+  table: "leads" | "tylife_b2b";
+  leadId: string;
+  staffUserId: string;
+  reason: string;
+  changedByName: string;
+  regionZone?: string | null;
+}): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    assignee_id: opts.staffUserId,
+    assigned_at: now,
+    status: "대기",
+    status_changed_at: now,
+  };
+  if (opts.regionZone !== undefined) patch.region_zone = opts.regionZone;
+
+  const { data: updated, error: updErr } = await supabase
+    .from(opts.table)
+    .update(patch)
+    .eq("id", opts.leadId)
+    .is("assignee_id", null)
+    .select("id")
+    .maybeSingle();
+  if (updErr) {
+    console.error("assignLeadToStaff update:", updErr);
+    return false;
+  }
+  if (!updated?.id) return false; // 이미 배정됨
+
+  await supabase.from("lead_assignment_logs").insert({
+    lead_table: opts.table,
+    lead_id: opts.leadId,
+    from_assignee_id: null,
+    to_assignee_id: opts.staffUserId,
+    assigned_at: now,
+    changed_by: null,
+    changed_by_name: opts.changedByName,
+    reason: opts.reason,
+  });
+  return true;
+}
+
 export async function tryAutoAssignLead(opts: {
   table: "leads" | "tylife_b2b";
   leadId: string;
   region: string | null;
+  utmSource?: string | null;
 }): Promise<void> {
   try {
     const supabase = getSupabaseAdmin();
     const enabled = await isAutoAssignEnabled();
-    const rules = await loadAssignmentRules();
-    const rule = matchRule(opts.region, rules);
-    const zone = rule?.region_group ?? resolveRegionZone(opts.region);
+    const zone = resolveRegionZone(opts.region);
 
     await supabase
       .from(opts.table)
       .update({ region_zone: zone ?? null })
       .eq("id", opts.leadId);
 
-    if (!enabled || !rule) return;
+    if (!enabled) return;
+
+    // 1) UTM 등록 담당자 우선
+    const utmAssignee = await resolveAssigneeIdFromUtmSource(opts.utmSource);
+    if (utmAssignee) {
+      const ok = await assignLeadToStaff({
+        table: opts.table,
+        leadId: opts.leadId,
+        staffUserId: utmAssignee.staffId,
+        reason: "utm",
+        changedByName: `UTM자동배정(${utmAssignee.utmLabel})`,
+        regionZone: zone ?? null,
+      });
+      if (ok) return;
+    }
+
+    // 2) 지역 규칙 가중치 배정
+    const rules = await loadAssignmentRules();
+    const rule = matchRule(opts.region, rules);
+    if (!rule) return;
 
     const memberIds = rule.members.map((m) => m.staff_user_id).filter(Boolean);
     if (!memberIds.length) return;
@@ -169,34 +283,20 @@ export async function tryAutoAssignLead(opts: {
     const member = pickWeightedMember(eligible);
     if (!member) return;
 
-    const now = new Date().toISOString();
-    const { error: updErr } = await supabase
-      .from(opts.table)
-      .update({
-        assignee_id: member.staff_user_id,
-        assigned_at: now,
-        status: "대기",
-        status_changed_at: now,
-        region_zone: rule.region_group,
-      })
-      .eq("id", opts.leadId)
-      .is("assignee_id", null);
-    if (updErr) {
-      console.error("tryAutoAssignLead update:", updErr);
-      return;
-    }
-
-    await supabase.from("assignment_rule_members").update({ assigned_count: member.assigned_count + 1 }).eq("id", member.id);
-    await supabase.from("lead_assignment_logs").insert({
-      lead_table: opts.table,
-      lead_id: opts.leadId,
-      from_assignee_id: null,
-      to_assignee_id: member.staff_user_id,
-      assigned_at: now,
-      changed_by: null,
-      changed_by_name: "자동배정",
+    const assigned = await assignLeadToStaff({
+      table: opts.table,
+      leadId: opts.leadId,
+      staffUserId: member.staff_user_id,
       reason: "auto",
+      changedByName: "자동배정",
+      regionZone: rule.region_group,
     });
+    if (assigned) {
+      await supabase
+        .from("assignment_rule_members")
+        .update({ assigned_count: member.assigned_count + 1 })
+        .eq("id", member.id);
+    }
   } catch (e) {
     console.error("tryAutoAssignLead:", e);
   }
