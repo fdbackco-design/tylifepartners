@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "type-check": "tsc --noEmit",
-    "test": "tsx --test lib/crm/regionZones.test.ts lib/crm/scope.test.ts lib/crm/merge/logic.test.ts",
+    "test": "tsx --test lib/crm/regionZones.test.ts lib/crm/scope.test.ts lib/crm/merge/logic.test.ts lib/crm/excelImport/logic.test.ts",
     "start": "next start",
     "lint": "next lint"
   },
@@ -18,7 +18,8 @@
     "next": "14.2.18",
     "nodemailer": "^8.0.5",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^20",
