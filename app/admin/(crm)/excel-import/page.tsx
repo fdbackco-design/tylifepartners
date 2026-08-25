@@ -52,16 +52,27 @@ export default function ExcelAssigneeImportPage() {
       fd.set("mode", "preview");
       fd.set("file", file);
       const res = await fetch("/api/admin/leads/excel-import", { method: "POST", body: fd });
-      const data = await res.json();
+      const text = await res.text();
+      let data: { ok?: boolean; message?: string; job_id?: string; summary?: Record<string, number>; rows?: RowPreview[] };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        setError(
+          res.ok
+            ? "미리보기 응답을 해석하지 못했습니다."
+            : `미리보기 실패 (HTTP ${res.status}). 파일이 크면 서버 타임아웃일 수 있습니다.`
+        );
+        return;
+      }
       if (!res.ok || !data.ok) {
         setError(data.message || "미리보기 실패");
         return;
       }
-      setPreviewJobId(data.job_id);
-      setSummary(data.summary);
+      setPreviewJobId(data.job_id ?? null);
+      setSummary(data.summary ?? null);
       setRows(data.rows ?? []);
     } catch {
-      setError("네트워크 오류");
+      setError("네트워크 오류 (요청이 끊겼거나 시간이 초과되었습니다). 다시 시도해 주세요.");
     } finally {
       setLoading(false);
     }

@@ -70,6 +70,7 @@ export default function AccountsPage() {
 
   const [search, setSearch] = useState("");
   const [filterRank, setFilterRank] = useState("all");
+  const [filterParent, setFilterParent] = useState("all");
   const [filterRegion, setFilterRegion] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
@@ -99,6 +100,16 @@ export default function AccountsPage() {
   }, []);
 
   const managers = items.filter((u) => u.rank === "manager" && u.is_active);
+  const parentFilterOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const u of items) {
+      if (u.rank === "manager") byId.set(u.id, u.name);
+      if (u.parent_id && u.parent_name) byId.set(u.parent_id, u.parent_name);
+    }
+    return Array.from(byId.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  }, [items]);
   const regions = REGION_ZONE_NAMES;
 
   const filtered = useMemo(() => {
@@ -109,12 +120,18 @@ export default function AccountsPage() {
         if (!hay.includes(q) && !formatPhoneKorean(u.phone).includes(q)) return false;
       }
       if (filterRank !== "all" && u.rank !== filterRank) return false;
+      if (filterParent === "none") {
+        if (u.parent_id) return false;
+      } else if (filterParent !== "all") {
+        // 해당 매니저 본인 + 산하 영업자
+        if (u.id !== filterParent && u.parent_id !== filterParent) return false;
+      }
       if (filterRegion !== "all" && (u.region || "") !== filterRegion) return false;
       const status = u.account_status ?? (u.is_active ? "active" : "inactive");
       if (filterStatus !== "all" && status !== filterStatus) return false;
       return true;
     });
-  }, [items, search, filterRank, filterRegion, filterStatus]);
+  }, [items, search, filterRank, filterParent, filterRegion, filterStatus]);
 
   const stats = {
     total: items.length,
@@ -283,6 +300,15 @@ export default function AccountsPage() {
           <option value="all">직급 전체</option>
           <option value="manager">매니저</option>
           <option value="sales">영업자</option>
+        </CrmSelect>
+        <CrmSelect value={filterParent} onChange={(e) => setFilterParent(e.target.value)} aria-label="소속 필터" style={{ width: 160 }}>
+          <option value="all">소속 전체</option>
+          <option value="none">소속 없음</option>
+          {parentFilterOptions.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
         </CrmSelect>
         <CrmSelect value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)} aria-label="권역 필터" style={{ width: 140 }}>
           <option value="all">권역 전체</option>
