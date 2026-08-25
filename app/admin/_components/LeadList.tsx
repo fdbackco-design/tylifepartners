@@ -272,19 +272,32 @@ export default function LeadList({
   };
 
   const openMemo = async (row: LeadRow) => {
+    const openId = row.id;
     setMemoRow(row);
     memoSavedRef.current = row.memo ?? "";
     setMemoSaveStatus("idle");
     setMemoLogs([]);
     const cat = row.type === "후보자" ? "candidates" : "consumers";
-    const res = await fetch(`/api/admin/leads/${row.id}?category=${cat}`);
-    const data = await res.json();
-    if (data.ok) {
+    try {
+      const res = await fetch(`/api/admin/leads/${row.id}?category=${cat}`);
+      const data = await res.json();
+      if (!data.ok) return;
       setMemoLogs(data.memo_logs ?? []);
-      if (data.item) {
-        setMemoRow(data.item);
+      if (!data.item) return;
+      // 상세 로드 중에 사용자가 이미 편집(붙여넣기 등)했으면 서버 메모로 덮지 않음
+      const current = memoRowRef.current;
+      const dirty =
+        current?.id === openId && (current.memo ?? "") !== memoSavedRef.current;
+      if (dirty) {
+        setMemoRow((prev) =>
+          prev?.id === openId ? { ...data.item, memo: prev.memo } : prev
+        );
+      } else if (memoRowRef.current?.id === openId) {
         memoSavedRef.current = data.item.memo ?? "";
+        setMemoRow(data.item);
       }
+    } catch {
+      // 목록 메모로 편집 유지
     }
   };
 
@@ -294,13 +307,21 @@ export default function LeadList({
 
   useEffect(() => {
     if (!memoRow || !isMemoEditable(memoRow.status)) return;
-    if ((memoRow.memo ?? "") === memoSavedRef.current) return;
+    if ((memoRow.memo ?? "") === memoSavedRef.current) {
+      // 붙여넣기 직후 서버 응답으로 내용이 되돌아간 경우 등, saving에 고착되지 않게
+      setMemoSaveStatus((s) => (s === "saving" ? "idle" : s));
+      return;
+    }
 
-    setMemoSaveStatus("saving");
     const row = memoRow;
     const memo = memoRow.memo ?? "";
+    setMemoSaveStatus("saving");
     const t = window.setTimeout(() => {
       void (async () => {
+        // 디바운스 동안 다시 바뀌었으면 이 요청은 무시 (최신 effect가 처리)
+        if (memoRowRef.current?.id !== row.id || (memoRowRef.current.memo ?? "") !== memo) {
+          return;
+        }
         const cat = row.type === "후보자" ? "candidates" : "consumers";
         try {
           const res = await fetch(`/api/admin/leads/${row.id}?category=${cat}`, {
@@ -310,18 +331,37 @@ export default function LeadList({
           });
           const data = await res.json();
           if (!data.ok) {
-            setMemoSaveStatus("error");
+            if (memoRowRef.current?.id === row.id && (memoRowRef.current.memo ?? "") === memo) {
+              setMemoSaveStatus("error");
+            }
             return;
           }
-          memoSavedRef.current = memo;
-          if (data.item) {
-            setItems((prev) => prev.map((x) => (x.id === row.id ? { ...data.item, memo: memoRowRef.current?.id === row.id ? memoRowRef.current.memo : data.item.memo } : x)));
-          }
+          // 저장 성공 시점에도 최신 입력이면 saved 반영
           if (memoRowRef.current?.id === row.id && (memoRowRef.current.memo ?? "") === memo) {
+            memoSavedRef.current = memo;
             setMemoSaveStatus("saved");
+          } else if (memoRowRef.current?.id === row.id) {
+            // 더 최신 입력이 있음 → saved ref만 이 시점 값으로 올리지 않음 (다음 저장이 이어짐)
+          } else {
+            memoSavedRef.current = memo;
+          }
+          if (data.item) {
+            setItems((prev) =>
+              prev.map((x) =>
+                x.id === row.id
+                  ? {
+                      ...data.item,
+                      memo:
+                        memoRowRef.current?.id === row.id ? memoRowRef.current.memo : data.item.memo,
+                    }
+                  : x
+              )
+            );
           }
         } catch {
-          setMemoSaveStatus("error");
+          if (memoRowRef.current?.id === row.id && (memoRowRef.current.memo ?? "") === memo) {
+            setMemoSaveStatus("error");
+          }
         }
       })();
     }, 700);
@@ -1001,11 +1041,11 @@ export default function LeadList({
               </button>
             </div>
             <textarea
-              value={memoRow.memo}
+              value={memoRow.memo ?? ""}
               disabled={!isMemoEditable(memoRow.status)}
               onChange={(e) => {
-                setMemoRow({ ...memoRow, memo: e.target.value });
-                setMemoSaveStatus("saving");
+                const value = e.target.value;
+                setMemoRow((prev) => (prev ? { ...prev, memo: value } : prev));
               }}
               aria-label="메모 내용"
             />
