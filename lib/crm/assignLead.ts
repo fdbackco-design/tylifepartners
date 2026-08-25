@@ -1,71 +1,100 @@
 import { appendStatusMemo } from "@/lib/crm/memo";
-import { loadStaffMaps } from "@/lib/crm/mapLead";
 import { assertLeadMutable } from "@/lib/crm/merge/execute";
 import { canChangeAssignee } from "@/lib/crm/scope";
 import { normalizeStatus, tableForCategory } from "@/lib/crm/status";
 import type { LeadCategory, SessionUser } from "@/lib/crm/types";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
+type LeadAssigneeSnapshot = {
+  id: string;
+  assignee_id?: string | null;
+  status?: string | null;
+  memo?: string | null;
+  merge_status?: string | null;
+};
+
 export async function changeLeadAssignee(opts: {
   session: SessionUser;
   id: string;
   category: LeadCategory;
   assigneeId: string | null;
+  /** PATCH 등에서 이미 로드한 행이면 재조회 생략 */
+  current?: LeadAssigneeSnapshot | null;
+  /** 이미 병합 여부 검증했으면 skip */
+  skipMutableCheck?: boolean;
 }): Promise<{ ok: true } | { ok: false; message: string; status: number }> {
   if (!canChangeAssignee(opts.session)) {
     return { ok: false, message: "담당자를 변경할 권한이 없습니다.", status: 403 };
   }
 
   const table = tableForCategory(opts.category);
-  const mutable = await assertLeadMutable(table, opts.id);
-  if (!mutable.ok) {
-    return { ok: false, message: mutable.message, status: 409 };
+  if (!opts.skipMutableCheck) {
+    const mutable = await assertLeadMutable(table, opts.id);
+    if (!mutable.ok) {
+      return { ok: false, message: mutable.message, status: 409 };
+    }
   }
+
   const supabase = getSupabaseAdmin();
-  const { data: current, error: loadErr } = await (supabase.from(table) as any)
-    .select("id, assignee_id, status, memo")
-    .eq("id", opts.id)
-    .maybeSingle();
-
-  if (loadErr || !current) {
-    return { ok: false, message: "리드를 찾을 수 없습니다.", status: 404 };
+  let current = opts.current ?? null;
+  if (!current) {
+    const { data, error: loadErr } = await (supabase.from(table) as any)
+      .select("id, assignee_id, status, memo")
+      .eq("id", opts.id)
+      .maybeSingle();
+    if (loadErr || !data) {
+      return { ok: false, message: "리드를 찾을 수 없습니다.", status: 404 };
+    }
+    current = data as LeadAssigneeSnapshot;
   }
 
-  const curAssignee = (current as { assignee_id?: string | null }).assignee_id ?? null;
+  const curAssignee = current.assignee_id ?? null;
   const nextAssignee = opts.assigneeId;
   if (nextAssignee === curAssignee) return { ok: true };
 
   const now = new Date();
   const nowIso = now.toISOString();
-  let nextMemo = String((current as { memo?: string | null }).memo ?? "");
-  const currentStatus = normalizeStatus((current as { status?: string }).status);
+  let nextMemo = String(current.memo ?? "");
+  const currentStatus = normalizeStatus(current.status);
   let nextStatus = currentStatus;
   const patch: Record<string, unknown> = {
     assignee_id: nextAssignee,
     assigned_at: nowIso,
   };
 
-  const { staffById } = await loadStaffMaps();
-  await supabase.from("lead_memo_logs").insert({
-    lead_table: table,
-    lead_id: opts.id,
-    assignee_id: curAssignee,
-    assignee_name: curAssignee ? staffById.get(curAssignee)?.name ?? "" : "",
-    memo: nextMemo,
-  });
-  await supabase.from("lead_assignment_logs").insert({
-    lead_table: table,
-    lead_id: opts.id,
-    from_assignee_id: curAssignee,
-    to_assignee_id: nextAssignee,
-    assigned_at: nowIso,
-    changed_by: opts.session.userId,
-    changed_by_name: opts.session.name,
-    reason: "manual",
-  });
+  // 이전 담당자 표시용 이름만 최소 조회
+  let curAssigneeName = "";
+  if (curAssignee) {
+    const { data: staffRow } = await supabase.from("staff_users").select("name").eq("id", curAssignee).maybeSingle();
+    curAssigneeName = staffRow?.name ?? "";
+  }
+
+  const writes: Array<PromiseLike<unknown>> = [
+    supabase.from("lead_assignment_logs").insert({
+      lead_table: table,
+      lead_id: opts.id,
+      from_assignee_id: curAssignee,
+      to_assignee_id: nextAssignee,
+      assigned_at: nowIso,
+      changed_by: opts.session.userId,
+      changed_by_name: opts.session.name,
+      reason: "manual",
+    }),
+  ];
+
+  if (nextMemo.trim()) {
+    writes.push(
+      supabase.from("lead_memo_logs").insert({
+        lead_table: table,
+        lead_id: opts.id,
+        assignee_id: curAssignee,
+        assignee_name: curAssigneeName,
+        memo: nextMemo,
+      })
+    );
+  }
 
   if (nextAssignee && !curAssignee && (nextStatus === "배정전" || nextStatus === "대기")) {
-    // 미배정 → 담당자 지정: 대기로 두고 대기 일차를 오늘부터 시작
     if (nextStatus === "배정전") {
       nextMemo = appendStatusMemo(nextMemo, "대기", now);
       patch.memo = nextMemo;
@@ -73,36 +102,45 @@ export async function changeLeadAssignee(opts: {
     nextStatus = "대기";
     patch.status = "대기";
     patch.status_changed_at = nowIso;
-    await supabase.from("lead_status_logs").insert({
-      lead_table: table,
-      lead_id: opts.id,
-      from_status: currentStatus,
-      to_status: "대기",
-      assignee_id: nextAssignee,
-      changed_at: nowIso,
-      changed_by_name: opts.session.name,
-    });
+    writes.push(
+      supabase.from("lead_status_logs").insert({
+        lead_table: table,
+        lead_id: opts.id,
+        from_status: currentStatus,
+        to_status: "대기",
+        assignee_id: nextAssignee,
+        changed_at: nowIso,
+        changed_by_name: opts.session.name,
+      })
+    );
   } else if (nextAssignee && nextStatus === "배정전") {
     nextMemo = appendStatusMemo(nextMemo, "대기", now);
     nextStatus = "대기";
     patch.status = "대기";
     patch.status_changed_at = nowIso;
     patch.memo = nextMemo;
-    await supabase.from("lead_status_logs").insert({
-      lead_table: table,
-      lead_id: opts.id,
-      from_status: currentStatus,
-      to_status: "대기",
-      assignee_id: nextAssignee,
-      changed_at: nowIso,
-      changed_by_name: opts.session.name,
-    });
+    writes.push(
+      supabase.from("lead_status_logs").insert({
+        lead_table: table,
+        lead_id: opts.id,
+        from_status: currentStatus,
+        to_status: "대기",
+        assignee_id: nextAssignee,
+        changed_at: nowIso,
+        changed_by_name: opts.session.name,
+      })
+    );
   }
 
-  const { error: updErr } = await supabase.from(table).update(patch).eq("id", opts.id);
-  if (updErr) {
-    console.error("changeLeadAssignee:", updErr);
-    return { ok: false, message: "저장 중 오류가 발생했습니다.", status: 500 };
+  writes.push(supabase.from(table).update(patch).eq("id", opts.id));
+
+  const results = await Promise.all(writes);
+  for (const r of results) {
+    const err = (r as { error?: { message?: string } | null })?.error;
+    if (err) {
+      console.error("changeLeadAssignee:", err);
+      return { ok: false, message: "저장 중 오류가 발생했습니다.", status: 500 };
+    }
   }
   return { ok: true };
 }

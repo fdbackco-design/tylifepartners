@@ -12,9 +12,10 @@ type Props = {
   history?: string[];
   onChange: (id: string | null) => void;
   disabled?: boolean;
+  busy?: boolean;
 };
 
-export default function AssigneePicker({ value, staff, teamName, history, onChange, disabled }: Props) {
+export default function AssigneePicker({ value, staff, teamName, history, onChange, disabled, busy }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const root = useRef<HTMLDivElement>(null);
@@ -22,6 +23,7 @@ export default function AssigneePicker({ value, staff, teamName, history, onChan
   const label = formatAssigneeWithTeam(current?.name || "", teamName);
   const historyText =
     history && history.length >= 2 ? history.join(" -> ") : "";
+  const locked = Boolean(disabled || busy);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -39,23 +41,26 @@ export default function AssigneePicker({ value, staff, teamName, history, onChan
   }, [open]);
 
   return (
-    <div ref={root} className="crm-assignee-picker">
+    <div ref={root} className={`crm-assignee-picker${busy ? " is-busy" : ""}`}>
       <button
         type="button"
         className="crm-btn crm-assignee-picker-btn"
-        disabled={disabled}
-        onClick={() => !disabled && setOpen((v) => !v)}
+        disabled={locked}
+        onClick={() => !locked && setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-busy={busy || undefined}
       >
+        {busy ? <span className="crm-assignee-picker-spinner" aria-hidden /> : null}
         <span className="crm-assignee-picker-label">{value ? label : "미배정"}</span>
+        {busy ? <span className="crm-assignee-picker-busy-text">저장 중</span> : null}
       </button>
       {historyText ? (
         <div className="crm-assignee-picker-history" title={historyText}>
           {historyText}
         </div>
       ) : null}
-      {open && (
+      {open && !busy && (
         <div className="crm-popover" role="listbox" style={{ minWidth: 220 }}>
           <input
             className="crm-input"

@@ -60,12 +60,34 @@ export async function POST(request: NextRequest) {
       const jobId = String(form.get("job_id") ?? "");
       if (!jobId) return NextResponse.json({ ok: false, message: "job_id 필요" }, { status: 400 });
       const supabase = getSupabaseAdmin();
-      const { data } = await supabase
-        .from("lead_excel_import_row_logs")
-        .select("*")
-        .eq("job_id", jobId)
-        .order("excel_row_number", { ascending: true });
-      const rows = (data ?? []).map((r) => ({
+      const pageSize = 1000;
+      const all: Array<{
+        excel_row_number: number;
+        excel_name: string | null;
+        normalized_phone: string | null;
+        excel_inbound_date: string | null;
+        primary_lead_id: string | null;
+        lead_table: string | null;
+        status: string;
+        reasons: string[] | null;
+        assignment_applied: number[] | null;
+        assignment_skipped: number[] | null;
+        memo_applied: number[] | null;
+        memo_skipped: number[] | null;
+      }> = [];
+      for (let from = 0; ; from += pageSize) {
+        const to = from + pageSize - 1;
+        const { data, error } = await supabase
+          .from("lead_excel_import_row_logs")
+          .select("*")
+          .eq("job_id", jobId)
+          .order("excel_row_number", { ascending: true })
+          .range(from, to);
+        if (error) throw new Error(error.message);
+        all.push(...((data ?? []) as typeof all));
+        if (!data || data.length < pageSize) break;
+      }
+      const rows = all.map((r) => ({
         엑셀행: r.excel_row_number,
         고객명: r.excel_name,
         연락처: r.normalized_phone,
