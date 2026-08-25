@@ -17,6 +17,7 @@ import {
 } from "@/lib/crm/merge/reinquiry";
 import { syncLeadToCrm } from "@/lib/crmSync";
 import { parseMetaIdsFromBody } from "@/lib/utm";
+import { notifyAdminsNewLead } from "@/lib/webPush";
 
 /** 클라이언트에서 보낸 유입 경로 (예: /, /v2, /me). 잘못된 값은 무시 */
 function normalizeEntryPage(raw: unknown): string | null {
@@ -219,6 +220,16 @@ export async function POST(request: NextRequest) {
         })
       );
 
+      runAfterResponse(
+        notifyAdminsNewLead({
+          kind: "consumers",
+          name,
+          phone,
+          leadId: samePerson.id,
+          entryPage,
+        })
+      );
+
       return NextResponse.json({ ok: true, reinquiry: true, lead_id: samePerson.id });
     }
 
@@ -360,6 +371,15 @@ export async function POST(request: NextRequest) {
           utmCampaign: utmCampaign || null,
           utmContent: utmContent || null,
           utmTerm: utmTerm || null,
+        })
+      );
+      runAfterResponse(
+        notifyAdminsNewLead({
+          kind: "consumers",
+          name,
+          phone,
+          leadId: insertedLead.id,
+          entryPage,
         })
       );
     }

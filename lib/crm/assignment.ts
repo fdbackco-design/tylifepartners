@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { notifyAssigneeAssigned } from "@/lib/webPush";
 import { matchStaffByLabel } from "@/lib/crm/excelImport/logic";
 import {
   keywordsForZone,
@@ -210,7 +211,7 @@ async function assignLeadToStaff(opts: {
     .update(patch)
     .eq("id", opts.leadId)
     .is("assignee_id", null)
-    .select("id")
+    .select("id, name, phone")
     .maybeSingle();
   if (updErr) {
     console.error("assignLeadToStaff update:", updErr);
@@ -228,6 +229,15 @@ async function assignLeadToStaff(opts: {
     changed_by_name: opts.changedByName,
     reason: opts.reason,
   });
+
+  void notifyAssigneeAssigned({
+    assigneeId: opts.staffUserId,
+    kind: opts.table === "tylife_b2b" ? "candidates" : "consumers",
+    name: String((updated as { name?: string }).name ?? ""),
+    phone: String((updated as { phone?: string }).phone ?? ""),
+    leadId: opts.leadId,
+  }).catch((e) => console.warn("[webPush] auto-assign notify:", e));
+
   return true;
 }
 

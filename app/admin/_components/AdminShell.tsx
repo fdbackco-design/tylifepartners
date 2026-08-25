@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { CrmSwitch } from "@/app/admin/_components/crm/ui";
+import PushSubscribeButton from "@/app/admin/_components/PushSubscribeButton";
 import { canAccessAdminPath, defaultAdminHome } from "@/lib/crm/scope";
 import type { SessionUser } from "@/lib/crm/types";
 
@@ -147,6 +148,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             <span>
               {user.name} · {rankLabel}
             </span>
+            <PushSubscribeButton />
             <button type="button" className="crm-btn" onClick={logout}>
               로그아웃
             </button>

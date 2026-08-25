@@ -26,6 +26,7 @@ import { getManagedLandingById } from "@/lib/managedLandings/store";
 import { verifyAdminSession } from "@/lib/adminSession";
 import { parseBaseRegion } from "@/lib/regions";
 import { parseMetaIdsFromBody } from "@/lib/utm";
+import { notifyAdminsNewLead } from "@/lib/webPush";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
 const ALLOWED_JOB_RANKS = new Set(["지점장 이상", "팀장 이상", "FC"]);
@@ -256,6 +257,15 @@ export async function POST(request: NextRequest) {
           jobRankForDb: jobRankStored,
         }).catch((e) => console.error("business reinquiry side effects:", e))
       );
+      runAfterResponse(
+        notifyAdminsNewLead({
+          kind: "candidates",
+          name,
+          phone,
+          leadId: samePerson.id,
+          entryPage,
+        })
+      );
       return NextResponse.json({ ok: true, reinquiry: true, lead_id: samePerson.id });
     }
 
@@ -375,6 +385,13 @@ export async function POST(request: NextRequest) {
               utmCampaign: utmCampaign || null,
               utmContent: utmContent || null,
               utmTerm: utmTerm || null,
+            });
+            await notifyAdminsNewLead({
+              kind: "candidates",
+              name,
+              phone,
+              leadId: insertedLead.id,
+              entryPage,
             });
           }
         }
