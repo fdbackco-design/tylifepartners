@@ -1,3 +1,5 @@
+import { getSupabaseAdmin } from "@/lib/supabase";
+
 /** 숫자만 남긴 연락처 (01012345678) */
 export function normalizePhoneDigits(phone: string): string {
   return String(phone ?? "").replace(/\D/g, "");
@@ -39,17 +41,41 @@ export function isGoogleSheetPhoneBlacklisted(phone: string): boolean {
 }
 
 /**
- * 상담 신청 자체를 차단할 연락처 (LEAD_BLOCKED_PHONES).
- * true면 DB 저장·구글 시트·담당자 분배·이메일·CRM 동기화를 전부 건너뛰고
- * 고객에게는 기존과 동일한 성공 응답만 반환한다.
- *
- * 값은 개인정보이므로 소스코드에 하드코딩하지 않고 환경변수로만 관리한다.
- * (모듈 캐시를 쓰므로 값 변경 시 재배포가 필요하다)
+ * 상담 신청 자체를 차단할 연락처 (LEAD_BLOCKED_PHONES env).
+ * DB 블랙리스트는 isLeadSubmissionBlockedAsync 사용.
  */
 export function isLeadSubmissionBlocked(phone: string): boolean {
   const digits = normalizePhoneDigits(phone);
   if (!digits) return false;
   return getBlockedLeadPhones().has(digits);
+}
+
+/**
+ * env + DB(lead_blacklist) 기준 상담 신청 차단.
+ * true면 DB 저장·시트·분배·이메일·CRM을 건너뛰고 성공 응답만 반환.
+ */
+export async function isLeadSubmissionBlockedAsync(phone: string): Promise<boolean> {
+  if (isLeadSubmissionBlocked(phone)) return true;
+  const digits = normalizePhoneDigits(phone);
+  if (digits.length < 10) return false;
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("lead_blacklist")
+      .select("id")
+      .eq("normalized_phone", digits)
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.error("isLeadSubmissionBlockedAsync:", error.message);
+      return false;
+    }
+    return Boolean(data?.id);
+  } catch (e) {
+    console.error("isLeadSubmissionBlockedAsync:", e);
+    return false;
+  }
 }
 
 /** 로그용 마스킹 (01012345678 → 010****5678). 로그에 전체 번호를 남기지 않기 위함 */

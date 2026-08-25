@@ -5,7 +5,7 @@ import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissio
 import { isLanding0623EntryPage, normalizeLanding0623EntryPage } from "@/lib/landing0623";
 import { isLanding0715EntryPage, normalizeLanding0715EntryPage } from "@/lib/landing0715";
 import { formatPhoneKorean } from "@/lib/phone";
-import { isLeadSubmissionBlocked, maskPhoneForLog } from "@/lib/phoneBlacklist";
+import { isLeadSubmissionBlockedAsync, maskPhoneForLog } from "@/lib/phoneBlacklist";
 import { runAfterResponse } from "@/lib/runAfterResponse";
 import { syncLeadToCrm } from "@/lib/crmSync";
 import { tryAutoAssignLead } from "@/lib/crm/assignment";
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       );
     }
     // 차단 대상 연락처: DB 저장·구글 시트·담당자 분배·이메일·CRM 전부 건너뛰고 성공 응답만 반환
-    if (isLeadSubmissionBlocked(phone)) {
+    if (await isLeadSubmissionBlockedAsync(phone)) {
       console.warn("[leadBlock] 차단 연락처 신청 차단(B2B):", maskPhoneForLog(phone));
       return NextResponse.json({ ok: true });
     }

@@ -300,7 +300,7 @@ export default function Landing0623Page({
                 maskPosition: "center",
               }}
             />
-            상품 소개서 받아보기
+            상품 소개서 받기
           </button>
         </div>
       )}
