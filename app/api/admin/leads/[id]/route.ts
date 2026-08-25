@@ -127,11 +127,29 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       id,
       category,
       assigneeId: nextAssignee,
+      current: current as { id: string; assignee_id?: string | null; status?: string | null; memo?: string | null },
+      skipMutableCheck: true,
     });
     if (!assignResult.ok) {
       return NextResponse.json({ ok: false, message: assignResult.message }, { status: assignResult.status });
     }
     assigneeChanged = true;
+
+    // 담당자만 바꾼 경우: 재조회·스태프·이력을 병렬로 끝내고 즉시 응답
+    if (body.status == null && body.memo == null && body.meeting_at === undefined) {
+      const [{ data: fresh }, { staffById, parentNameById }] = await Promise.all([
+        (supabase.from(table) as any).select(select).eq("id", id).maybeSingle(),
+        loadStaffMaps(),
+      ]);
+      const item = mapLeadRow((fresh ?? current) as Record<string, unknown>, category, staffById, parentNameById);
+      const [withHistory] = await attachAssigneeHistories([item]);
+      return NextResponse.json({
+        ok: true,
+        item: withHistory,
+        allowed_statuses: allowedStatusesFor(session, withHistory.status),
+      });
+    }
+
     const { data: refreshed } = await (supabase.from(table) as any).select(select).eq("id", id).maybeSingle();
     if (refreshed) Object.assign(current, refreshed);
     nextMemo = String((current as { memo?: string | null }).memo ?? "");

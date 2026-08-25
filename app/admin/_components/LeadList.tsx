@@ -64,6 +64,7 @@ export default function LeadList({
   const [pageSize, setPageSize] = useState(Number(searchParams.get("limit") || 20));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [patchingAssigneeIds, setPatchingAssigneeIds] = useState<Set<string>>(() => new Set());
   const [assigneeIds, setAssigneeIds] = useState(csvParam(searchParams.get("assignee_ids")));
   const [teamIds, setTeamIds] = useState(csvParam(searchParams.get("team_ids")));
   const [regions, setRegions] = useState(csvParam(searchParams.get("regions")));
@@ -220,6 +221,54 @@ export default function LeadList({
     }
     alert(data.message || "저장 실패");
     return null;
+  };
+
+  const patchAssignee = async (row: LeadRow, nextId: string | null) => {
+    if (patchingAssigneeIds.has(row.id)) return;
+    if ((row.assignee_id ?? null) === nextId) return;
+
+    const snapshot = row;
+    const nextStaff = nextId ? staff.find((s) => s.id === nextId) : null;
+    const parentName = nextStaff?.parent_id
+      ? staff.find((s) => s.id === nextStaff.parent_id)?.name ?? row.team_name
+      : "";
+    const optimistic: LeadRow = {
+      ...row,
+      assignee_id: nextId,
+      assignee_name: nextStaff?.name ?? "",
+      team_name: parentName,
+      assignee_history:
+        nextStaff?.name && row.assignee_name && row.assignee_name !== nextStaff.name
+          ? [...(row.assignee_history?.length ? row.assignee_history : [row.assignee_name]), nextStaff.name]
+          : row.assignee_history,
+    };
+    // 미배정→지정 시 배정전은 대기로 바뀌는 서버 규칙과 UI를 맞춤
+    if (nextId && row.status === "배정전") {
+      optimistic.status = "대기";
+    }
+
+    setPatchingAssigneeIds((prev) => {
+      const next = new Set(prev);
+      next.add(row.id);
+      return next;
+    });
+    setItems((prev) => prev.map((x) => (x.id === row.id ? optimistic : x)));
+
+    try {
+      const saved = await patch(row, { assignee_id: nextId });
+      if (!saved) {
+        setItems((prev) => prev.map((x) => (x.id === row.id ? snapshot : x)));
+      }
+    } catch {
+      setItems((prev) => prev.map((x) => (x.id === row.id ? snapshot : x)));
+      alert("네트워크 오류로 담당자 변경에 실패했습니다.");
+    } finally {
+      setPatchingAssigneeIds((prev) => {
+        const next = new Set(prev);
+        next.delete(row.id);
+        return next;
+      });
+    }
   };
 
   const openMemo = async (row: LeadRow) => {
@@ -767,7 +816,8 @@ export default function LeadList({
                             staff={staff}
                             teamName={row.team_name}
                             history={isAdmin ? row.assignee_history : undefined}
-                            onChange={(id) => void patch(row, { assignee_id: id })}
+                            busy={patchingAssigneeIds.has(row.id)}
+                            onChange={(id) => void patchAssignee(row, id)}
                           />
                         ) : (
                           <div>
@@ -875,7 +925,8 @@ export default function LeadList({
                               staff={staff}
                               teamName={row.team_name}
                               history={isAdmin ? row.assignee_history : undefined}
-                              onChange={(id) => void patch(row, { assignee_id: id })}
+                              busy={patchingAssigneeIds.has(row.id)}
+                              onChange={(id) => void patchAssignee(row, id)}
                             />
                           ) : (
                             <span className="crm-lead-mobile-assignee-text">
