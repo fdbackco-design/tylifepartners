@@ -79,10 +79,6 @@ export async function POST(request: NextRequest) {
     }
     if (rank === "manager") parentId = null;
 
-    if (rank === "sales" && !region) {
-      return NextResponse.json({ ok: false, message: "영업자의 담당 권역을 선택해 주세요." }, { status: 400 });
-    }
-
     const loginId = credentialsFromPhone(phone);
     if (loginId.length < 8) {
       return NextResponse.json({ ok: false, message: "휴대폰번호 형식이 올바르지 않습니다." }, { status: 400 });

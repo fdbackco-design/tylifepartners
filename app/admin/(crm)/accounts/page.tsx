@@ -156,21 +156,18 @@ export default function AccountsPage() {
       setFormError("휴대폰번호는 010-0000-0000 형식이어야 합니다.");
       return;
     }
-    const effectiveRank = editUser?.rank ?? (me?.rank === "manager" ? "sales" : rank);
-    if (effectiveRank === "sales" && !region) {
-      setFormError("영업자의 담당 권역을 선택해 주세요.");
-      return;
-    }
     setSaving(true);
     try {
       if (editUser) {
+        const nextRank = me?.rank === "admin" ? rank : editUser.rank;
         const res = await fetch(`/api/admin/users/${editUser.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: name.trim(),
             region: region.trim() || null,
-            parent_id: rank === "sales" ? parentId || null : null,
+            ...(me?.rank === "admin" ? { rank: nextRank } : {}),
+            parent_id: nextRank === "sales" ? parentId || null : null,
           }),
         });
         const data = await res.json();
@@ -405,13 +402,37 @@ export default function AccountsPage() {
             inputMode="numeric"
           />
         </CrmField>
+        {me?.rank === "admin" && (
+          <CrmField
+            label="직급"
+            htmlFor="acc-rank"
+            hint={
+              editUser?.rank === "manager" && rank === "sales"
+                ? "매니저 → 영업자로 바꾸면 기존 산하 영업자의 소속이 해제됩니다."
+                : undefined
+            }
+          >
+            <CrmSelect
+              id="acc-rank"
+              value={rank}
+              onChange={(e) => {
+                const next = e.target.value;
+                setRank(next);
+                if (next === "manager") setParentId("");
+              }}
+            >
+              <option value="manager">매니저</option>
+              <option value="sales">영업자</option>
+            </CrmSelect>
+          </CrmField>
+        )}
         <CrmField
           label="담당 권역"
           htmlFor="acc-region"
-          hint={rank === "sales" || editUser?.rank === "sales" || me?.rank === "manager" ? "영업자의 자동 배정 권역입니다." : "매니저는 선택 사항입니다."}
+          hint="영업자·매니저 모두 권역 목록에서 선택할 수 있습니다. 자동 배정 시 해당 권역 우선 배정에 사용됩니다."
         >
           <CrmSelect id="acc-region" value={region} onChange={(e) => setRegion(e.target.value)}>
-            <option value="">권역 선택</option>
+            <option value="">권역 선택 (선택 사항)</option>
             {REGION_ZONE_NAMES.map((z) => (
               <option key={z} value={z}>
                 {z}
@@ -419,23 +440,17 @@ export default function AccountsPage() {
             ))}
           </CrmSelect>
         </CrmField>
-        {me?.rank === "admin" && !editUser && (
-          <CrmField label="직급" htmlFor="acc-rank">
-            <CrmSelect id="acc-rank" value={rank} onChange={(e) => setRank(e.target.value)}>
-              <option value="manager">매니저</option>
-              <option value="sales">영업자</option>
-            </CrmSelect>
-          </CrmField>
-        )}
-        {me?.rank === "admin" && (editUser ? editUser.rank === "sales" : rank === "sales") && (
+        {me?.rank === "admin" && rank === "sales" && (
           <CrmField label="소속 매니저" htmlFor="acc-parent" hint="영업자가 소속될 매니저를 선택합니다.">
             <CrmSelect id="acc-parent" value={parentId} onChange={(e) => setParentId(e.target.value)}>
               <option value="">소속 매니저 없음</option>
-              {managers.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
+              {managers
+                .filter((m) => m.id !== editUser?.id)
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
             </CrmSelect>
           </CrmField>
         )}
