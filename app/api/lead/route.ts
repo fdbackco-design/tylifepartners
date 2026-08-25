@@ -118,6 +118,14 @@ export async function POST(request: NextRequest) {
         console.error("reinquiry attach failed:", attached.message);
       } else {
         console.info("[lead] reinquiry attached to existing lead", samePerson.id);
+        if (!samePerson.assignee_id) {
+          await tryAutoAssignLead({
+            table: "leads",
+            leadId: samePerson.id,
+            region: regionRaw,
+            utmSource,
+          });
+        }
       }
 
       {
@@ -239,6 +247,7 @@ export async function POST(request: NextRequest) {
         table: "leads",
         leadId: insertedLead.id,
         region: regionRaw,
+        utmSource,
       });
     }
 

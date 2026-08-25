@@ -154,7 +154,10 @@ export async function buildMergePreview(table: LeadTable): Promise<MergePreviewR
     const memoBlocks =
       memoPreview === primaryMemo
         ? 0
-        : memoPreview.split("[중복 고객 병합 · 원본 고객 ID:").length - 1;
+        : Math.max(
+            memoPreview.split("[중복 고객 병합 · 유입일:").length - 1,
+            memoPreview.split("[중복 고객 병합 · 원본 고객 ID:").length - 1
+          );
 
     const conflicts: string[] = [];
     if (classified.skipReasons.includes("name_mismatch")) {

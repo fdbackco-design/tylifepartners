@@ -75,5 +75,5 @@ export async function loadStaffMaps() {
     parentNameById.set(r.id, r.name);
     if (!staffById.has(r.id)) staffById.set(r.id, { id: r.id, name: r.name, parent_id: r.parent_id });
   }
-  return { staffById, parentNameById, staff: all ?? [] };
+  return { staffById, parentNameById, staff: (data ?? []) as Array<StaffLite & { rank?: string; is_active?: boolean }> };
 }

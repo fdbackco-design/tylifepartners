@@ -202,6 +202,14 @@ export async function POST(request: NextRequest) {
         utm_term: utmTerm || null,
         receivedAtIso: nowIso,
       });
+      if (!samePerson.assignee_id) {
+        await tryAutoAssignLead({
+          table: "tylife_b2b",
+          leadId: samePerson.id,
+          region: regionForDb,
+          utmSource,
+        });
+      }
       runAfterResponse(
         processBusinessLeadSideEffects({
           dateKstYmd: formatKstYmd(new Date()),
@@ -275,6 +283,7 @@ export async function POST(request: NextRequest) {
         table: "tylife_b2b",
         leadId: insertedLead.id,
         region: regionForDb,
+        utmSource,
       });
     }
 
