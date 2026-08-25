@@ -6,6 +6,7 @@ import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
 import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { useUTM } from "@/lib/useUTM";
+import { attributionFieldsFromUtm } from "@/lib/utm";
 import {
   BASE_REGIONS,
   formatRegionValue,
@@ -123,11 +124,7 @@ export default function SidejobLandingPage() {
           phone: rawPhone,
           entry_page: "sidejob",
           source: utm.utm_source || "sidejob",
-          utm_source: utm.utm_source || null,
-          utm_medium: utm.utm_medium || null,
-          utm_campaign: utm.utm_campaign || null,
-          utm_content: utm.utm_content || null,
-          utm_term: utm.utm_term || null,
+          ...attributionFieldsFromUtm(utm),
           marketing_consent: marketingChecked ? 1 : null,
           region: formatRegionValue(region, regionDetailEnabled ? district : null),
           available_time: availableTime,
@@ -650,4 +647,3 @@ export default function SidejobLandingPage() {
     </main>
   );
 }
-

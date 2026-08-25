@@ -21,7 +21,12 @@ const SECONDARY_TABS = [
   { href: "/admin/blacklist", label: "블랙리스트", ranks: ["admin"] as const },
   { href: "/admin/utm", label: "UTM", ranks: ["admin"] as const },
   { href: "/admin/landings", label: "랜딩", ranks: ["admin"] as const },
+  { href: "/admin/landing-analytics", label: "스크롤 히트맵", ranks: ["admin"] as const },
 ];
+
+function isActiveTab(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -149,7 +154,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </div>
         <nav className="crm-tabs" aria-label="주요 메뉴">
           {primaryTabs.map((t) => (
-            <Link key={t.href} href={t.href} className={`crm-tab${pathname.startsWith(t.href) ? " active" : ""}`}>
+            <Link key={t.href} href={t.href} className={`crm-tab${isActiveTab(pathname, t.href) ? " active" : ""}`}>
               {t.label}
             </Link>
           ))}
@@ -157,7 +162,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             <>
               <span className="crm-tab-divider" aria-hidden />
               {secondaryTabs.map((t) => (
-                <Link key={t.href} href={t.href} className={`crm-tab${pathname.startsWith(t.href) ? " active" : ""}`}>
+                <Link key={t.href} href={t.href} className={`crm-tab${isActiveTab(pathname, t.href) ? " active" : ""}`}>
                   {t.label}
                 </Link>
               ))}

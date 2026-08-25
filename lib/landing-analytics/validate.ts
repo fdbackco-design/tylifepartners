@@ -13,7 +13,9 @@ const UUID_RE =
 const ALLOWED_KEYS = new Set<string>([
   "landing_key",
   "session_id",
+  "visitor_id",
   "event_type",
+  "event_key",
   "page_url",
   "referrer",
   "utm_source",
@@ -74,10 +76,17 @@ export function parseTrackBody(raw: unknown): { ok: true; data: LandingTrackPayl
     return { ok: false, message: "Invalid session_id" };
   }
 
+  const visitor_id = body.visitor_id;
+  if (visitor_id != null && visitor_id !== "" && (typeof visitor_id !== "string" || !UUID_RE.test(visitor_id))) {
+    return { ok: false, message: "Invalid visitor_id" };
+  }
+
   const event_type = body.event_type;
   if (typeof event_type !== "string" || !LANDING_EVENT_TYPES.includes(event_type as LandingEventType)) {
     return { ok: false, message: "Invalid event_type" };
   }
+
+  const event_key = clampStr(body.event_key, 120);
 
   const depth = clampNum(body.depth, 0, 100);
   const max_depth = clampNum(body.max_depth, 0, 100);
@@ -86,6 +95,15 @@ export function parseTrackBody(raw: unknown): { ok: true; data: LandingTrackPayl
   if (event_type === "scroll_depth") {
     if (depth == null || !SCROLL_DEPTH_MILESTONES.includes(depth as (typeof SCROLL_DEPTH_MILESTONES)[number])) {
       return { ok: false, message: "scroll_depth requires depth 25|50|75|100" };
+    }
+  }
+
+  if (event_type === "scroll_sample") {
+    if (max_depth == null) {
+      return { ok: false, message: "scroll_sample requires max_depth" };
+    }
+    if (!event_key) {
+      return { ok: false, message: "scroll_sample requires event_key" };
     }
   }
 
@@ -98,9 +116,9 @@ export function parseTrackBody(raw: unknown): { ok: true; data: LandingTrackPayl
     }
   }
 
-  if (event_type === "click") {
+  if (event_type === "click" || event_type === "cta_click") {
     if (clampRatio(body.x_ratio) == null || clampRatio(body.y_ratio) == null) {
-      return { ok: false, message: "click requires x_ratio and y_ratio" };
+      return { ok: false, message: `${event_type} requires x_ratio and y_ratio` };
     }
   }
 
@@ -128,7 +146,9 @@ export function parseTrackBody(raw: unknown): { ok: true; data: LandingTrackPayl
   const data: LandingTrackPayload = {
     landing_key: landing_key as LandingTrackPayload["landing_key"],
     session_id,
+    visitor_id: typeof visitor_id === "string" ? visitor_id : undefined,
     event_type: event_type as LandingEventType,
+    event_key,
     page_url: clampStr(body.page_url, 500),
     referrer: clampStr(body.referrer, 500),
     utm_source: clampStr(body.utm_source, 120),
@@ -157,7 +177,9 @@ export function toDbRow(data: LandingTrackPayload) {
   return {
     landing_key: data.landing_key,
     session_id: data.session_id,
+    visitor_id: data.visitor_id ?? null,
     event_type: data.event_type,
+    event_key: data.event_key ?? null,
     page_url: data.page_url ?? null,
     referrer: data.referrer ?? null,
     utm_source: data.utm_source ?? null,

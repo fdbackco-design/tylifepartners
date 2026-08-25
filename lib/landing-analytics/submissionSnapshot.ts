@@ -1,4 +1,7 @@
-import { getOrCreateLandingSessionId } from "@/lib/landing-analytics/client";
+import {
+  getOrCreateLandingSessionId,
+  getOrCreateLandingVisitorId,
+} from "@/lib/landing-analytics/client";
 import {
   computeMaxDepthPercent,
   readDocumentMetrics,
@@ -11,6 +14,7 @@ import {
 
 export type SubmissionAnalyticsPayload = {
   analytics_session_id: string;
+  analytics_visitor_id: string;
   max_scroll_depth: number;
   last_section_name: string | null;
   last_section_label: string | null;
@@ -28,6 +32,7 @@ export function initSubmissionSnapshot(
   activeSections = sections?.length ? sections : null;
   snapshot = {
     analytics_session_id: getOrCreateLandingSessionId(),
+    analytics_visitor_id: getOrCreateLandingVisitorId(),
     max_scroll_depth: 0,
     last_section_name: null,
     last_section_label: null,
@@ -63,8 +68,13 @@ export function getSubmissionAnalyticsPayload(): Partial<SubmissionAnalyticsPayl
   refreshSubmissionSnapshot();
   return {
     analytics_session_id: snapshot.analytics_session_id,
+    analytics_visitor_id: snapshot.analytics_visitor_id,
     max_scroll_depth: Math.round(snapshot.max_scroll_depth * 10) / 10,
     last_section_name: snapshot.last_section_name,
     last_section_label: snapshot.last_section_label,
   };
+}
+
+export function getActiveLandingKeyForAnalytics(): string | null {
+  return activeLandingKey;
 }

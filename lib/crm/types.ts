@@ -68,6 +68,13 @@ export type LeadRow = {
   utm_campaign: string;
   utm_content: string;
   utm_term: string;
+  /** Meta 광고 ID (없으면 utm_content가 숫자 ID일 때 추론) */
+  meta_ad_id: string | null;
+  meta_ad_name: string | null;
+  meta_creative_type: string | null;
+  meta_creative_preview: string | null;
+  meta_creative_full: string | null;
+  meta_creative_status: string | null;
   marketing_consent: number | null;
   status: LeadStatus;
   memo: string;

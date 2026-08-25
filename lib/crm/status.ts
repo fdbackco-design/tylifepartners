@@ -51,6 +51,27 @@ export function getAdminStatus(
   return null;
 }
 
+/** 필터 UI용 관리자상태 옵션 (일차 숫자는 키로 묶음) */
+export const ADMIN_STATUS_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: "need_assign", label: "담당자 지정 필요" },
+  { value: "waiting_day", label: "대기 N일차" },
+  { value: "first_contact_day", label: "1차컨택 N일차" },
+  { value: "absent_day", label: "부재 N일차" },
+  { value: "done_day", label: "상담완료 N일차" },
+  { value: "need_reassign", label: "담당자 변경 필요" },
+  { value: "need_recontact", label: "재컨택 필요" },
+  { value: "none", label: "관리자상태 없음" },
+];
+
+export function matchesAdminStatusFilter(
+  adminStatus: AdminStatusInfo | null | undefined,
+  selectedKeys: string[] | undefined
+): boolean {
+  if (!selectedKeys?.length) return true;
+  const key = adminStatus?.key ?? "none";
+  return selectedKeys.includes(key);
+}
+
 /**
  * 상담상태 선택지:
  * - 배정전: 배정전만

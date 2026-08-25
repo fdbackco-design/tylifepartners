@@ -6,6 +6,7 @@ import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissio
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { useRouter } from "next/navigation";
 import { useUTM } from "@/lib/useUTM";
+import { attributionFieldsFromUtm } from "@/lib/utm";
 import {
   BASE_REGIONS,
   formatRegionValue,
@@ -119,11 +120,7 @@ export default function BusinessLandingPage() {
           phone: rawPhone,
           entry_page: "business",
           source: utm.utm_source || "business",
-          utm_source: utm.utm_source || null,
-          utm_medium: utm.utm_medium || null,
-          utm_campaign: utm.utm_campaign || null,
-          utm_content: utm.utm_content || null,
-          utm_term: utm.utm_term || null,
+          ...attributionFieldsFromUtm(utm),
           marketing_consent: marketingChecked ? 1 : null,
           region: formatRegionValue(region, regionDetailEnabled ? district : null),
           available_time: availableTime,

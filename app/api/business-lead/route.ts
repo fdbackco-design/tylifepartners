@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { processBusinessLeadSideEffects } from "@/lib/businessLeadSideEffects";
 import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
+import { linkLandingSessionToLead } from "@/lib/landing-analytics/linkSession";
 import { isLanding0623EntryPage, normalizeLanding0623EntryPage } from "@/lib/landing0623";
 import { isLanding0715EntryPage, normalizeLanding0715EntryPage } from "@/lib/landing0715";
 import { formatPhoneKorean } from "@/lib/phone";
@@ -24,6 +25,7 @@ import {
 import { getManagedLandingById } from "@/lib/managedLandings/store";
 import { verifyAdminSession } from "@/lib/adminSession";
 import { parseBaseRegion } from "@/lib/regions";
+import { parseMetaIdsFromBody } from "@/lib/utm";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
 const ALLOWED_JOB_RANKS = new Set(["지점장 이상", "팀장 이상", "FC"]);
@@ -62,6 +64,10 @@ export async function POST(request: NextRequest) {
     const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
     const utmContent = body.utm_content != null ? String(body.utm_content).trim() : null;
     const utmTerm = body.utm_term != null ? String(body.utm_term).trim() : null;
+    const metaIds = parseMetaIdsFromBody(body as Record<string, unknown>, {
+      utm_content: utmContent,
+      utm_campaign: utmCampaign,
+    });
     const marketingConsent =
       body.marketing_consent === 1 || body.marketing_consent === "1" ? 1 : null;
     const region = body.region != null ? String(body.region).trim() : body.location != null ? String(body.location).trim() : "";
@@ -200,7 +206,28 @@ export async function POST(request: NextRequest) {
         utm_campaign: utmCampaign || null,
         utm_content: utmContent || null,
         utm_term: utmTerm || null,
+        meta_ad_id: metaIds.meta_ad_id,
+        meta_adset_id: metaIds.meta_adset_id,
+        meta_campaign_id: metaIds.meta_campaign_id,
         receivedAtIso: nowIso,
+      });
+      await supabase
+        .from("tylife_b2b")
+        .update({
+          analytics_session_id: analytics.analytics_session_id,
+          analytics_visitor_id: analytics.analytics_visitor_id,
+          max_scroll_depth: analytics.max_scroll_depth,
+          last_section_name: analytics.last_section_name,
+          last_section_label: analytics.last_section_label,
+        })
+        .eq("id", samePerson.id);
+      await linkLandingSessionToLead({
+        leadTable: "tylife_b2b",
+        leadId: samePerson.id,
+        sessionId: analytics.analytics_session_id,
+        visitorId: analytics.analytics_visitor_id,
+        landingKey: entryPage,
+        pageUrl: entryPage,
       });
       if (!samePerson.assignee_id) {
         await tryAutoAssignLead({
@@ -245,6 +272,9 @@ export async function POST(request: NextRequest) {
       utm_campaign: utmCampaign || null,
       utm_content: utmContent || null,
       utm_term: utmTerm || null,
+      meta_ad_id: metaIds.meta_ad_id,
+      meta_adset_id: metaIds.meta_adset_id,
+      meta_campaign_id: metaIds.meta_campaign_id,
       marketing_consent: marketingConsent,
       region: regionForDb,
       available_time: availableTimeForDb,
@@ -252,6 +282,7 @@ export async function POST(request: NextRequest) {
       job: jobForDb,
       job_rank: jobRankStored,
       analytics_session_id: analytics.analytics_session_id,
+      analytics_visitor_id: analytics.analytics_visitor_id,
       max_scroll_depth: analytics.max_scroll_depth,
       last_section_name: analytics.last_section_name,
       last_section_label: analytics.last_section_label,
@@ -279,6 +310,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (insertedLead?.id) {
+      await linkLandingSessionToLead({
+        leadTable: "tylife_b2b",
+        leadId: insertedLead.id,
+        sessionId: analytics.analytics_session_id,
+        visitorId: analytics.analytics_visitor_id,
+        landingKey: entryPage,
+        pageUrl: entryPage,
+      });
       await tryAutoAssignLead({
         table: "tylife_b2b",
         leadId: insertedLead.id,

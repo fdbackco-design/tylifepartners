@@ -2,10 +2,21 @@ import { startOfKstDayIso, startOfNextKstDayIso } from "@/lib/crm/kst";
 import { attachAssigneeHistories } from "@/lib/crm/assigneeHistory";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
 import { visibleAssigneeIds } from "@/lib/crm/scope";
-import { getAdminStatus } from "@/lib/crm/status";
+import { getAdminStatus, matchesAdminStatusFilter } from "@/lib/crm/status";
 import type { LeadCategory, LeadRow, SessionUser } from "@/lib/crm/types";
+import { attachMetaCreatives } from "@/lib/meta/ads";
 import { loadActiveBlacklistPhones } from "@/lib/phoneBlacklist";
 import { getSupabaseAdmin } from "@/lib/supabase";
+
+async function enrichLeads(items: LeadRow[]): Promise<LeadRow[]> {
+  const withHistory = await attachAssigneeHistories(items);
+  try {
+    return await attachMetaCreatives(withHistory);
+  } catch (e) {
+    console.warn("[queryLeads] meta creative attach skipped:", e instanceof Error ? e.message : e);
+    return withHistory;
+  }
+}
 
 export type LeadQueryInput = {
   category: LeadCategory | "all";
@@ -14,6 +25,8 @@ export type LeadQueryInput = {
   teamIds?: string[];
   regions?: string[];
   statuses?: string[];
+  /** 관리자상태 키 (need_assign, waiting_day, …, none) */
+  adminStatuses?: string[];
   jobRanks?: string[];
   ageGroups?: string[];
   jobs?: string[];
@@ -45,6 +58,7 @@ export function parseLeadQuery(sp: URLSearchParams): LeadQueryInput {
     teamIds: csv(sp.get("team_ids")),
     regions: csv(sp.get("regions")),
     statuses: csv(sp.get("statuses")),
+    adminStatuses: csv(sp.get("admin_statuses")),
     jobRanks: csv(sp.get("job_ranks")),
     ageGroups: csv(sp.get("age_groups")),
     jobs: csv(sp.get("jobs")),
@@ -144,28 +158,42 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
 
   const fetchTable = async (kind: "consumers" | "candidates") => {
     const table = kind === "candidates" ? "tylife_b2b" : "leads";
-    const select = kind === "candidates" ? CANDIDATE_SELECT : CONSUMER_SELECT;
-    let query = (supabase.from(table) as any)
-      .select(select, { count: "exact" })
-      .or("merge_status.eq.active,merge_status.is.null")
-      .order("created_at", { ascending: false });
-    query = applyCommonFilters(query, q, scoped, session.rank);
-    query = applyBlacklistFilter(query, blockedPhones);
-    if (teamAssigneeIds) {
-      let ids = teamAssigneeIds;
-      if (scoped !== "all") ids = ids.filter((id) => scoped.includes(id));
-      query = query.in("assignee_id", ids.length ? ids : [NO_MATCH_ID]);
+    const selectFull = kind === "candidates" ? CANDIDATE_SELECT : CONSUMER_SELECT;
+    const selectLegacy = selectFull
+      .replace(", meta_ad_id, meta_adset_id, meta_campaign_id", "")
+      .replace("meta_ad_id, meta_adset_id, meta_campaign_id, ", "");
+
+    const run = async (select: string) => {
+      let query = (supabase.from(table) as any)
+        .select(select, { count: "exact" })
+        .or("merge_status.eq.active,merge_status.is.null")
+        .order("created_at", { ascending: false });
+      query = applyCommonFilters(query, q, scoped, session.rank);
+      query = applyBlacklistFilter(query, blockedPhones);
+      if (teamAssigneeIds) {
+        let ids = teamAssigneeIds;
+        if (scoped !== "all") ids = ids.filter((id) => scoped.includes(id));
+        query = query.in("assignee_id", ids.length ? ids : [NO_MATCH_ID]);
+      }
+      query = applyRegionFilter(query, q.regions, kind === "consumers");
+      if (q.needReassign) {
+        query = query.in("status", ["대기", "1차컨택", "부재(메신저완료)"]);
+      }
+      // 관리자상태는 DB 컬럼이 아니라 계산값이므로, 필터 시 넉넉히 가져온 뒤 메모리에서 걸러 페이징
+      const needsMemoryPaging = q.category === "all" || Boolean(q.adminStatuses?.length);
+      if (!needsMemoryPaging) {
+        query = query.range(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50) - 1);
+      } else {
+        query = query.limit(3000);
+      }
+      return query;
+    };
+
+    let { data, error, count } = await run(selectFull);
+    if (error && /meta_ad|schema cache|column/i.test(error.message)) {
+      console.warn(`[queryLeads] meta columns missing on ${table}, falling back:`, error.message);
+      ({ data, error, count } = await run(selectLegacy));
     }
-    query = applyRegionFilter(query, q.regions, kind === "consumers");
-    if (q.needReassign) {
-      query = query.in("status", ["대기", "1차컨택", "부재(메신저완료)"]);
-    }
-    if (q.category !== "all") {
-      query = query.range(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50) - 1);
-    } else {
-      query = query.limit(3000);
-    }
-    const { data, error, count } = await query;
     if (error) throw error;
     const items = (data ?? []).map((row: Record<string, unknown>) =>
       mapLeadRow(row, kind, staffById, parentNameById)
@@ -177,19 +205,30 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
     i.admin_status?.key === "need_reassign" ||
     getAdminStatus(i.status, i.status_changed_at, i.created_at_iso, i.assignee_id)?.key === "need_reassign";
 
+  const applyAdminStatusFilter = (items: LeadRow[]) =>
+    items.filter((i) => matchesAdminStatusFilter(i.admin_status, q.adminStatuses));
+
   if (q.category === "all") {
     const [a, b] = await Promise.all([fetchTable("consumers"), fetchTable("candidates")]);
     let items = [...a.items, ...b.items].sort((x, y) => (x.created_at_iso < y.created_at_iso ? 1 : -1));
     if (q.needReassign) items = items.filter(isNeedReassign);
+    items = applyAdminStatusFilter(items);
     const total = items.length;
     const page = items.slice(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50));
-    return { items: await attachAssigneeHistories(page), total };
+    return { items: await enrichLeads(page), total };
   }
 
   const result = await fetchTable(q.category);
-  if (q.needReassign) {
-    const items = result.items.filter(isNeedReassign);
-    return { items: await attachAssigneeHistories(items), total: items.length };
+  let items = result.items;
+  if (q.needReassign) items = items.filter(isNeedReassign);
+  if (q.adminStatuses?.length) {
+    items = applyAdminStatusFilter(items);
+    const total = items.length;
+    const page = items.slice(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50));
+    return { items: await enrichLeads(page), total };
   }
-  return { items: await attachAssigneeHistories(result.items), total: result.total };
+  if (q.needReassign) {
+    return { items: await enrichLeads(items), total: items.length };
+  }
+  return { items: await enrichLeads(items), total: result.total };
 }

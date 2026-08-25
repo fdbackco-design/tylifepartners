@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { sendLeadEmailNotification } from "@/lib/email";
 import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
 import { parseSubmissionAnalytics } from "@/lib/landing-analytics/parseSubmissionAnalytics";
+import { linkLandingSessionToLead } from "@/lib/landing-analytics/linkSession";
 import { resolveSheetMediumFromUtmSource } from "@/lib/utmSourceMapping";
 import { formatPhoneKorean } from "@/lib/phone";
 import { isLeadSubmissionBlockedAsync, maskPhoneForLog } from "@/lib/phoneBlacklist";
@@ -15,6 +16,7 @@ import {
   pickSamePersonLead,
 } from "@/lib/crm/merge/reinquiry";
 import { syncLeadToCrm } from "@/lib/crmSync";
+import { parseMetaIdsFromBody } from "@/lib/utm";
 
 /** 클라이언트에서 보낸 유입 경로 (예: /, /v2, /me). 잘못된 값은 무시 */
 function normalizeEntryPage(raw: unknown): string | null {
@@ -55,6 +57,10 @@ export async function POST(request: NextRequest) {
     const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
     const utmContent = body.utm_content != null ? String(body.utm_content).trim() : null;
     const utmTerm = body.utm_term != null ? String(body.utm_term).trim() : null;
+    const metaIds = parseMetaIdsFromBody(body as Record<string, unknown>, {
+      utm_content: utmContent,
+      utm_campaign: utmCampaign,
+    });
     const entryPage = normalizeEntryPage(body.entry_page);
     const entryPageRaw = body.entry_page != null ? String(body.entry_page).trim() : "";
     const region = body.region != null ? String(body.region).trim() : null;
@@ -112,12 +118,33 @@ export async function POST(request: NextRequest) {
         utm_campaign: utmCampaign || null,
         utm_content: utmContent || null,
         utm_term: utmTerm || null,
+        meta_ad_id: metaIds.meta_ad_id,
+        meta_adset_id: metaIds.meta_adset_id,
+        meta_campaign_id: metaIds.meta_campaign_id,
         receivedAtIso: nowIso,
       });
       if (!attached.ok) {
         console.error("reinquiry attach failed:", attached.message);
       } else {
         console.info("[lead] reinquiry attached to existing lead", samePerson.id);
+        await supabase
+          .from("leads")
+          .update({
+            analytics_session_id: analytics.analytics_session_id,
+            analytics_visitor_id: analytics.analytics_visitor_id,
+            max_scroll_depth: analytics.max_scroll_depth,
+            last_section_name: analytics.last_section_name,
+            last_section_label: analytics.last_section_label,
+          })
+          .eq("id", samePerson.id);
+        await linkLandingSessionToLead({
+          leadTable: "leads",
+          leadId: samePerson.id,
+          sessionId: analytics.analytics_session_id,
+          visitorId: analytics.analytics_visitor_id,
+          landingKey: entryPage,
+          pageUrl: entryPage,
+        });
         if (!samePerson.assignee_id) {
           await tryAutoAssignLead({
             table: "leads",
@@ -208,9 +235,13 @@ export async function POST(request: NextRequest) {
       utm_campaign: utmCampaign || null,
       utm_content: utmContent || null,
       utm_term: utmTerm || null,
+      meta_ad_id: metaIds.meta_ad_id,
+      meta_adset_id: metaIds.meta_adset_id,
+      meta_campaign_id: metaIds.meta_campaign_id,
       marketing_consent: marketingConsent,
       entry_page: entryPage,
       analytics_session_id: analytics.analytics_session_id,
+      analytics_visitor_id: analytics.analytics_visitor_id,
       max_scroll_depth: analytics.max_scroll_depth,
       last_section_name: analytics.last_section_name,
       last_section_label: analytics.last_section_label,
@@ -243,6 +274,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (insertedLead?.id) {
+      await linkLandingSessionToLead({
+        leadTable: "leads",
+        leadId: insertedLead.id,
+        sessionId: analytics.analytics_session_id,
+        visitorId: analytics.analytics_visitor_id,
+        landingKey: entryPage,
+        pageUrl: entryPage,
+      });
       await tryAutoAssignLead({
         table: "leads",
         leadId: insertedLead.id,

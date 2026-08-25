@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
 import { fromKstHourLocalInput, toKstHourLocalInput } from "@/lib/crm/kst";
-import { assigneeColor, formatYmdDot, maskCustomerName, todayYmdLocal } from "@/lib/crm/ui";
+import { assigneeColor, formatYmdDot, todayYmdLocal } from "@/lib/crm/ui";
 
 type Meeting = {
   id: string;
@@ -168,7 +168,7 @@ export default function CalendarPage() {
       }}
       title={`${timeLabel(m.meeting_at)} ${m.name}`}
     >
-      {timeLabel(m.meeting_at)} {maskCustomerName(m.name)} · {m.assignee_name || "미배정"}
+      {timeLabel(m.meeting_at)} {m.name} · {m.assignee_name || "미배정"}
     </button>
   );
 
@@ -343,7 +343,7 @@ export default function CalendarPage() {
                     <td>
                       {formatYmdDot(m.date)} {timeLabel(m.meeting_at)}
                     </td>
-                    <td>{maskCustomerName(m.name)}</td>
+                    <td>{m.name}</td>
                     <td>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                         <span style={{ width: 8, height: 8, borderRadius: 99, background: assigneeColor(m.assignee_id) }} />

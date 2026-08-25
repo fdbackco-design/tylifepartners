@@ -37,6 +37,10 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase.from("landing_events").insert(toDbRow(parsed.data));
 
     if (error) {
+      // 동일 session_id + event_key 중복은 성공으로 간주
+      if (/duplicate|unique|uq_landing_events_session_event_key/i.test(error.message)) {
+        return NextResponse.json({ ok: true, deduped: true });
+      }
       console.error("landing_events insert error:", error);
       return NextResponse.json({ ok: false, message: "Save failed" }, { status: 500 });
     }

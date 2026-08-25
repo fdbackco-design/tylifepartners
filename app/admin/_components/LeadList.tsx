@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatPhoneKorean } from "@/lib/phone";
 import { fromKstHourLocalInput, toKstHourLocalInput } from "@/lib/crm/kst";
-import { allowedStatusesFor, isMemoEditable, rowBackground } from "@/lib/crm/status";
+import { ADMIN_STATUS_FILTER_OPTIONS, allowedStatusesFor, isMemoEditable, rowBackground } from "@/lib/crm/status";
 import { formatYmdDot } from "@/lib/crm/ui";
 import type { LeadCategory, LeadRow, LeadStatus, SessionUser } from "@/lib/crm/types";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
@@ -12,6 +12,7 @@ import DateRangePicker from "@/app/admin/_components/crm/DateRangePicker";
 import FilterPopover, { type FilterGroup } from "@/app/admin/_components/crm/FilterPopover";
 import StatusBadgeMenu from "@/app/admin/_components/crm/StatusBadgeMenu";
 import { formatAssigneeWithTeam } from "@/lib/crm/assigneeHistoryFormat";
+import LeadBehaviorPanel from "@/app/admin/_components/LeadBehaviorPanel";
 
 type StaffOpt = { id: string; name: string; parent_id: string | null; rank?: string };
 
@@ -69,6 +70,7 @@ export default function LeadList({
   const [teamIds, setTeamIds] = useState(csvParam(searchParams.get("team_ids")));
   const [regions, setRegions] = useState(csvParam(searchParams.get("regions")));
   const [statuses, setStatuses] = useState(csvParam(searchParams.get("statuses")));
+  const [adminStatuses, setAdminStatuses] = useState(csvParam(searchParams.get("admin_statuses")));
   const [jobRanks, setJobRanks] = useState(csvParam(searchParams.get("job_ranks")));
   const [ageGroups, setAgeGroups] = useState(csvParam(searchParams.get("age_groups")));
   const [jobs, setJobs] = useState(csvParam(searchParams.get("jobs")));
@@ -105,6 +107,7 @@ export default function LeadList({
     if (teamIds.length) sp.set("team_ids", teamIds.join(","));
     if (regions.length) sp.set("regions", regions.join(","));
     if (statuses.length) sp.set("statuses", statuses.join(","));
+    if (adminStatuses.length) sp.set("admin_statuses", adminStatuses.join(","));
     if (jobRanks.length) sp.set("job_ranks", jobRanks.join(","));
     if (ageGroups.length) sp.set("age_groups", ageGroups.join(","));
     if (jobs.length) sp.set("jobs", jobs.join(","));
@@ -121,6 +124,7 @@ export default function LeadList({
     teamIds,
     regions,
     statuses,
+    adminStatuses,
     jobRanks,
     ageGroups,
     jobs,
@@ -142,6 +146,7 @@ export default function LeadList({
     if (teamIds.length) sp.set("team_ids", teamIds.join(","));
     if (regions.length) sp.set("regions", regions.join(","));
     if (statuses.length) sp.set("statuses", statuses.join(","));
+    if (adminStatuses.length) sp.set("admin_statuses", adminStatuses.join(","));
     if (jobRanks.length) sp.set("job_ranks", jobRanks.join(","));
     if (ageGroups.length) sp.set("age_groups", ageGroups.join(","));
     if (jobs.length) sp.set("jobs", jobs.join(","));
@@ -159,6 +164,7 @@ export default function LeadList({
     teamIds,
     regions,
     statuses,
+    adminStatuses,
     jobRanks,
     ageGroups,
     jobs,
@@ -465,6 +471,7 @@ export default function LeadList({
       teamIds.length +
       regions.length +
       statuses.length +
+      adminStatuses.length +
       jobRanks.length +
       ageGroups.length +
       jobs.length +
@@ -498,6 +505,16 @@ export default function LeadList({
       })),
       selected: statuses,
     },
+    ...(showAdmin
+      ? [
+          {
+            key: "adminStatuses",
+            label: "관리자상태",
+            options: ADMIN_STATUS_FILTER_OPTIONS,
+            selected: adminStatuses,
+          },
+        ]
+      : []),
     { key: "jobRanks", label: "직급", options: options.job_ranks.map((v) => ({ value: v, label: v })), selected: jobRanks },
     { key: "ageGroups", label: "연령대", options: options.age_groups.map((v) => ({ value: v, label: v })), selected: ageGroups },
     { key: "jobs", label: "직업", options: options.jobs.map((v) => ({ value: v, label: v })), selected: jobs },
@@ -561,6 +578,16 @@ export default function LeadList({
       },
     });
   }
+  for (const v of adminStatuses) {
+    chips.push({
+      key: `as-${v}`,
+      label: `관리자: ${ADMIN_STATUS_FILTER_OPTIONS.find((o) => o.value === v)?.label ?? v}`,
+      onRemove: () => {
+        setAdminStatuses((prev) => prev.filter((x) => x !== v));
+        setPage(0);
+      },
+    });
+  }
   for (const v of jobRanks) {
     chips.push({
       key: `jr-${v}`,
@@ -607,6 +634,7 @@ export default function LeadList({
     setTeamIds(next.teamIds ?? []);
     setRegions(next.regions ?? []);
     setStatuses(next.statuses ?? []);
+    setAdminStatuses(next.adminStatuses ?? []);
     setJobRanks(next.jobRanks ?? []);
     setAgeGroups(next.ageGroups ?? []);
     setJobs(next.jobs ?? []);
@@ -619,6 +647,7 @@ export default function LeadList({
     setTeamIds([]);
     setRegions([]);
     setStatuses([]);
+    setAdminStatuses([]);
     setJobRanks([]);
     setAgeGroups([]);
     setJobs([]);
@@ -788,6 +817,7 @@ export default function LeadList({
                       />
                     </th>
                   )}
+                  <th>광고소재</th>
                   <th>미리보기</th>
                   <th>고객</th>
                   <th>신청시간</th>
@@ -824,6 +854,49 @@ export default function LeadList({
                           />
                         </td>
                       )}
+                      <td onClick={(e) => e.stopPropagation()}>
+                        {row.meta_creative_preview ? (
+                          <button
+                            type="button"
+                            className="crm-meta-creative"
+                            title={
+                              [row.meta_ad_name, row.meta_ad_id, row.meta_creative_type]
+                                .filter(Boolean)
+                                .join(" · ") || "Meta 광고 소재"
+                            }
+                            onClick={() =>
+                              setPreviewSrc(row.meta_creative_full || row.meta_creative_preview)
+                            }
+                          >
+                            <img
+                              className="crm-thumb crm-thumb-meta"
+                              src={row.meta_creative_preview}
+                              alt={row.meta_ad_name || "광고 소재"}
+                            />
+                            {row.meta_creative_type === "video" && (
+                              <span className="crm-meta-creative-badge">영상</span>
+                            )}
+                          </button>
+                        ) : row.meta_ad_id ? (
+                          <span
+                            className="crm-cell-plain"
+                            style={{ fontSize: 11, color: "var(--crm-muted)" }}
+                            title={
+                              row.meta_creative_status === "missing_token"
+                                ? "META_ACCESS_TOKEN 미설정"
+                                : row.meta_ad_name || row.meta_ad_id
+                            }
+                          >
+                            {row.meta_ad_name
+                              ? row.meta_ad_name.slice(0, 18)
+                              : `ID ${row.meta_ad_id.slice(-6)}`}
+                          </span>
+                        ) : (
+                          <span className="crm-cell-plain" style={{ color: "var(--crm-muted)" }}>
+                            -
+                          </span>
+                        )}
+                      </td>
                       <td>
                         <img
                           className="crm-thumb"
@@ -1073,6 +1146,12 @@ export default function LeadList({
                 ))}
               </div>
             )}
+            <LeadBehaviorPanel
+              leadId={memoRow.id}
+              category={memoRow.type === "후보자" ? "candidates" : "consumers"}
+              customerName={memoRow.name}
+              customerPhone={memoRow.phone}
+            />
           </aside>
         </>
       )}
@@ -1082,7 +1161,7 @@ export default function LeadList({
           <button type="button" className="crm-drawer-backdrop" aria-label="미리보기 닫기" onClick={() => setPreviewSrc(null)} />
           <div
             role="dialog"
-            aria-label="랜딩 미리보기"
+            aria-label="이미지 미리보기"
             style={{
               position: "fixed",
               zIndex: 62,
@@ -1092,7 +1171,7 @@ export default function LeadList({
               pointerEvents: "none",
             }}
           >
-            <img src={previewSrc} alt="랜딩 확대" style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: 8, pointerEvents: "auto" }} />
+            <img src={previewSrc} alt="미리보기 확대" style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: 8, pointerEvents: "auto" }} />
           </div>
         </>
       )}

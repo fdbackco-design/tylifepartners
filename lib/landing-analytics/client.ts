@@ -2,7 +2,10 @@ import { getDeviceType } from "@/lib/landing-analytics/device";
 import type { LandingTrackPayload } from "@/lib/landing-analytics/types";
 import { parseUTMFromUrl } from "@/lib/utm";
 
-const SESSION_STORAGE_KEY = "tylife_landing_session_id";
+const VISITOR_STORAGE_KEY = "tylife_landing_visitor_id";
+/** 레거시: 예전에는 session_id를 localStorage에 장기 보관했음 → visitor로 이전 */
+const LEGACY_SESSION_STORAGE_KEY = "tylife_landing_session_id";
+const SESSION_STORAGE_KEY = "tylife_landing_visit_session_id";
 const UTM_STORAGE_KEY = "tylife_utm";
 
 function randomUUID(): string {
@@ -16,13 +19,42 @@ function randomUUID(): string {
   });
 }
 
+function isUuidLike(value: string | null | undefined): value is string {
+  return Boolean(value && value.length >= 32);
+}
+
+/** 익명 방문자 ID (브라우저 localStorage, 장기) */
+export function getOrCreateLandingVisitorId(): string {
+  if (typeof window === "undefined") return randomUUID();
+  try {
+    const existing = localStorage.getItem(VISITOR_STORAGE_KEY);
+    if (isUuidLike(existing)) return existing;
+
+    const legacy = localStorage.getItem(LEGACY_SESSION_STORAGE_KEY);
+    if (isUuidLike(legacy)) {
+      localStorage.setItem(VISITOR_STORAGE_KEY, legacy);
+      return legacy;
+    }
+
+    const id = randomUUID();
+    localStorage.setItem(VISITOR_STORAGE_KEY, id);
+    return id;
+  } catch {
+    return randomUUID();
+  }
+}
+
+/**
+ * 방문 세션 ID (sessionStorage — 탭/방문 단위)
+ * 폼 스냅샷·이벤트·고객 연결에 사용
+ */
 export function getOrCreateLandingSessionId(): string {
   if (typeof window === "undefined") return randomUUID();
   try {
-    const existing = localStorage.getItem(SESSION_STORAGE_KEY);
-    if (existing && existing.length >= 32) return existing;
+    const existing = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (isUuidLike(existing)) return existing;
     const id = randomUUID();
-    localStorage.setItem(SESSION_STORAGE_KEY, id);
+    sessionStorage.setItem(SESSION_STORAGE_KEY, id);
     return id;
   } catch {
     return randomUUID();
@@ -60,6 +92,7 @@ export function buildBasePayload(landingKey: string): Omit<LandingTrackPayload, 
 
   return {
     landing_key: landingKey,
+    visitor_id: getOrCreateLandingVisitorId(),
     session_id: getOrCreateLandingSessionId(),
     page_url: typeof window !== "undefined" ? window.location.href.slice(0, 500) : undefined,
     referrer: typeof document !== "undefined" ? document.referrer?.slice(0, 500) : undefined,
@@ -95,5 +128,14 @@ export function sendLandingEvent(
     credentials: "omit",
   }).catch(() => {
     /* MVP: silent fail */
+  });
+}
+
+/** 상담 신청 성공 직후 — 세션에 신청 시점 마커 */
+export function trackLeadSubmitEvent(landingKey: string): void {
+  sendLandingEvent({
+    ...buildBasePayload(landingKey),
+    event_type: "lead_submit",
+    max_depth: undefined,
   });
 }
