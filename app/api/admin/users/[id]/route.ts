@@ -22,17 +22,53 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const body = await request.json();
   const patch: Record<string, unknown> = {};
   if (body.name != null) patch.name = String(body.name).trim();
-  if (body.region != null) {
-    const regionRaw = String(body.region).trim() || null;
+  if (body.region !== undefined) {
+    const regionRaw = String(body.region ?? "").trim() || null;
     if (regionRaw && !isRegionZoneName(regionRaw)) {
       return NextResponse.json({ ok: false, message: "담당 권역을 목록에서 선택해 주세요." }, { status: 400 });
     }
     patch.region = regionRaw;
   }
   if (body.is_active != null) patch.is_active = Boolean(body.is_active);
+
+  let nextRank = String(existing.rank);
+  if (body.rank != null) {
+    if (session.rank !== "admin") {
+      return NextResponse.json({ ok: false, message: "직급 변경은 관리자만 가능합니다." }, { status: 403 });
+    }
+    const rank = String(body.rank).trim();
+    if (rank !== "manager" && rank !== "sales") {
+      return NextResponse.json({ ok: false, message: "직급은 매니저 또는 영업자만 가능합니다." }, { status: 400 });
+    }
+    nextRank = rank;
+    patch.rank = rank;
+  }
+
   if (body.parent_id !== undefined && session.rank === "admin") {
     patch.parent_id = body.parent_id ? String(body.parent_id) : null;
   }
+
+  // 직급 전환 시 소속 관계 정리
+  if (nextRank === "manager") {
+    patch.parent_id = null;
+  } else if (nextRank === "sales" && body.parent_id !== undefined && session.rank === "admin") {
+    const parentId = body.parent_id ? String(body.parent_id) : null;
+    if (parentId === id) {
+      return NextResponse.json({ ok: false, message: "본인을 소속 매니저로 지정할 수 없습니다." }, { status: 400 });
+    }
+    if (parentId) {
+      const { data: parent } = await supabase
+        .from("staff_users")
+        .select("id, rank, is_active")
+        .eq("id", parentId)
+        .maybeSingle();
+      if (!parent || parent.rank !== "manager" || !parent.is_active) {
+        return NextResponse.json({ ok: false, message: "활성 매니저만 소속으로 지정할 수 있습니다." }, { status: 400 });
+      }
+    }
+    patch.parent_id = parentId;
+  }
+
   if (body.reset_password) {
     patch.password_hash = hashPassword(credentialsFromPhone(existing.phone));
   }
@@ -42,5 +78,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     console.error("PATCH staff_users:", error);
     return NextResponse.json({ ok: false, message: "수정에 실패했습니다." }, { status: 500 });
   }
+
+  // 매니저 → 영업자로 내리면 기존 산하의 parent_id 해제
+  if (existing.rank === "manager" && nextRank === "sales") {
+    const { error: clearErr } = await supabase
+      .from("staff_users")
+      .update({ parent_id: null })
+      .eq("parent_id", id);
+    if (clearErr) {
+      console.error("PATCH clear subordinates parent_id:", clearErr);
+      return NextResponse.json(
+        { ok: false, message: "직급은 변경됐지만 산하 소속 정리에 실패했습니다. 산하 계정을 확인해 주세요." },
+        { status: 500 }
+      );
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }
