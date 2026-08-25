@@ -4,6 +4,7 @@ import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/
 import { visibleAssigneeIds } from "@/lib/crm/scope";
 import { getAdminStatus } from "@/lib/crm/status";
 import type { LeadCategory, LeadRow, SessionUser } from "@/lib/crm/types";
+import { loadActiveBlacklistPhones } from "@/lib/phoneBlacklist";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export type LeadQueryInput = {
@@ -114,10 +115,23 @@ function applyRegionFilter(query: any, regions: string[] | undefined, includeLoc
   return query.or(parts.join(","));
 }
 
+/** 블랙리스트 번호는 소비자/후보자 목록·내보내기에서 제외 */
+function applyBlacklistFilter(query: any, blockedPhones: string[]) {
+  if (!blockedPhones.length) return query;
+  // PostgREST in() 값에 콤마만 쓰므로 숫자 전화만 허용
+  const safe = blockedPhones.filter((p) => /^\d{10,11}$/.test(p));
+  if (!safe.length) return query;
+  return query.not("normalized_phone", "in", `(${safe.join(",")})`);
+}
+
 export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promise<{ items: LeadRow[]; total: number }> {
   const supabase = getSupabaseAdmin();
-  const scoped = await visibleAssigneeIds(session);
-  const { staffById, parentNameById } = await loadStaffMaps();
+  const [scoped, staffMaps, blockedPhones] = await Promise.all([
+    visibleAssigneeIds(session),
+    loadStaffMaps(),
+    loadActiveBlacklistPhones(),
+  ]);
+  const { staffById, parentNameById } = staffMaps;
 
   let teamAssigneeIds: string[] | null = null;
   if (q.teamIds?.length) {
@@ -136,6 +150,7 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
       .or("merge_status.eq.active,merge_status.is.null")
       .order("created_at", { ascending: false });
     query = applyCommonFilters(query, q, scoped, session.rank);
+    query = applyBlacklistFilter(query, blockedPhones);
     if (teamAssigneeIds) {
       let ids = teamAssigneeIds;
       if (scoped !== "all") ids = ids.filter((id) => scoped.includes(id));
