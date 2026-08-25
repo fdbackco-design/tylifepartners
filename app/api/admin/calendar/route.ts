@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     let q = supabase
       .from(table)
       .select("id, name, phone, status, assignee_id, meeting_at, region")
+      .or("merge_status.eq.active,merge_status.is.null")
       .gte("meeting_at", startOfKstDayIso(start))
       .lt("meeting_at", startOfKstDayIso(nextMonth))
       .not("meeting_at", "is", null)

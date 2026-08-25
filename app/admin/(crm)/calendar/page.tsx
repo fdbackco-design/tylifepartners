@@ -318,7 +318,6 @@ export default function CalendarPage() {
           {weekDays.map((date) => (
             <div key={date} className={`crm-cal-cell${date === today ? " is-today" : ""}`} style={{ minHeight: 160 }} onClick={() => setSelectedDay(date)}>
               <div className="crm-cal-daynum">{Number(date.slice(8, 10))}</div>
-              <div style={{ fontSize: 11, color: "var(--crm-muted)", marginBottom: 4 }}>{formatYmdDot(date)}</div>
               <DayEvents date={date} max={8} />
             </div>
           ))}

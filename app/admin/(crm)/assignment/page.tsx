@@ -384,8 +384,8 @@ export default function AssignmentPage() {
                 const isFixed = REGION_ZONE_NAMES.includes(rule.region_group as (typeof REGION_ZONE_NAMES)[number]);
                 return (
                   <tr key={rule.id} style={!rule.enabled ? { opacity: 0.55 } : undefined}>
-                    <td style={{ fontWeight: 700 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <td style={{ fontWeight: 700 }} className="crm-cell-nowrap">
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                         {rule.region_group}
                         {!isFixed ? <CrmBadge tone="primary">추가</CrmBadge> : null}
                       </div>
@@ -402,7 +402,7 @@ export default function AssignmentPage() {
                     <td style={{ fontSize: 13 }}>{names.join(", ") || "—"}</td>
                     <td style={{ fontSize: 13 }}>{rule.members.map((m) => m.weight).join(", ") || "—"}</td>
                     <td style={{ fontSize: 13 }}>{memberRatios.join(" / ") || "—"}</td>
-                    <td>
+                    <td className="crm-cell-nowrap">
                       <CrmSwitch
                         checked={rule.enabled}
                         onChange={(v) => setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, enabled: v } : r)))}
@@ -478,10 +478,7 @@ export default function AssignmentPage() {
                   const ratio = ratios(draftMembers)[mi];
                   const options = staffOptionsForZone(sheetRule.region_group);
                   return (
-                    <div
-                      key={mi}
-                      style={{ display: "grid", gridTemplateColumns: "1fr 88px 72px auto", gap: 8, alignItems: "center" }}
-                    >
+                    <div key={mi} className="crm-assign-member-row">
                       <CrmSelect
                         value={m.staff_user_id}
                         onChange={(e) =>

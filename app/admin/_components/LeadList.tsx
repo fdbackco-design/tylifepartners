@@ -537,44 +537,6 @@ export default function LeadList({
     setPage(0);
   };
 
-  const renderRowActions = (row: LeadRow) => {
-    const allowed = session ? allowedStatusesFor(session as SessionUser, row.status) : [row.status];
-    return (
-      <>
-        {showAdmin ? (
-          <AssigneePicker
-            value={row.assignee_id}
-            staff={staff}
-            teamName={row.team_name}
-            history={isAdmin ? row.assignee_history : undefined}
-            onChange={(id) => void patch(row, { assignee_id: id })}
-          />
-        ) : (
-          <div>
-            <div>{formatAssigneeWithTeam(row.assignee_name, row.team_name)}</div>
-          </div>
-        )}
-        {showAdmin && <div>{row.admin_status ? <span className="admin-tag">{row.admin_status.label}</span> : "-"}</div>}
-        <StatusBadgeMenu
-          value={row.status}
-          options={allowed}
-          onChange={(status) => void patch(row, { status })}
-        />
-        {row.status === "대면확정" && (
-          <input
-            className="crm-input"
-            type="datetime-local"
-            step={3600}
-            value={toKstHourLocalInput(row.meeting_at)}
-            onChange={(e) => void patch(row, { meeting_at: fromKstHourLocalInput(e.target.value) })}
-            style={{ marginTop: 6, height: 32, fontSize: 12 }}
-            aria-label="대면 일정"
-          />
-        )}
-      </>
-    );
-  };
-
   return (
     <div>
       {(title || description) && (
@@ -860,34 +822,101 @@ export default function LeadList({
           </div>
 
           {isMobile && (
-            <div className="crm-cards">
-              {items.map((row) => (
-                <article key={row.id} className="crm-card" style={{ background: rowBackground(row.status, row.admin_status?.key) || "#fff" }}>
-                  <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            <div className="crm-lead-list-shell">
+              <table className="crm-lead-mobile-table">
+                <thead>
+                  <tr>
                     {canBulkAssign && (
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(row.id)}
-                        onChange={() => toggleSelect(row)}
-                        aria-label={`${row.name} 선택`}
-                        style={{ marginTop: 10 }}
-                      />
+                      <th className="crm-lead-mobile-check">
+                        <input
+                          type="checkbox"
+                          checked={allPageSelected}
+                          onChange={toggleSelectAllPage}
+                          aria-label="현재 페이지 전체 선택"
+                        />
+                      </th>
                     )}
-                    <img className="crm-thumb" src={row.landing_preview} alt="" onClick={() => setPreviewSrc(row.landing_preview)} />
-                    <div className="crm-customer" style={{ flex: 1 }}>
-                      <span className="crm-customer-name">{row.name}</span>
-                      <span className="crm-customer-phone">{formatPhoneKorean(row.phone)}</span>
-                      <span style={{ fontSize: 12, color: "var(--crm-muted)" }}>{row.created_at}</span>
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gap: 8, marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
-                    {renderRowActions(row)}
-                    <button type="button" className="crm-btn" onClick={() => void openMemo(row)}>
-                      메모 보기
-                    </button>
-                  </div>
-                </article>
-              ))}
+                    <th>이름</th>
+                    <th>연락처</th>
+                    <th>날짜</th>
+                    <th>담당자</th>
+                    {showAdmin && <th>관리자상태</th>}
+                    <th>상담상태</th>
+                    <th>메모</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((row) => {
+                    const allowed = session ? allowedStatusesFor(session as SessionUser, row.status) : [row.status];
+                    return (
+                      <tr
+                        key={row.id}
+                        className={selectedId === row.id ? "is-selected" : undefined}
+                        style={{ background: rowBackground(row.status, row.admin_status?.key) }}
+                        onClick={() => setSelectedId(row.id)}
+                      >
+                        {canBulkAssign && (
+                          <td className="crm-lead-mobile-check" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(row.id)}
+                              onChange={() => toggleSelect(row)}
+                              aria-label={`${row.name} 선택`}
+                            />
+                          </td>
+                        )}
+                        <td className="crm-lead-mobile-name">{row.name}</td>
+                        <td className="crm-lead-mobile-phone">{formatPhoneKorean(row.phone)}</td>
+                        <td className="crm-lead-mobile-date">{row.created_at}</td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          {showAdmin ? (
+                            <AssigneePicker
+                              value={row.assignee_id}
+                              staff={staff}
+                              teamName={row.team_name}
+                              history={isAdmin ? row.assignee_history : undefined}
+                              onChange={(id) => void patch(row, { assignee_id: id })}
+                            />
+                          ) : (
+                            <span className="crm-lead-mobile-assignee-text">
+                              {formatAssigneeWithTeam(row.assignee_name, row.team_name) || "-"}
+                            </span>
+                          )}
+                        </td>
+                        {showAdmin && (
+                          <td onClick={(e) => e.stopPropagation()}>
+                            {row.admin_status ? <span className="admin-tag">{row.admin_status.label}</span> : "-"}
+                          </td>
+                        )}
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <div className="crm-lead-mobile-status-cell">
+                            <StatusBadgeMenu
+                              value={row.status}
+                              options={allowed}
+                              onChange={(status) => void patch(row, { status })}
+                            />
+                            {row.status === "대면확정" && (
+                              <input
+                                className="crm-input"
+                                type="datetime-local"
+                                step={3600}
+                                value={toKstHourLocalInput(row.meeting_at)}
+                                onChange={(e) => void patch(row, { meeting_at: fromKstHourLocalInput(e.target.value) })}
+                                aria-label="대면 일정"
+                              />
+                            )}
+                          </div>
+                        </td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <button type="button" className="crm-btn crm-lead-mobile-memo" onClick={() => void openMemo(row)}>
+                            메모
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
 

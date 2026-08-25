@@ -64,6 +64,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   return NextResponse.json({
     ok: true,
     item: withHistory,
+    merge_status: (data as { merge_status?: string }).merge_status ?? "active",
+    merged_into_id: (data as { merged_into_id?: string | null }).merged_into_id ?? null,
     allowed_statuses: allowedStatusesFor(session, withHistory.status),
     assignment_logs: (assignLogs ?? []).map((l) => ({
       id: l.id,
@@ -90,6 +92,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { data: current, error: loadErr } = await (supabase.from(table) as any).select(select).eq("id", id).maybeSingle();
   if (loadErr || !current) {
     return NextResponse.json({ ok: false, message: "리드를 찾을 수 없습니다." }, { status: 404 });
+  }
+
+  if ((current as { merge_status?: string }).merge_status === "merged") {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "병합된 고객은 수정할 수 없습니다.",
+        merged_into_id: (current as { merged_into_id?: string | null }).merged_into_id ?? null,
+      },
+      { status: 409 }
+    );
   }
 
   const scoped = await visibleAssigneeIds(session);

@@ -133,6 +133,7 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
     const select = kind === "candidates" ? CANDIDATE_SELECT : CONSUMER_SELECT;
     let query = (supabase.from(table) as any)
       .select(select, { count: "exact" })
+      .or("merge_status.eq.active,merge_status.is.null")
       .order("created_at", { ascending: false });
     query = applyCommonFilters(query, q, scoped, session.rank);
     if (teamAssigneeIds) {

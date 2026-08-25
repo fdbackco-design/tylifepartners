@@ -9,6 +9,11 @@ import { isLeadSubmissionBlocked, maskPhoneForLog } from "@/lib/phoneBlacklist";
 import { runAfterResponse } from "@/lib/runAfterResponse";
 import { tryAutoAssignLead } from "@/lib/crm/assignment";
 import { resolveRegionZone } from "@/lib/crm/regionZones";
+import {
+  attachInboundToExistingLead,
+  findActiveLeadsByPhone,
+  pickSamePersonLead,
+} from "@/lib/crm/merge/reinquiry";
 import { syncLeadToCrm } from "@/lib/crmSync";
 
 /** 클라이언트에서 보낸 유입 경로 (예: /, /v2, /me). 잘못된 값은 무시 */
@@ -90,9 +95,102 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseAdmin();
     const regionRaw = location || region || null;
     const nowIso = new Date().toISOString();
+
+    // 동일 활성 고객(이름+전화) 재유입 → 신규 행 대신 유입 이력 추가
+    const existingHits = await findActiveLeadsByPhone("leads", phone);
+    const samePerson = pickSamePersonLead(existingHits, name);
+    if (samePerson) {
+      const attached = await attachInboundToExistingLead({
+        table: "leads",
+        leadId: samePerson.id,
+        name,
+        phone,
+        source: utmSource || source,
+        entry_page: entryPage,
+        utm_source: utmSource || null,
+        utm_medium: utmMedium || null,
+        utm_campaign: utmCampaign || null,
+        utm_content: utmContent || null,
+        utm_term: utmTerm || null,
+        receivedAtIso: nowIso,
+      });
+      if (!attached.ok) {
+        console.error("reinquiry attach failed:", attached.message);
+      } else {
+        console.info("[lead] reinquiry attached to existing lead", samePerson.id);
+      }
+
+      {
+        const medium = await resolveSheetMediumFromUtmSource(utmSource, source);
+        const managerName =
+          entryPageRaw === "no-clawback" || entryPageRaw === "/no-clawback" ? "" : undefined;
+        const sheetResult = await appendLeadRowToGoogleSheet({
+          dateKstYmd: formatKstYmd(new Date()),
+          medium,
+          managerName,
+          kind: "B2C",
+          name,
+          phone: phonePretty,
+          entry_page: entryPage,
+          region: location || null,
+          available_time: desiredTime || null,
+          age_group: ageGroup || null,
+          job: job || null,
+        });
+        if (!sheetResult.ok && !sheetResult.skipped) {
+          console.error("Google Sheets append failed:", sheetResult.error);
+        }
+      }
+
+      const emailResult = await sendLeadEmailNotification({
+        kind: "b2c",
+        name,
+        phone,
+        createdAtIso: nowIso,
+        adminUrl: "https://www.feed-life.com/admin",
+        entry_page: entryPage,
+        desired_date: desiredDate || null,
+        desired_time: desiredTime || null,
+        location: location || null,
+        utm_source: utmSource || null,
+        utm_medium: utmMedium || null,
+        utm_campaign: utmCampaign || null,
+        utm_content: utmContent || null,
+      });
+      if (!emailResult.ok && !emailResult.skipped) {
+        console.error("Lead email notify failed:", emailResult.error);
+      }
+
+      runAfterResponse(
+        syncLeadToCrm(supabase, {
+          submissionId: samePerson.id,
+          sourceTable: "leads",
+          customerName: name,
+          phone,
+          region: location || region || null,
+          ageGroup: ageGroup || null,
+          occupation: job || null,
+          inquiryType: null,
+          message: null,
+          privacyConsent: true,
+          receivedAtIso: nowIso,
+          landingPage: entryPage,
+          referrer: request.headers.get("referer"),
+          utmSource: utmSource || null,
+          utmMedium: utmMedium || null,
+          utmCampaign: utmCampaign || null,
+          utmContent: utmContent || null,
+          utmTerm: utmTerm || null,
+        })
+      );
+
+      return NextResponse.json({ ok: true, reinquiry: true, lead_id: samePerson.id });
+    }
+
     const { data: insertedLead, error } = await supabase.from("leads").insert({
       name,
       phone,
+      normalized_phone: phone,
       source: utmSource || source,
       desired_date: desiredDate || null,
       desired_time: desiredTime || null,
@@ -115,6 +213,7 @@ export async function POST(request: NextRequest) {
       available_time: desiredTime || null,
       age_group: ageGroup || null,
       job: job || null,
+      merge_status: "active",
     })
       // 저장되는 값·컬럼은 그대로. CRM 동기화용 submission_id/실제 접수 시각만 돌려받는다.
       .select("id, created_at")

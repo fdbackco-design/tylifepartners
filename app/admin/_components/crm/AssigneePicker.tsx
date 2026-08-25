@@ -39,29 +39,19 @@ export default function AssigneePicker({ value, staff, teamName, history, onChan
   }, [open]);
 
   return (
-    <div ref={root} style={{ position: "relative", minWidth: 120 }}>
+    <div ref={root} className="crm-assignee-picker">
       <button
         type="button"
-        className="crm-btn"
-        style={{ width: "100%", justifyContent: "flex-start", height: "auto", minHeight: 36, padding: "6px 10px" }}
+        className="crm-btn crm-assignee-picker-btn"
         disabled={disabled}
         onClick={() => !disabled && setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span style={{ textAlign: "left", lineHeight: 1.3 }}>{value ? label : "미배정"}</span>
+        <span className="crm-assignee-picker-label">{value ? label : "미배정"}</span>
       </button>
       {historyText ? (
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: 11,
-            lineHeight: 1.35,
-            color: "var(--crm-muted)",
-            wordBreak: "keep-all",
-          }}
-          title={historyText}
-        >
+        <div className="crm-assignee-picker-history" title={historyText}>
           {historyText}
         </div>
       ) : null}

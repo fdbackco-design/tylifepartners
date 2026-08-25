@@ -18,6 +18,7 @@ const PRIMARY_TABS = [
 const SECONDARY_TABS = [
   { href: "/admin/accounts", label: "계정 관리", ranks: ["admin", "manager"] as const },
   { href: "/admin/assignment", label: "자동 분배 설정", ranks: ["admin"] as const },
+  { href: "/admin/merge", label: "중복 병합", ranks: ["admin"] as const },
   { href: "/admin/utm", label: "UTM", ranks: ["admin"] as const },
   { href: "/admin/landings", label: "랜딩", ranks: ["admin"] as const },
 ];
@@ -122,7 +123,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         <div className="crm-header-bar">
           <Link href={home} className="crm-brand">
             <img className="crm-brand-mark" src="/icon.png" alt="" width={28} height={28} />
-            FEED LIFE 상담관리
+            <span className="crm-brand-text">
+              <span className="crm-brand-full">FEED LIFE 상담관리</span>
+              <span className="crm-brand-short">FEED LIFE</span>
+            </span>
           </Link>
           <div className="crm-header-meta">
             {user.rank === "admin" && (

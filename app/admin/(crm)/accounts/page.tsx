@@ -335,10 +335,10 @@ export default function AccountsPage() {
           <tbody>
             {filtered.map((u) => (
               <tr key={u.id}>
-                <td style={{ fontWeight: 600 }}>{u.name}</td>
-                <td>{u.rank === "manager" ? "매니저" : "영업자"}</td>
-                <td>{u.login_id}</td>
-                <td>{formatPhoneKorean(u.phone)}</td>
+                <td style={{ fontWeight: 600 }} className="crm-cell-nowrap">{u.name}</td>
+                <td className="crm-cell-nowrap">{u.rank === "manager" ? "매니저" : "영업자"}</td>
+                <td className="crm-cell-nowrap">{u.login_id}</td>
+                <td className="crm-cell-nowrap">{formatPhoneKorean(u.phone)}</td>
                 <td>
                   {u.region && isRegionZoneName(u.region) ? (
                     <CrmBadge tone="primary">{u.region}</CrmBadge>
