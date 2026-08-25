@@ -1,6 +1,5 @@
 /**
- * UTM 추적 구조
- * 플랫폼별 utm_source, utm_medium 정의 및 링크 생성
+ * UTM + Meta 광고 추적 파라미터
  */
 
 export type UTMPlatform =
@@ -34,10 +33,30 @@ export interface UTMParams {
   utm_campaign?: string;
   utm_content?: string;
   utm_term?: string;
+  /** Meta Ads URL 파라미터 / 동적 매크로 {{ad.id}} */
+  meta_ad_id?: string;
+  meta_adset_id?: string;
+  meta_campaign_id?: string;
+}
+
+/** Meta 광고·광고세트·캠페인 ID로 쓸 수 있는 숫자 문자열 */
+export function isLikelyMetaObjectId(raw: string | null | undefined): boolean {
+  const s = String(raw ?? "").trim();
+  return /^\d{5,30}$/.test(s);
+}
+
+function firstParam(params: URLSearchParams, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const v = params.get(key)?.trim();
+    if (v) return v;
+  }
+  return undefined;
 }
 
 /**
- * URL 쿼리에서 UTM 파라미터 추출
+ * URL 쿼리에서 UTM + Meta 광고 ID 추출
+ * 권장 광고 URL 예시:
+ *   ...?utm_source=facebook&utm_content={{ad.id}}&ad_id={{ad.id}}&adset_id={{adset.id}}&campaign_id={{campaign.id}}
  */
 export function parseUTMFromUrl(search: string = ""): UTMParams {
   if (typeof window !== "undefined" && !search) {
@@ -55,16 +74,71 @@ export function parseUTMFromUrl(search: string = ""): UTMParams {
   if (utmCampaign) utm.utm_campaign = utmCampaign;
   if (utmContent) utm.utm_content = utmContent;
   if (utmTerm) utm.utm_term = utmTerm;
+
+  const adId =
+    firstParam(params, ["ad_id", "adid", "fb_ad_id"]) ||
+    (isLikelyMetaObjectId(utmContent) ? String(utmContent).trim() : undefined);
+  const adsetId = firstParam(params, ["adset_id", "adsetid", "fb_adset_id"]);
+  const campaignId =
+    firstParam(params, ["campaign_id", "campaignid", "fb_campaign_id"]) ||
+    (isLikelyMetaObjectId(utmCampaign) ? String(utmCampaign).trim() : undefined);
+
+  if (adId && isLikelyMetaObjectId(adId)) utm.meta_ad_id = adId;
+  if (adsetId && isLikelyMetaObjectId(adsetId)) utm.meta_adset_id = adsetId;
+  if (campaignId && isLikelyMetaObjectId(campaignId)) utm.meta_campaign_id = campaignId;
+
   return utm;
+}
+
+/** 상담 신청 body에 넣을 attribution 필드 */
+export function attributionFieldsFromUtm(utm: UTMParams): {
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  utm_term: string | null;
+  meta_ad_id: string | null;
+  meta_adset_id: string | null;
+  meta_campaign_id: string | null;
+} {
+  return {
+    utm_source: utm.utm_source || null,
+    utm_medium: utm.utm_medium || null,
+    utm_campaign: utm.utm_campaign || null,
+    utm_content: utm.utm_content || null,
+    utm_term: utm.utm_term || null,
+    meta_ad_id: utm.meta_ad_id || null,
+    meta_adset_id: utm.meta_adset_id || null,
+    meta_campaign_id: utm.meta_campaign_id || null,
+  };
+}
+
+/** API body에서 Meta 광고 ID 정규화 (meta_* 또는 ad_id 별칭) */
+export function parseMetaIdsFromBody(
+  body: Record<string, unknown>,
+  fallbacks?: { utm_content?: string | null; utm_campaign?: string | null }
+): {
+  meta_ad_id: string | null;
+  meta_adset_id: string | null;
+  meta_campaign_id: string | null;
+} {
+  const pick = (...vals: unknown[]): string | null => {
+    for (const v of vals) {
+      if (v == null) continue;
+      const s = String(v).trim();
+      if (isLikelyMetaObjectId(s)) return s;
+    }
+    return null;
+  };
+  return {
+    meta_ad_id: pick(body.meta_ad_id, body.ad_id, body.adid, fallbacks?.utm_content),
+    meta_adset_id: pick(body.meta_adset_id, body.adset_id, body.adsetid),
+    meta_campaign_id: pick(body.meta_campaign_id, body.campaign_id, body.campaignid, fallbacks?.utm_campaign),
+  };
 }
 
 /**
  * 플랫폼별 UTM 링크 생성
- * @param baseUrl 사이트 기본 URL (예: https://www.feed-life.com)
- * @param path 경로 (예: /, /me, /business)
- * @param platform 플랫폼 키
- * @param campaign 캠페인명 (선택)
- * @param content 콘텐츠 구분 (선택)
  */
 export function buildUTMLink(
   baseUrl: string,
@@ -82,9 +156,6 @@ export function buildUTMLink(
   return url.toString();
 }
 
-/**
- * 모든 플랫폼별 UTM 링크 한번에 생성
- */
 export function buildAllPlatformLinks(
   baseUrl: string,
   path: string = "/",

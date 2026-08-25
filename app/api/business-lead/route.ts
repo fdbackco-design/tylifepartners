@@ -24,6 +24,7 @@ import {
 import { getManagedLandingById } from "@/lib/managedLandings/store";
 import { verifyAdminSession } from "@/lib/adminSession";
 import { parseBaseRegion } from "@/lib/regions";
+import { parseMetaIdsFromBody } from "@/lib/utm";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
 const ALLOWED_JOB_RANKS = new Set(["지점장 이상", "팀장 이상", "FC"]);
@@ -62,6 +63,10 @@ export async function POST(request: NextRequest) {
     const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
     const utmContent = body.utm_content != null ? String(body.utm_content).trim() : null;
     const utmTerm = body.utm_term != null ? String(body.utm_term).trim() : null;
+    const metaIds = parseMetaIdsFromBody(body as Record<string, unknown>, {
+      utm_content: utmContent,
+      utm_campaign: utmCampaign,
+    });
     const marketingConsent =
       body.marketing_consent === 1 || body.marketing_consent === "1" ? 1 : null;
     const region = body.region != null ? String(body.region).trim() : body.location != null ? String(body.location).trim() : "";
@@ -200,6 +205,9 @@ export async function POST(request: NextRequest) {
         utm_campaign: utmCampaign || null,
         utm_content: utmContent || null,
         utm_term: utmTerm || null,
+        meta_ad_id: metaIds.meta_ad_id,
+        meta_adset_id: metaIds.meta_adset_id,
+        meta_campaign_id: metaIds.meta_campaign_id,
         receivedAtIso: nowIso,
       });
       if (!samePerson.assignee_id) {
@@ -245,6 +253,9 @@ export async function POST(request: NextRequest) {
       utm_campaign: utmCampaign || null,
       utm_content: utmContent || null,
       utm_term: utmTerm || null,
+      meta_ad_id: metaIds.meta_ad_id,
+      meta_adset_id: metaIds.meta_adset_id,
+      meta_campaign_id: metaIds.meta_campaign_id,
       marketing_consent: marketingConsent,
       region: regionForDb,
       available_time: availableTimeForDb,

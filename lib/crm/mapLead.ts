@@ -41,6 +41,12 @@ export function mapLeadRow(
     utm_campaign: String(row.utm_campaign ?? ""),
     utm_content: String(row.utm_content ?? ""),
     utm_term: String(row.utm_term ?? ""),
+    meta_ad_id: row.meta_ad_id ? String(row.meta_ad_id) : null,
+    meta_ad_name: null,
+    meta_creative_type: null,
+    meta_creative_preview: null,
+    meta_creative_full: null,
+    meta_creative_status: null,
     marketing_consent: row.marketing_consent == null ? null : Number(row.marketing_consent),
     status,
     memo: String(row.memo ?? ""),
@@ -56,10 +62,10 @@ export function mapLeadRow(
 }
 
 export const CONSUMER_SELECT =
-  "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, location, desired_time, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, merged_into_id, merged_at, normalized_phone";
+  "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, meta_adset_id, meta_campaign_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, location, desired_time, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, merged_into_id, merged_at, normalized_phone";
 
 export const CANDIDATE_SELECT =
-  "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, merged_into_id, merged_at, normalized_phone";
+  "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, meta_adset_id, meta_campaign_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, merged_into_id, merged_at, normalized_phone";
 
 export async function loadStaffMaps() {
   const supabase = getSupabaseAdmin();

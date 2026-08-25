@@ -788,6 +788,7 @@ export default function LeadList({
                       />
                     </th>
                   )}
+                  <th>광고소재</th>
                   <th>미리보기</th>
                   <th>고객</th>
                   <th>신청시간</th>
@@ -824,6 +825,49 @@ export default function LeadList({
                           />
                         </td>
                       )}
+                      <td onClick={(e) => e.stopPropagation()}>
+                        {row.meta_creative_preview ? (
+                          <button
+                            type="button"
+                            className="crm-meta-creative"
+                            title={
+                              [row.meta_ad_name, row.meta_ad_id, row.meta_creative_type]
+                                .filter(Boolean)
+                                .join(" · ") || "Meta 광고 소재"
+                            }
+                            onClick={() =>
+                              setPreviewSrc(row.meta_creative_full || row.meta_creative_preview)
+                            }
+                          >
+                            <img
+                              className="crm-thumb crm-thumb-meta"
+                              src={row.meta_creative_preview}
+                              alt={row.meta_ad_name || "광고 소재"}
+                            />
+                            {row.meta_creative_type === "video" && (
+                              <span className="crm-meta-creative-badge">영상</span>
+                            )}
+                          </button>
+                        ) : row.meta_ad_id ? (
+                          <span
+                            className="crm-cell-plain"
+                            style={{ fontSize: 11, color: "var(--crm-muted)" }}
+                            title={
+                              row.meta_creative_status === "missing_token"
+                                ? "META_ACCESS_TOKEN 미설정"
+                                : row.meta_ad_name || row.meta_ad_id
+                            }
+                          >
+                            {row.meta_ad_name
+                              ? row.meta_ad_name.slice(0, 18)
+                              : `ID ${row.meta_ad_id.slice(-6)}`}
+                          </span>
+                        ) : (
+                          <span className="crm-cell-plain" style={{ color: "var(--crm-muted)" }}>
+                            -
+                          </span>
+                        )}
+                      </td>
                       <td>
                         <img
                           className="crm-thumb"
@@ -1082,7 +1126,7 @@ export default function LeadList({
           <button type="button" className="crm-drawer-backdrop" aria-label="미리보기 닫기" onClick={() => setPreviewSrc(null)} />
           <div
             role="dialog"
-            aria-label="랜딩 미리보기"
+            aria-label="이미지 미리보기"
             style={{
               position: "fixed",
               zIndex: 62,
@@ -1092,7 +1136,7 @@ export default function LeadList({
               pointerEvents: "none",
             }}
           >
-            <img src={previewSrc} alt="랜딩 확대" style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: 8, pointerEvents: "auto" }} />
+            <img src={previewSrc} alt="미리보기 확대" style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: 8, pointerEvents: "auto" }} />
           </div>
         </>
       )}

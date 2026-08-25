@@ -4,8 +4,19 @@ import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/
 import { visibleAssigneeIds } from "@/lib/crm/scope";
 import { getAdminStatus } from "@/lib/crm/status";
 import type { LeadCategory, LeadRow, SessionUser } from "@/lib/crm/types";
+import { attachMetaCreatives } from "@/lib/meta/ads";
 import { loadActiveBlacklistPhones } from "@/lib/phoneBlacklist";
 import { getSupabaseAdmin } from "@/lib/supabase";
+
+async function enrichLeads(items: LeadRow[]): Promise<LeadRow[]> {
+  const withHistory = await attachAssigneeHistories(items);
+  try {
+    return await attachMetaCreatives(withHistory);
+  } catch (e) {
+    console.warn("[queryLeads] meta creative attach skipped:", e instanceof Error ? e.message : e);
+    return withHistory;
+  }
+}
 
 export type LeadQueryInput = {
   category: LeadCategory | "all";
@@ -144,28 +155,40 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
 
   const fetchTable = async (kind: "consumers" | "candidates") => {
     const table = kind === "candidates" ? "tylife_b2b" : "leads";
-    const select = kind === "candidates" ? CANDIDATE_SELECT : CONSUMER_SELECT;
-    let query = (supabase.from(table) as any)
-      .select(select, { count: "exact" })
-      .or("merge_status.eq.active,merge_status.is.null")
-      .order("created_at", { ascending: false });
-    query = applyCommonFilters(query, q, scoped, session.rank);
-    query = applyBlacklistFilter(query, blockedPhones);
-    if (teamAssigneeIds) {
-      let ids = teamAssigneeIds;
-      if (scoped !== "all") ids = ids.filter((id) => scoped.includes(id));
-      query = query.in("assignee_id", ids.length ? ids : [NO_MATCH_ID]);
+    const selectFull = kind === "candidates" ? CANDIDATE_SELECT : CONSUMER_SELECT;
+    const selectLegacy = selectFull
+      .replace(", meta_ad_id, meta_adset_id, meta_campaign_id", "")
+      .replace("meta_ad_id, meta_adset_id, meta_campaign_id, ", "");
+
+    const run = async (select: string) => {
+      let query = (supabase.from(table) as any)
+        .select(select, { count: "exact" })
+        .or("merge_status.eq.active,merge_status.is.null")
+        .order("created_at", { ascending: false });
+      query = applyCommonFilters(query, q, scoped, session.rank);
+      query = applyBlacklistFilter(query, blockedPhones);
+      if (teamAssigneeIds) {
+        let ids = teamAssigneeIds;
+        if (scoped !== "all") ids = ids.filter((id) => scoped.includes(id));
+        query = query.in("assignee_id", ids.length ? ids : [NO_MATCH_ID]);
+      }
+      query = applyRegionFilter(query, q.regions, kind === "consumers");
+      if (q.needReassign) {
+        query = query.in("status", ["대기", "1차컨택", "부재(메신저완료)"]);
+      }
+      if (q.category !== "all") {
+        query = query.range(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50) - 1);
+      } else {
+        query = query.limit(3000);
+      }
+      return query;
+    };
+
+    let { data, error, count } = await run(selectFull);
+    if (error && /meta_ad|schema cache|column/i.test(error.message)) {
+      console.warn(`[queryLeads] meta columns missing on ${table}, falling back:`, error.message);
+      ({ data, error, count } = await run(selectLegacy));
     }
-    query = applyRegionFilter(query, q.regions, kind === "consumers");
-    if (q.needReassign) {
-      query = query.in("status", ["대기", "1차컨택", "부재(메신저완료)"]);
-    }
-    if (q.category !== "all") {
-      query = query.range(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50) - 1);
-    } else {
-      query = query.limit(3000);
-    }
-    const { data, error, count } = await query;
     if (error) throw error;
     const items = (data ?? []).map((row: Record<string, unknown>) =>
       mapLeadRow(row, kind, staffById, parentNameById)
@@ -183,13 +206,13 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
     if (q.needReassign) items = items.filter(isNeedReassign);
     const total = items.length;
     const page = items.slice(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50));
-    return { items: await attachAssigneeHistories(page), total };
+    return { items: await enrichLeads(page), total };
   }
 
   const result = await fetchTable(q.category);
   if (q.needReassign) {
     const items = result.items.filter(isNeedReassign);
-    return { items: await attachAssigneeHistories(items), total: items.length };
+    return { items: await enrichLeads(items), total: items.length };
   }
-  return { items: await attachAssigneeHistories(result.items), total: result.total };
+  return { items: await enrichLeads(result.items), total: result.total };
 }

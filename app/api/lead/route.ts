@@ -15,6 +15,7 @@ import {
   pickSamePersonLead,
 } from "@/lib/crm/merge/reinquiry";
 import { syncLeadToCrm } from "@/lib/crmSync";
+import { parseMetaIdsFromBody } from "@/lib/utm";
 
 /** 클라이언트에서 보낸 유입 경로 (예: /, /v2, /me). 잘못된 값은 무시 */
 function normalizeEntryPage(raw: unknown): string | null {
@@ -55,6 +56,10 @@ export async function POST(request: NextRequest) {
     const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
     const utmContent = body.utm_content != null ? String(body.utm_content).trim() : null;
     const utmTerm = body.utm_term != null ? String(body.utm_term).trim() : null;
+    const metaIds = parseMetaIdsFromBody(body as Record<string, unknown>, {
+      utm_content: utmContent,
+      utm_campaign: utmCampaign,
+    });
     const entryPage = normalizeEntryPage(body.entry_page);
     const entryPageRaw = body.entry_page != null ? String(body.entry_page).trim() : "";
     const region = body.region != null ? String(body.region).trim() : null;
@@ -112,6 +117,9 @@ export async function POST(request: NextRequest) {
         utm_campaign: utmCampaign || null,
         utm_content: utmContent || null,
         utm_term: utmTerm || null,
+        meta_ad_id: metaIds.meta_ad_id,
+        meta_adset_id: metaIds.meta_adset_id,
+        meta_campaign_id: metaIds.meta_campaign_id,
         receivedAtIso: nowIso,
       });
       if (!attached.ok) {
@@ -208,6 +216,9 @@ export async function POST(request: NextRequest) {
       utm_campaign: utmCampaign || null,
       utm_content: utmContent || null,
       utm_term: utmTerm || null,
+      meta_ad_id: metaIds.meta_ad_id,
+      meta_adset_id: metaIds.meta_adset_id,
+      meta_campaign_id: metaIds.meta_campaign_id,
       marketing_consent: marketingConsent,
       entry_page: entryPage,
       analytics_session_id: analytics.analytics_session_id,

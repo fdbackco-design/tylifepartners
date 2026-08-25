@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { DESIRED_TIME_OPTIONS, LOCATION_OPTIONS, getDesiredDateOptions } from "@/lib/formOptions";
 import { useUTM } from "@/lib/useUTM";
+import { attributionFieldsFromUtm } from "@/lib/utm";
 import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
 import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
 import { useRouter } from "next/navigation";
@@ -96,11 +97,7 @@ export default function ParentLandingPage({ hero1, hero2, karrotPage, entryPage 
           desired_date: desiredDate || null,
           desired_time: desiredTime || null,
           location: location || null,
-          utm_source: utm.utm_source || null,
-          utm_medium: utm.utm_medium || null,
-          utm_campaign: utm.utm_campaign || null,
-          utm_content: utm.utm_content || null,
-          utm_term: utm.utm_term || null,
+          ...attributionFieldsFromUtm(utm),
           marketing_consent: marketingChecked ? 1 : null,
           entry_page: entryPage,
           ...getSubmissionAnalyticsPayload(),

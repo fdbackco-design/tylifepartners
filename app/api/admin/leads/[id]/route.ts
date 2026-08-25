@@ -6,8 +6,19 @@ import { attachAssigneeHistories } from "@/lib/crm/assigneeHistory";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
 import { visibleAssigneeIds } from "@/lib/crm/scope";
 import { allowedStatusesFor, isLeadStatus, isMemoEditable, normalizeStatus, tableForCategory } from "@/lib/crm/status";
-import type { LeadCategory } from "@/lib/crm/types";
+import type { LeadCategory, LeadRow } from "@/lib/crm/types";
+import { attachMetaCreatives } from "@/lib/meta/ads";
 import { getSupabaseAdmin } from "@/lib/supabase";
+
+async function enrichLeadItem(item: LeadRow): Promise<LeadRow> {
+  const [withHistory] = await attachAssigneeHistories([item]);
+  try {
+    const [withMeta] = await attachMetaCreatives([withHistory]);
+    return withMeta;
+  } catch {
+    return withHistory;
+  }
+}
 
 function categoryOf(request: NextRequest): LeadCategory {
   const cat = request.nextUrl.searchParams.get("category");
@@ -33,7 +44,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const { staffById, parentNameById } = await loadStaffMaps();
   const item = mapLeadRow(data as Record<string, unknown>, category, staffById, parentNameById);
-  const [withHistory] = await attachAssigneeHistories([item]);
+  const withHistory = await enrichLeadItem(item);
 
   const [{ data: assignLogs }, { data: memoLogs }, { data: statusLogs }] = await Promise.all([
     supabase
@@ -142,7 +153,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         loadStaffMaps(),
       ]);
       const item = mapLeadRow((fresh ?? current) as Record<string, unknown>, category, staffById, parentNameById);
-      const [withHistory] = await attachAssigneeHistories([item]);
+      const withHistory = await enrichLeadItem(item);
       return NextResponse.json({
         ok: true,
         item: withHistory,
@@ -214,6 +225,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { data: fresh } = await (supabase.from(table) as any).select(select).eq("id", id).maybeSingle();
   const { staffById, parentNameById } = await loadStaffMaps();
   const item = mapLeadRow((fresh ?? current) as Record<string, unknown>, category, staffById, parentNameById);
-  const [withHistory] = await attachAssigneeHistories([item]);
+  const withHistory = await enrichLeadItem(item);
   return NextResponse.json({ ok: true, item: withHistory, allowed_statuses: allowedStatusesFor(session, withHistory.status) });
 }

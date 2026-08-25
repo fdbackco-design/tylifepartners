@@ -283,7 +283,7 @@ export default function UtmLinkPanel() {
     <div className="crm-ui-content">
       <CrmPageHeader
         title="UTM 링크 생성기"
-        description="광고 및 영업자별 유입 링크를 생성합니다"
+        description="광고 및 영업자별 유입 링크를 생성합니다. Meta(FB·IG) 광고는 아래 URL 끝에 ad_id={{ad.id}} 를 붙여 소재 추적이 가능합니다."
       />
 
       {toast ? (
@@ -443,6 +443,15 @@ export default function UtmLinkPanel() {
                   <span>utm_source</span>
                   <strong style={{ fontFamily: "ui-monospace, monospace" }}>{selectedValue}</strong>
                 </div>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <CrmAlert tone="info">
+                  Meta(FB·IG) 광고 URL에는 Ads Manager에서 아래 파라미터를 추가하세요.
+                  <code style={{ display: "block", marginTop: 6, fontSize: 12, wordBreak: "break-all" }}>
+                    &amp;ad_id=&#123;&#123;ad.id&#125;&#125;&amp;adset_id=&#123;&#123;adset.id&#125;&#125;&amp;campaign_id=&#123;&#123;campaign.id&#125;&#125;&amp;utm_content=&#123;&#123;ad.id&#125;&#125;
+                  </code>
+                  고객 목록 &quot;광고소재&quot; 열에서 이미지·영상 썸네일을 확인할 수 있습니다.
+                </CrmAlert>
               </div>
             </>
           )}

@@ -59,6 +59,9 @@ export async function attachInboundToExistingLead(opts: {
   utm_campaign?: string | null;
   utm_content?: string | null;
   utm_term?: string | null;
+  meta_ad_id?: string | null;
+  meta_adset_id?: string | null;
+  meta_campaign_id?: string | null;
   receivedAtIso: string;
 }): Promise<{ ok: boolean; message?: string }> {
   const supabase = getSupabaseAdmin();
@@ -170,6 +173,9 @@ export async function attachInboundToExistingLead(opts: {
       utm_campaign: opts.utm_campaign ?? null,
       utm_content: opts.utm_content ?? null,
       utm_term: opts.utm_term ?? null,
+      meta_ad_id: opts.meta_ad_id ?? null,
+      meta_adset_id: opts.meta_adset_id ?? null,
+      meta_campaign_id: opts.meta_campaign_id ?? null,
       entry_page: opts.entry_page ?? null,
       source: opts.source ?? undefined,
       memo: nextMemo,

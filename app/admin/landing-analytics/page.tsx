@@ -103,9 +103,6 @@ export default function LandingAnalyticsAdminPage() {
     <main style={{ padding: "20px 16px 48px", maxWidth: 960, margin: "0 auto" }}>
       <header style={{ marginBottom: 24, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
         <h1 style={{ margin: 0, fontSize: 22, flex: 1 }}>랜딩 행동 분석</h1>
-        <Link href="/admin" style={{ fontSize: 14 }}>
-          ← 리드 관리
-        </Link>
       </header>
 
       <section
