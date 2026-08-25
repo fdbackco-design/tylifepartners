@@ -150,7 +150,7 @@ export default function BlacklistPage() {
     <div className="crm-ui-content">
       <CrmPageHeader
         title="블랙리스트"
-        description="등록된 전화번호로 상담 신청이 오면 소비자·후보자 DB에 저장되지 않습니다. 신청자에게는 성공으로 보입니다."
+        description="등록된 전화번호로 상담 신청이 오면 소비자·후보자 DB에 저장되지 않고, 기존 고객도 목록에서 숨깁니다."
         actions={
           <CrmButton variant="primary" onClick={openCreate}>
             등록
@@ -273,7 +273,9 @@ export default function BlacklistPage() {
         <CrmField label="메모 (선택)" htmlFor="bl-memo">
           <CrmInput id="bl-memo" value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="차단 사유 등" />
         </CrmField>
-        <CrmAlert tone="info">같은 번호로 상담 신청 시 소비자·후보자 DB에 나타나지 않습니다.</CrmAlert>
+        <CrmAlert tone="info">
+          같은 번호로 상담 신청 시 소비자·후보자 DB에 저장되지 않으며, 이미 있는 고객도 목록에서 숨겨집니다.
+        </CrmAlert>
         {formError ? <CrmAlert tone="danger">{formError}</CrmAlert> : null}
       </CrmSheet>
     </div>
