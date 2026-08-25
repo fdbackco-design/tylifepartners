@@ -18,7 +18,6 @@ const PRIMARY_TABS = [
 const SECONDARY_TABS = [
   { href: "/admin/accounts", label: "계정 관리", ranks: ["admin", "manager"] as const },
   { href: "/admin/assignment", label: "자동 분배 설정", ranks: ["admin"] as const },
-  { href: "/admin/merge", label: "중복 병합", ranks: ["admin"] as const },
   { href: "/admin/excel-import", label: "엑셀 이관", ranks: ["admin"] as const },
   { href: "/admin/utm", label: "UTM", ranks: ["admin"] as const },
   { href: "/admin/landings", label: "랜딩", ranks: ["admin"] as const },

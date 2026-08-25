@@ -4,6 +4,8 @@ import { buildExcelImportPreview, executeExcelImport } from "@/lib/crm/excelImpo
 import { buildResultWorkbook } from "@/lib/crm/excelImport/parse";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session || session.rank !== "admin") {
