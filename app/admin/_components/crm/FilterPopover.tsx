@@ -67,7 +67,7 @@ export default function FilterPopover({ groups, onApply, onReset }: Props) {
         {count > 0 && <span className="crm-badge">{count}</span>}
       </button>
       {open && (
-        <div className="crm-popover crm-popover-right" role="dialog" aria-label="필터" style={{ minWidth: 320, maxHeight: 420, overflow: "auto" }}>
+        <div className="crm-popover crm-popover-right crm-filter-popover" role="dialog" aria-label="필터">
           {groups.map((g) => (
             <div key={g.key} style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "var(--crm-muted)", marginBottom: 6 }}>{g.label}</div>

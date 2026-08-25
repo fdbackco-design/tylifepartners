@@ -1,5 +1,6 @@
 import { appendStatusMemo } from "@/lib/crm/memo";
 import { loadStaffMaps } from "@/lib/crm/mapLead";
+import { assertLeadMutable } from "@/lib/crm/merge/execute";
 import { canChangeAssignee } from "@/lib/crm/scope";
 import { normalizeStatus, tableForCategory } from "@/lib/crm/status";
 import type { LeadCategory, SessionUser } from "@/lib/crm/types";
@@ -16,6 +17,10 @@ export async function changeLeadAssignee(opts: {
   }
 
   const table = tableForCategory(opts.category);
+  const mutable = await assertLeadMutable(table, opts.id);
+  if (!mutable.ok) {
+    return { ok: false, message: mutable.message, status: 409 };
+  }
   const supabase = getSupabaseAdmin();
   const { data: current, error: loadErr } = await (supabase.from(table) as any)
     .select("id, assignee_id, status, memo")

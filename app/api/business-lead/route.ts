@@ -11,6 +11,11 @@ import { syncLeadToCrm } from "@/lib/crmSync";
 import { tryAutoAssignLead } from "@/lib/crm/assignment";
 import { resolveRegionZone } from "@/lib/crm/regionZones";
 import {
+  attachInboundToExistingLead,
+  findActiveLeadsByPhone,
+  pickSamePersonLead,
+} from "@/lib/crm/merge/reinquiry";
+import {
   DEFAULT_FORM_CONFIG,
   normalizeFormConfig,
   resolveAllowedRegions,
@@ -179,9 +184,50 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdmin();
     const nowIso = new Date().toISOString();
+
+    const existingHits = await findActiveLeadsByPhone("tylife_b2b", phone);
+    const samePerson = pickSamePersonLead(existingHits, name);
+    if (samePerson) {
+      await attachInboundToExistingLead({
+        table: "tylife_b2b",
+        leadId: samePerson.id,
+        name,
+        phone,
+        source: utmSource || source,
+        entry_page: entryPage,
+        utm_source: utmSource || null,
+        utm_medium: utmMedium || null,
+        utm_campaign: utmCampaign || null,
+        utm_content: utmContent || null,
+        utm_term: utmTerm || null,
+        receivedAtIso: nowIso,
+      });
+      runAfterResponse(
+        processBusinessLeadSideEffects({
+          dateKstYmd: formatKstYmd(new Date()),
+          name,
+          phone,
+          phonePretty,
+          source,
+          utmSource,
+          utmMedium,
+          utmCampaign,
+          utmContent,
+          entryPage,
+          region: regionForDb ?? "",
+          availableTime: availableTimeForDb ?? "",
+          ageGroup: ageGroupForDb ?? "",
+          job: jobForDb ?? "",
+          jobRankForDb: jobRankStored,
+        }).catch((e) => console.error("business reinquiry side effects:", e))
+      );
+      return NextResponse.json({ ok: true, reinquiry: true, lead_id: samePerson.id });
+    }
+
     const { data: insertedLead, error } = await supabase.from("tylife_b2b").insert({
       name,
       phone,
+      normalized_phone: phone,
       source: utmSource || source,
       entry_page: entryPage,
       landing_id: landingId,
@@ -204,6 +250,7 @@ export async function POST(request: NextRequest) {
       status: "배정전",
       status_changed_at: nowIso,
       region_zone: resolveRegionZone(regionForDb),
+      merge_status: "active",
     })
       // 저장되는 값·컬럼은 그대로. CRM 동기화용 submission_id/실제 접수 시각만 돌려받는다.
       .select("id, created_at")

@@ -51,13 +51,13 @@ export default function DateRangePicker({ from, to, onChange }: Props) {
       : "기간 선택";
 
   return (
-    <div ref={root} style={{ position: "relative" }}>
+    <div ref={root} className="crm-date-range">
       <button type="button" className="crm-btn" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((v) => !v)}>
         {label}
       </button>
       {open && (
-        <div className="crm-popover crm-popover-right" role="dialog" aria-label="기간 선택">
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+        <div className="crm-popover crm-date-range-popover" role="dialog" aria-label="기간 선택">
+          <div className="crm-date-range-presets">
             {PRESETS.map((p) => (
               <button
                 key={p.label}
@@ -68,6 +68,8 @@ export default function DateRangePicker({ from, to, onChange }: Props) {
                   const [a, b] = p.get();
                   setDraftFrom(a);
                   setDraftTo(b);
+                  onChange(a, b);
+                  setOpen(false);
                 }}
               >
                 {p.label}

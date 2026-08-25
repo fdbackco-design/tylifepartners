@@ -46,8 +46,8 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main style={{ maxWidth: 400, margin: "0 auto", padding: 24 }}>
-      <h1 style={{ marginBottom: 24, fontSize: 20, fontWeight: 600 }}>상담관리 로그인</h1>
+    <main className="crm-admin-login">
+      <h1 className="crm-admin-login-title">상담관리 로그인</h1>
       <form onSubmit={onSubmit}>
         <label htmlFor="login-id" style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}>
           아이디
