@@ -148,10 +148,12 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             <span>
               {user.name} · {rankLabel}
             </span>
-            <PushSubscribeButton />
-            <button type="button" className="crm-btn" onClick={logout}>
-              로그아웃
-            </button>
+            <div className="crm-header-actions">
+              <PushSubscribeButton />
+              <button type="button" className="crm-btn" onClick={logout}>
+                로그아웃
+              </button>
+            </div>
           </div>
         </div>
         <nav className="crm-tabs" aria-label="주요 메뉴">
