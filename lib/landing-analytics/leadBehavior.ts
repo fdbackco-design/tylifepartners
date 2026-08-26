@@ -75,7 +75,13 @@ function summarizeSession(
       markers.add(Math.round(ev.depth));
       maxDepth = Math.max(maxDepth, ev.depth);
     }
-    if (ev.duration_seconds != null) duration = Math.max(duration, ev.duration_seconds);
+    // heartbeat / leave 기반 체류초 (section_dwell은 아래 합산)
+    if (
+      ev.duration_seconds != null &&
+      (ev.event_type === "heartbeat" || ev.event_type === "leave")
+    ) {
+      duration = Math.max(duration, ev.duration_seconds);
+    }
 
     if (ev.event_type === "section_dwell" && ev.section_name) {
       const prev = dwellMap.get(ev.section_name);
@@ -126,10 +132,27 @@ function summarizeSession(
 
   markers.add(Math.round(maxDepth));
 
+  // leave/heartbeat가 없으면 이벤트 시각 차로 체류 추정
+  if (duration <= 0 && started && ended) {
+    const ms = new Date(ended).getTime() - new Date(started).getTime();
+    if (Number.isFinite(ms) && ms > 0) duration = Math.max(1, Math.round(ms / 1000));
+  }
+
+  // page_url이 경로만 있으면 landing_key 대신 표시용으로 유지
+  let displayPage = landingKey;
+  if (pageUrl) {
+    try {
+      const u = pageUrl.startsWith("http") ? new URL(pageUrl) : null;
+      displayPage = u ? u.pathname : pageUrl;
+    } catch {
+      displayPage = pageUrl;
+    }
+  }
+
   return {
     session_id: sessionId,
     visitor_id: visitorId,
-    landing_key: landingKey,
+    landing_key: landingKey || displayPage,
     page_url: pageUrl,
     linked_at: linkMeta?.linked_at ?? null,
     started_at: started,
