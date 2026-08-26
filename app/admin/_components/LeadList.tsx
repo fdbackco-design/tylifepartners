@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatPhoneKorean } from "@/lib/phone";
 import { fromKstHourLocalInput, toKstHourLocalInput } from "@/lib/crm/kst";
 import { ADMIN_STATUS_FILTER_OPTIONS, allowedStatusesFor, isMemoEditable, rowBackground } from "@/lib/crm/status";
+import { formatKstDateTime } from "@/lib/crm/kst";
 import { formatYmdDot } from "@/lib/crm/ui";
 import type { LeadCategory, LeadRow, LeadStatus, SessionUser } from "@/lib/crm/types";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
@@ -30,6 +31,13 @@ function useDebounced<T>(value: T, ms: number): T {
     return () => clearTimeout(t);
   }, [value, ms]);
   return v;
+}
+
+function formatAssignedAt(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "-";
+  return formatKstDateTime(d);
 }
 
 export default function LeadList({
@@ -290,6 +298,7 @@ export default function LeadList({
       assignee_id: nextId,
       assignee_name: nextStaff?.name ?? "",
       team_name: parentName,
+      assigned_at: nextId ? new Date().toISOString() : null,
       assignee_history:
         nextStaff?.name && row.assignee_name && row.assignee_name !== nextStaff.name
           ? [...(row.assignee_history?.length ? row.assignee_history : [row.assignee_name]), nextStaff.name]
@@ -889,6 +898,7 @@ export default function LeadList({
                   <th>직급</th>
                   <th>유입경로</th>
                   <th>담당자</th>
+                  <th>배정일</th>
                   {showAdmin && <th>관리자상태</th>}
                   <th>상담상태</th>
                   <th>메모</th>
@@ -1003,6 +1013,13 @@ export default function LeadList({
                           </div>
                         )}
                       </td>
+                      <td
+                        className="crm-cell-plain"
+                        style={{ color: "var(--crm-muted)", fontSize: 12, whiteSpace: "nowrap" }}
+                        title={row.assignee_id ? "현재 담당자 배정 시각" : undefined}
+                      >
+                        {row.assignee_id ? formatAssignedAt(row.assigned_at) : "-"}
+                      </td>
                       {showAdmin && (
                         <td className="crm-cell-admin-status">
                           {row.admin_status ? <span className="admin-tag">{row.admin_status.label}</span> : "-"}
@@ -1071,6 +1088,7 @@ export default function LeadList({
                     <th>연락처</th>
                     <th>날짜</th>
                     <th>담당자</th>
+                    <th>배정일</th>
                     {showAdmin && <th>관리자상태</th>}
                     <th>상담상태</th>
                     <th>메모</th>
@@ -1114,6 +1132,13 @@ export default function LeadList({
                               {formatAssigneeWithTeam(row.assignee_name, row.team_name) || "-"}
                             </span>
                           )}
+                        </td>
+                        <td
+                          className="crm-lead-mobile-date"
+                          style={{ color: "var(--crm-muted)", fontSize: 11, whiteSpace: "nowrap" }}
+                          title={row.assignee_id ? "현재 담당자 배정 시각" : undefined}
+                        >
+                          {row.assignee_id ? formatAssignedAt(row.assigned_at) : "-"}
                         </td>
                         {showAdmin && (
                           <td onClick={(e) => e.stopPropagation()}>
