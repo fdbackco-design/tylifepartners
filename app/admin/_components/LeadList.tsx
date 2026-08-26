@@ -173,37 +173,84 @@ export default function LeadList({
     dateTo,
   ]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const loadGenRef = useRef(0);
+
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    const gen = ++loadGenRef.current;
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const res = await fetch(`/api/admin/leads?${query}`);
       const data = await res.json();
+      if (gen !== loadGenRef.current) return;
       if (res.status === 401) {
         window.location.href = "/admin";
         return;
       }
       if (!data.ok) {
-        setError(data.message || "조회에 실패했습니다.");
-        setItems([]);
-        setTotal(0);
+        if (!silent) {
+          setError(data.message || "조회에 실패했습니다.");
+          setItems([]);
+          setTotal(0);
+        }
         return;
       }
       setItems(data.items ?? []);
       setTotal(data.total ?? 0);
       setStaff(data.staff ?? []);
-      setSelectedIds(new Map());
+      if (!silent) setSelectedIds(new Map());
       if (data.session) setSession(data.session);
       if (data.options) setOptions(data.options);
     } catch {
-      setError("네트워크 오류가 발생했습니다.");
+      if (gen !== loadGenRef.current) return;
+      if (!silent) setError("네트워크 오류가 발생했습니다.");
     } finally {
-      setLoading(false);
+      if (gen === loadGenRef.current && !silent) setLoading(false);
     }
   }, [query]);
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  // 열려 있는 DB 탭에서 새 상담신청이 목록에 자동 반영되도록 조용히 갱신
+  useEffect(() => {
+    const POLL_MS = 15_000;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const clear = () => {
+      if (timer != null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const schedule = () => {
+      clear();
+      timer = setInterval(() => {
+        if (document.hidden) return;
+        void load({ silent: true });
+      }, POLL_MS);
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        clear();
+        return;
+      }
+      void load({ silent: true });
+      schedule();
+    };
+
+    if (!document.hidden) schedule();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clear();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [load]);
 
   const patch = async (row: LeadRow, body: Record<string, unknown>) => {
