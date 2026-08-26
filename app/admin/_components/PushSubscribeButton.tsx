@@ -142,6 +142,19 @@ export default function PushSubscribeButton() {
         return;
       }
       setStatus("on");
+
+      // 데스크톱·모바일 모두: 설정 직후 확인 알림 (브라우저/OS 알림 허용 상태 확인용)
+      try {
+        await reg.showNotification("FEED LIFE 상담관리", {
+          body: "알림이 켜졌습니다. 신규 DB·배정 시 이 PC/브라우저로도 알림이 옵니다.",
+          icon: "/icon.png",
+          badge: "/icon.png",
+          tag: "tylife-crm-push-on",
+          data: { url: "/admin/consumers" },
+        });
+      } catch {
+        /* 무시 — 구독은 성공 */
+      }
     } catch (e) {
       console.error(e);
       alert("알림 설정 중 오류가 발생했습니다.");

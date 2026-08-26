@@ -81,9 +81,17 @@ export function LandingAnalyticsReportView({
             </tr>
           </thead>
           <tbody>
-            {report.device_depth_reach.map((row) => (
-              <tr key={row.device} style={{ borderBottom: "1px solid #eee" }}>
-                <td style={{ padding: 8 }}>{row.device}</td>
+                {report.device_depth_reach.map((row) => (
+                  <tr key={row.device} style={{ borderBottom: "1px solid #eee" }}>
+                    <td style={{ padding: 8 }}>
+                      {row.device === "mobile"
+                        ? "모바일"
+                        : row.device === "tablet"
+                          ? "태블릿"
+                          : row.device === "desktop"
+                            ? "데스크톱"
+                            : row.device}
+                    </td>
                 <td style={{ padding: 8 }}>{row.sessions}</td>
                 <td style={{ padding: 8 }}>{row.avg_max_depth.toFixed(1)}%</td>
                 <td style={{ padding: 8 }}>{row.reach_25.toFixed(0)}%</td>
