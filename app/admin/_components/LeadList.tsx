@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatPhoneKorean } from "@/lib/phone";
 import { fromKstHourLocalInput, toKstHourLocalInput } from "@/lib/crm/kst";
@@ -12,8 +13,6 @@ import DateRangePicker from "@/app/admin/_components/crm/DateRangePicker";
 import FilterPopover, { type FilterGroup } from "@/app/admin/_components/crm/FilterPopover";
 import StatusBadgeMenu from "@/app/admin/_components/crm/StatusBadgeMenu";
 import { formatAssigneeWithTeam } from "@/lib/crm/assigneeHistoryFormat";
-import { landingKeyFromEntryPage } from "@/lib/landing-analytics/sections";
-import Link from "next/link";
 
 type StaffOpt = { id: string; name: string; parent_id: string | null; rank?: string };
 
@@ -400,6 +399,7 @@ export default function LeadList({
   const showAdmin = isAdmin || session?.rank === "manager";
   const canExport = showAdmin;
   const canBulkAssign = needReassign && showAdmin;
+  const showHeatmapFor = (row: LeadRow) => category === "candidates" || row.type === "후보자";
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const allPageSelected = items.length > 0 && items.every((r) => selectedIds.has(r.id));
 
@@ -964,18 +964,32 @@ export default function LeadList({
                         )}
                       </td>
                       <td onClick={(e) => e.stopPropagation()} style={{ minWidth: 280, width: "28%" }}>
-                        <div
-                          className="crm-memo-preview"
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => void openMemo(row)}
-                          onDoubleClick={() => void openMemo(row)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") void openMemo(row);
-                          }}
-                          title={isMemoEditable(row.status) ? "클릭하여 메모 편집" : "배정전·대기 상태에서는 메모를 편집할 수 없습니다"}
-                        >
-                          {row.memo?.trim() || "메모 없음"}
+                        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                          <div
+                            className="crm-memo-preview"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => void openMemo(row)}
+                            onDoubleClick={() => void openMemo(row)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") void openMemo(row);
+                            }}
+                            title={isMemoEditable(row.status) ? "클릭하여 메모 편집" : "배정전·대기 상태에서는 메모를 편집할 수 없습니다"}
+                            style={{ flex: 1 }}
+                          >
+                            {row.memo?.trim() || "메모 없음"}
+                          </div>
+                          {showHeatmapFor(row) && (
+                            <Link
+                              href={`/admin/candidates/heatmap?id=${encodeURIComponent(row.id)}`}
+                              className="crm-btn"
+                              style={{ flexShrink: 0, fontSize: 12 }}
+                              title="이 고객의 스크롤 히트맵"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              히트맵
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1073,9 +1087,21 @@ export default function LeadList({
                           </div>
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
-                          <button type="button" className="crm-btn crm-lead-mobile-memo" onClick={() => void openMemo(row)}>
-                            메모
-                          </button>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button type="button" className="crm-btn crm-lead-mobile-memo" onClick={() => void openMemo(row)}>
+                              메모
+                            </button>
+                            {showHeatmapFor(row) && (
+                              <Link
+                                href={`/admin/candidates/heatmap?id=${encodeURIComponent(row.id)}`}
+                                className="crm-btn"
+                                title="이 고객의 스크롤 히트맵"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                히트맵
+                              </Link>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1147,28 +1173,22 @@ export default function LeadList({
                 ))}
               </div>
             )}
-            <div className="crm-behavior-panel">
-              <div className="crm-behavior-panel-head">
-                <strong>행동 분석</strong>
+            {showHeatmapFor(memoRow) && (
+              <div className="crm-behavior-panel">
+                <div className="crm-behavior-panel-head">
+                  <strong>스크롤 히트맵</strong>
+                </div>
+                <p className="crm-behavior-muted" style={{ marginBottom: 10 }}>
+                  이 고객의 구간별 이탈률·디바이스·클릭·섹션 히트맵을 확인합니다.
+                </p>
+                <Link
+                  href={`/admin/candidates/heatmap?id=${encodeURIComponent(memoRow.id)}`}
+                  className="crm-btn crm-btn-primary"
+                >
+                  이 고객 히트맵 보기
+                </Link>
               </div>
-              <p className="crm-behavior-muted" style={{ marginBottom: 10 }}>
-                고객별 스크롤·체류는 스크롤 히트맵 페이지에서 확인합니다.
-                {memoRow.entry_page ? ` (유입: ${memoRow.entry_page})` : ""}
-              </p>
-              <Link
-                href={(() => {
-                  const key = landingKeyFromEntryPage(memoRow.entry_page);
-                  const qs = new URLSearchParams();
-                  if (key) qs.set("landing_key", key);
-                  const q = qs.toString();
-                  return q ? `/admin/landing-analytics?${q}` : "/admin/landing-analytics";
-                })()}
-                className="crm-btn crm-btn-primary"
-                style={{ display: "inline-flex", textDecoration: "none" }}
-              >
-                스크롤 히트맵 열기
-              </Link>
-            </div>
+            )}
           </aside>
         </>
       )}

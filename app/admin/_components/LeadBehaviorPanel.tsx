@@ -20,27 +20,44 @@ function formatKst(iso: string | null): string {
   }
 }
 
+/** 페이지 세로축: 위=상단(0%), 아래=하단(100%). 도달 구간은 위에서부터 채움 */
 function ScrollPageViz({ session }: { session: LeadBehaviorSessionSummary }) {
-  const max = Math.max(session.max_scroll_depth, 1);
+  const max = Math.min(100, Math.max(0, session.max_scroll_depth));
+  const ticks = [0, 25, 50, 75, 100];
+
   return (
-    <div className="crm-behavior-page-viz" aria-label="스크롤 위치 시각화">
+    <div className="crm-behavior-page-viz" aria-label="스크롤 도달 시각화">
       <div className="crm-behavior-page-viz-track">
-        <div className="crm-behavior-page-viz-fill" style={{ height: `${Math.min(100, max)}%` }} />
-        {session.scroll_positions.map((p, i) => (
-          <span
-            key={`${p.at}-${i}`}
-            className="crm-behavior-page-viz-dot"
-            style={{ top: `${Math.min(100, Math.max(0, p.y_ratio * 100))}%` }}
-            title={`${Math.round(p.y_ratio * 100)}% · ${formatKst(p.at)}`}
-          />
+        {/* 도달한 구간: 상단(0%)부터 max%까지 */}
+        <div
+          className="crm-behavior-page-viz-fill"
+          style={{ top: 0, height: `${max}%` }}
+          title={`상단부터 ${max}%까지 스크롤`}
+        />
+        {ticks.map((t) => (
+          <span key={t} className="crm-behavior-page-viz-tick" style={{ top: `${t}%` }}>
+            <i />
+            <em>{t}%</em>
+          </span>
         ))}
-        <span className="crm-behavior-page-viz-max" style={{ top: `${Math.min(100, max)}%` }}>
+        {session.scroll_positions.map((p, i) => {
+          const pct = Math.min(100, Math.max(0, (p.depth ?? p.y_ratio * 100)));
+          return (
+            <span
+              key={`${p.at}-${i}`}
+              className="crm-behavior-page-viz-dot"
+              style={{ top: `${pct}%` }}
+              title={`스크롤 ${Math.round(pct)}% · ${formatKst(p.at)}`}
+            />
+          );
+        })}
+        <span className="crm-behavior-page-viz-max" style={{ top: `${max}%` }}>
           최대 {session.max_scroll_depth}%
         </span>
       </div>
       <div className="crm-behavior-page-viz-labels">
-        <span>상단</span>
-        <span>하단</span>
+        <span>상단 0%</span>
+        <span>하단 100%</span>
       </div>
     </div>
   );
@@ -67,7 +84,10 @@ export default function LeadBehaviorPanel({ leadId, category, customerName, cust
       }
       const r = data.report as LeadBehaviorReport;
       setReport(r);
-      setSessionId((prev) => prev || r.sessions[0]?.session_id || "");
+      setSessionId((prev) => {
+        if (prev && r.sessions.some((s) => s.session_id === prev)) return prev;
+        return r.sessions[0]?.session_id || "";
+      });
     } catch {
       setError("네트워크 오류");
     } finally {
@@ -98,14 +118,14 @@ export default function LeadBehaviorPanel({ leadId, category, customerName, cust
 
       {!loading && !error && report && report.sessions.length === 0 && (
         <p className="crm-behavior-muted">
-          연결된 방문 세션이 없습니다. 상담 신청 시 analytics_session_id가 저장된 이후 유입부터 표시됩니다.
+          이 고객에 연결된 방문 세션이 없습니다. 상담 신청 시 세션이 저장된 이후 유입부터 표시됩니다.
         </p>
       )}
 
       {!loading && report && report.sessions.length > 0 && (
         <>
           <label className="crm-behavior-session-pick">
-            방문 세션
+            방문 세션 ({report.sessions.length})
             <select value={active?.session_id || ""} onChange={(e) => setSessionId(e.target.value)}>
               {report.sessions.map((s, idx) => (
                 <option key={s.session_id} value={s.session_id}>
@@ -139,7 +159,10 @@ export default function LeadBehaviorPanel({ leadId, category, customerName, cust
                 </div>
               </div>
 
-              <ScrollPageViz session={active} />
+              <div>
+                <h4 className="crm-behavior-sub">스크롤 도달 (페이지 세로)</h4>
+                <ScrollPageViz session={active} />
+              </div>
 
               <div>
                 <h4 className="crm-behavior-sub">구간별 체류</h4>
