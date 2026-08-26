@@ -133,13 +133,13 @@ export default function DashboardPage() {
                   return (
                     <li key={r.staff_id} className="crm-dash-bar-row">
                       <div className="crm-dash-bar-meta">
-                        <span className="crm-dash-bar-name">
-                          {r.staff_name}
-                          {r.rank === "manager" && (
-                            <span className="crm-dash-rank-tag">매니저</span>
-                          )}
-                        </span>
                         <span className="crm-dash-bar-stats">
+                          <span className="crm-dash-bar-name">
+                            {r.staff_name}
+                            {r.rank === "manager" && (
+                              <span className="crm-dash-rank-tag">매니저</span>
+                            )}
+                          </span>
                           <strong>{rate}%</strong>
                           <span>
                             {r.first_contact.toLocaleString()} / {r.assigned.toLocaleString()}
