@@ -149,6 +149,7 @@ export default function CandidateLeadHeatmapPage({ category = "candidates" }: Pr
           {report && (
             <LandingAnalyticsReportView
               report={report}
+              variant="lead"
               submissionCountHint="신청 시 구간: 이 고객이 상담 신청할 때 머물던 구간(1건)."
             />
           )}
