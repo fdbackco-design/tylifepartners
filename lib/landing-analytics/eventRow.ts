@@ -12,4 +12,6 @@ export type LandingEventAggregateRow = {
   viewport_width?: number | null;
   user_agent?: string | null;
   landing_key?: string | null;
+  visitor_id?: string | null;
+  created_at?: string | null;
 };

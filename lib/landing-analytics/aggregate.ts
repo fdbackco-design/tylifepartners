@@ -91,7 +91,12 @@ function applyDepthMilestones(s: SessionSummary, depth: number) {
 }
 
 function buildSessionMap(events: LandingEventAggregateRow[]): Map<string, SessionSummary> {
-  const map = new Map<string, SessionSummary>();
+  type Acc = SessionSummary & {
+    startedAtMs: number | null;
+    endedAtMs: number | null;
+    sectionDwellSeconds: number;
+  };
+  const map = new Map<string, Acc>();
 
   for (const ev of events) {
     let s = map.get(ev.session_id);
@@ -102,12 +107,23 @@ function buildSessionMap(events: LandingEventAggregateRow[]): Map<string, Sessio
         duration_seconds: 0,
         device_type: "unknown",
         reached_depths: new Set(),
+        startedAtMs: null,
+        endedAtMs: null,
+        sectionDwellSeconds: 0,
       };
       map.set(ev.session_id, s);
     }
 
     const inferred = inferDeviceType(ev);
     if (inferred) s.device_type = inferred;
+
+    if (ev.created_at) {
+      const t = new Date(ev.created_at).getTime();
+      if (Number.isFinite(t)) {
+        s.startedAtMs = s.startedAtMs == null ? t : Math.min(s.startedAtMs, t);
+        s.endedAtMs = s.endedAtMs == null ? t : Math.max(s.endedAtMs, t);
+      }
+    }
 
     if (ev.event_type === "scroll_depth" && ev.depth != null) {
       applyDepthMilestones(s, ev.depth);
@@ -127,13 +143,40 @@ function buildSessionMap(events: LandingEventAggregateRow[]): Map<string, Sessio
     }
 
     if (ev.event_type === "heartbeat" || ev.event_type === "leave") {
-      if (ev.duration_seconds != null) {
+      if (ev.duration_seconds != null && Number.isFinite(ev.duration_seconds)) {
         s.duration_seconds = Math.max(s.duration_seconds, ev.duration_seconds);
       }
     }
+
+    if (
+      ev.event_type === "section_dwell" &&
+      ev.duration_seconds != null &&
+      Number.isFinite(ev.duration_seconds) &&
+      ev.duration_seconds > 0
+    ) {
+      s.sectionDwellSeconds += ev.duration_seconds;
+    }
   }
 
-  return map;
+  // leave/heartbeat가 빠진 세션(신청 직후 이탈 등)은 섹션 체류 합·이벤트 시각 차로 보정
+  const out = new Map<string, SessionSummary>();
+  for (const s of Array.from(map.values())) {
+    if (s.duration_seconds <= 0 && s.sectionDwellSeconds > 0) {
+      s.duration_seconds = Math.round(s.sectionDwellSeconds);
+    }
+    if (s.duration_seconds <= 0 && s.startedAtMs != null && s.endedAtMs != null) {
+      const sec = Math.round((s.endedAtMs - s.startedAtMs) / 1000);
+      if (sec > 0) s.duration_seconds = Math.max(1, sec);
+    }
+    out.set(s.session_id, {
+      session_id: s.session_id,
+      max_depth: s.max_depth,
+      duration_seconds: s.duration_seconds,
+      device_type: s.device_type,
+      reached_depths: s.reached_depths,
+    });
+  }
+  return out;
 }
 
 export function aggregateLandingAnalytics(
