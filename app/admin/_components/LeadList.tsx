@@ -399,7 +399,19 @@ export default function LeadList({
   const showAdmin = isAdmin || session?.rank === "manager";
   const canExport = showAdmin;
   const canBulkAssign = needReassign && showAdmin;
-  const showHeatmapFor = (row: LeadRow) => category === "candidates" || row.type === "후보자";
+  const showHeatmapFor = (_row: LeadRow) => category === "candidates" || category === "consumers" || category === "all";
+
+  const heatmapHref = (row: LeadRow) => {
+    const cat =
+      category === "candidates"
+        ? "candidates"
+        : category === "consumers"
+          ? "consumers"
+          : row.type === "후보자"
+            ? "candidates"
+            : "consumers";
+    return `/admin/${cat}/heatmap?id=${encodeURIComponent(row.id)}`;
+  };
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const allPageSelected = items.length > 0 && items.every((r) => selectedIds.has(r.id));
 
@@ -819,7 +831,7 @@ export default function LeadList({
                     </th>
                   )}
                   <th>광고소재</th>
-                  <th>미리보기</th>
+                  <th>랜딩페이지</th>
                   <th>고객</th>
                   <th>신청시간</th>
                   <th>유입페이지</th>
@@ -898,16 +910,21 @@ export default function LeadList({
                           </span>
                         )}
                       </td>
-                      <td>
-                        <img
-                          className="crm-thumb"
-                          src={row.landing_preview}
-                          alt={`${row.entry_page || "유입"} 미리보기`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPreviewSrc(row.landing_preview);
-                          }}
-                        />
+                      <td onClick={(e) => e.stopPropagation()}>
+                        {showHeatmapFor(row) ? (
+                          <Link
+                            href={heatmapHref(row)}
+                            className="crm-btn"
+                            style={{ fontSize: 12 }}
+                            title="이 고객의 랜딩 스크롤 히트맵"
+                          >
+                            랜딩페이지
+                          </Link>
+                        ) : (
+                          <span className="crm-cell-plain" style={{ color: "var(--crm-muted)" }}>
+                            -
+                          </span>
+                        )}
                       </td>
                       <td>
                         <div className="crm-customer">
@@ -979,17 +996,6 @@ export default function LeadList({
                           >
                             {row.memo?.trim() || "메모 없음"}
                           </div>
-                          {showHeatmapFor(row) && (
-                            <Link
-                              href={`/admin/candidates/heatmap?id=${encodeURIComponent(row.id)}`}
-                              className="crm-btn"
-                              style={{ flexShrink: 0, fontSize: 12 }}
-                              title="이 고객의 스크롤 히트맵"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              히트맵
-                            </Link>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -1093,12 +1099,12 @@ export default function LeadList({
                             </button>
                             {showHeatmapFor(row) && (
                               <Link
-                                href={`/admin/candidates/heatmap?id=${encodeURIComponent(row.id)}`}
+                                href={heatmapHref(row)}
                                 className="crm-btn"
-                                title="이 고객의 스크롤 히트맵"
+                                title="이 고객의 랜딩 스크롤 히트맵"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                히트맵
+                                랜딩페이지
                               </Link>
                             )}
                           </div>
@@ -1171,22 +1177,6 @@ export default function LeadList({
                     <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{l.memo || "-"}</div>
                   </div>
                 ))}
-              </div>
-            )}
-            {showHeatmapFor(memoRow) && (
-              <div className="crm-behavior-panel">
-                <div className="crm-behavior-panel-head">
-                  <strong>스크롤 히트맵</strong>
-                </div>
-                <p className="crm-behavior-muted" style={{ marginBottom: 10 }}>
-                  이 고객의 구간별 이탈률·디바이스·클릭·섹션 히트맵을 확인합니다.
-                </p>
-                <Link
-                  href={`/admin/candidates/heatmap?id=${encodeURIComponent(memoRow.id)}`}
-                  className="crm-btn crm-btn-primary"
-                >
-                  이 고객 히트맵 보기
-                </Link>
               </div>
             )}
           </aside>

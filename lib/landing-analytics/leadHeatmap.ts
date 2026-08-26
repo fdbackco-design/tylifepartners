@@ -1,3 +1,4 @@
+import { resolveLandingPageImages } from "@/lib/crm/landingPreview";
 import {
   aggregateLandingAnalytics,
   type LandingAnalyticsReport,
@@ -28,6 +29,7 @@ export type LeadHeatmapResult = {
   landing_key: string;
   session_ids: string[];
   event_count: number;
+  landing_images: string[];
   report: LandingAnalyticsReport;
 };
 
@@ -476,6 +478,11 @@ export async function loadLeadHeatmapReport(
     });
   }
 
+  const landingImages = await resolveLandingPageImages({
+    entryPage: leadRow.entry_page,
+    landingKey,
+  });
+
   return {
     lead: {
       id: leadRow.id,
@@ -489,6 +496,7 @@ export async function loadLeadHeatmapReport(
     landing_key: landingKey,
     session_ids: sessionIds,
     event_count: events.length,
+    landing_images: landingImages,
     report,
   };
 }
