@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import DateRangePicker from "@/app/admin/_components/crm/DateRangePicker";
 import { CrmStatRow } from "@/app/admin/_components/crm/ui";
-import { todayYmdLocal } from "@/lib/crm/ui";
+import { addDaysLocal, todayYmdLocal } from "@/lib/crm/ui";
 
 type Row = {
   staff_id: string;
@@ -18,7 +18,7 @@ type SortMode = "rate_desc" | "rate_asc";
 
 export default function DashboardPage() {
   const t = todayYmdLocal();
-  const [from, setFrom] = useState(t);
+  const [from, setFrom] = useState(() => addDaysLocal(t, -6));
   const [to, setTo] = useState(t);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,7 +87,7 @@ export default function DashboardPage() {
         <div className="crm-skeleton" style={{ height: 280, marginTop: 16 }} />
       ) : (
         <>
-          <div style={{ marginTop: 16 }}>
+          <div className="crm-dash-stats" style={{ marginTop: 16 }}>
             <CrmStatRow
               items={[
                 { label: "총 배정 건수", value: summary.totalAssigned.toLocaleString() },
@@ -133,7 +133,12 @@ export default function DashboardPage() {
                   return (
                     <li key={r.staff_id} className="crm-dash-bar-row">
                       <div className="crm-dash-bar-meta">
-                        <span className="crm-dash-bar-name">{r.staff_name}</span>
+                        <span className="crm-dash-bar-name">
+                          {r.staff_name}
+                          {r.rank === "manager" && (
+                            <span className="crm-dash-rank-tag">매니저</span>
+                          )}
+                        </span>
                         <span className="crm-dash-bar-stats">
                           <strong>{rate}%</strong>
                           <span>
@@ -150,36 +155,6 @@ export default function DashboardPage() {
               </ul>
             )}
           </section>
-
-          <div className="crm-table-shell" style={{ marginTop: 20, maxHeight: "none" }}>
-            <table className="crm-table" style={{ minWidth: 640 }}>
-              <thead>
-                <tr>
-                  <th>영업자</th>
-                  <th>직급</th>
-                  <th>배정 건수</th>
-                  <th>1차컨택</th>
-                  <th>1차컨택률</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.staff_id}>
-                    <td>{r.staff_name}</td>
-                    <td>{r.rank === "manager" ? "매니저" : "영업자"}</td>
-                    <td>{r.assigned}</td>
-                    <td>{r.first_contact}</td>
-                    <td>{r.first_contact_rate == null ? "-" : `${r.first_contact_rate}%`}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {rows.length === 0 && (
-              <div className="crm-empty" style={{ border: "none" }}>
-                표시할 데이터가 없습니다.
-              </div>
-            )}
-          </div>
         </>
       )}
     </div>

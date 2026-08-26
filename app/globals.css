@@ -479,6 +479,26 @@ main.crm-admin-login {
   border-radius: var(--crm-radius);
 }
 
+.crm-dash-stats .crm-ui-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.crm-dash-stats .crm-ui-stat {
+  min-width: 0;
+  padding: 12px 10px;
+}
+
+.crm-dash-stats .crm-ui-stat-value {
+  font-size: 18px;
+  word-break: break-all;
+}
+
+.crm-dash-stats .crm-ui-stat-label {
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .crm-dash-chart-head {
   display: flex;
   flex-wrap: wrap;
@@ -523,10 +543,28 @@ main.crm-admin-login {
 }
 
 .crm-dash-bar-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   font-weight: 600;
   color: var(--crm-text);
   min-width: 0;
+}
+
+.crm-dash-rank-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  color: var(--crm-primary);
+  background: var(--crm-primary-soft);
+  border: 1px solid rgba(64, 2, 147, 0.18);
+  flex-shrink: 0;
 }
 
 .crm-dash-bar-stats {
@@ -562,6 +600,23 @@ main.crm-admin-login {
 @media (max-width: 640px) {
   .crm-dash-chart {
     padding: 12px;
+  }
+
+  .crm-dash-stats .crm-ui-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .crm-dash-stats .crm-ui-stat {
+    padding: 10px 8px;
+  }
+
+  .crm-dash-stats .crm-ui-stat-value {
+    font-size: 16px;
+  }
+
+  .crm-dash-stats .crm-ui-stat-label {
+    font-size: 10px;
   }
 
   .crm-dash-bar-meta {
