@@ -13,6 +13,47 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 type Status = "loading" | "unsupported" | "need_permission" | "on" | "off" | "unconfigured";
 
+function BellIcon({ active }: { active?: boolean }) {
+  return (
+    <svg
+      className="crm-push-bell-icon"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
+      <path
+        d="M12 3a5.5 5.5 0 0 0-5.5 5.5v2.1c0 .7-.22 1.38-.63 1.95L4.7 14.3A1.4 1.4 0 0 0 5.85 16.5h12.3a1.4 1.4 0 0 0 1.15-2.2l-1.17-1.75a3.5 3.5 0 0 1-.63-1.95V8.5A5.5 5.5 0 0 0 12 3Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+        fill={active ? "currentColor" : "none"}
+        fillOpacity={active ? 0.18 : 0}
+      />
+      <path
+        d="M9.5 17.5a2.5 2.5 0 0 0 5 0"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+async function fetchJson(url: string, init?: RequestInit) {
+  const res = await fetch(url, {
+    credentials: "same-origin",
+    ...init,
+    headers: {
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...init?.headers,
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  return { res, data };
+}
+
 export default function PushSubscribeButton() {
   const [status, setStatus] = useState<Status>("loading");
   const [busy, setBusy] = useState(false);
@@ -25,8 +66,12 @@ export default function PushSubscribeButton() {
     }
 
     try {
-      const vapidRes = await fetch("/api/admin/push/vapid-public");
-      const vapid = await vapidRes.json();
+      const { res, data: vapid } = await fetchJson("/api/admin/push/vapid-public");
+      if (res.status === 401) {
+        // 세션 문제는 구독 시점에 안내. 버튼은 유지.
+        setStatus(Notification.permission === "granted" ? "on" : "need_permission");
+        return;
+      }
       if (!vapid.ok || !vapid.configured || !vapid.publicKey) {
         setStatus("unconfigured");
         return;
@@ -58,8 +103,11 @@ export default function PushSubscribeButton() {
     if (busy) return;
     setBusy(true);
     try {
-      const vapidRes = await fetch("/api/admin/push/vapid-public");
-      const vapid = await vapidRes.json();
+      const { res: vapidRes, data: vapid } = await fetchJson("/api/admin/push/vapid-public");
+      if (vapidRes.status === 401) {
+        alert("로그인이 만료되었습니다. 다시 로그인한 뒤 알림을 켜 주세요.");
+        return;
+      }
       if (!vapid.ok || !vapid.publicKey) {
         alert(vapid.message || "웹 푸시가 설정되지 않았습니다.");
         return;
@@ -81,12 +129,14 @@ export default function PushSubscribeButton() {
         });
       }
 
-      const res = await fetch("/api/admin/push/subscribe", {
+      const { res, data } = await fetchJson("/api/admin/push/subscribe", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subscription: sub.toJSON() }),
       });
-      const data = await res.json();
+      if (res.status === 401) {
+        alert("로그인이 만료되었습니다. 다시 로그인한 뒤 알림을 켜 주세요.");
+        return;
+      }
       if (!data.ok) {
         alert(data.message || "알림 구독에 실패했습니다.");
         return;
@@ -108,9 +158,8 @@ export default function PushSubscribeButton() {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
-        await fetch("/api/admin/push/subscribe", {
+        await fetchJson("/api/admin/push/subscribe", {
           method: "DELETE",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ endpoint: sub.endpoint }),
         });
         await sub.unsubscribe();
@@ -123,14 +172,35 @@ export default function PushSubscribeButton() {
     }
   };
 
-  if (status === "loading" || status === "unsupported" || status === "unconfigured") {
+  if (status === "unsupported") {
     return null;
+  }
+
+  if (status === "unconfigured") {
+    return (
+      <button
+        type="button"
+        className="crm-push-bell"
+        disabled
+        title="웹 푸시 서버 설정이 필요합니다"
+        aria-label="알림 미설정"
+      >
+        <BellIcon />
+      </button>
+    );
   }
 
   if (status === "on") {
     return (
-      <button type="button" className="crm-btn" disabled={busy} onClick={() => void disable()} title="웹 푸시 알림 끄기">
-        알림 ON
+      <button
+        type="button"
+        className="crm-push-bell is-on"
+        disabled={busy}
+        onClick={() => void disable()}
+        title="웹 푸시 알림 끄기"
+        aria-label="알림 끄기"
+      >
+        <BellIcon active />
       </button>
     );
   }
@@ -138,12 +208,13 @@ export default function PushSubscribeButton() {
   return (
     <button
       type="button"
-      className="crm-btn crm-btn-primary"
-      disabled={busy}
+      className="crm-push-bell"
+      disabled={busy || status === "loading"}
       onClick={() => void enable()}
-      title="신규 DB·배정 알림 받기"
+      title={status === "off" ? "브라우저에서 알림이 차단되었습니다" : "신규 DB·배정 알림 받기"}
+      aria-label="알림 켜기"
     >
-      {busy ? "설정 중…" : "알림 켜기"}
+      <BellIcon />
     </button>
   );
 }

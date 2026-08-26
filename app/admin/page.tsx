@@ -42,53 +42,52 @@ export default function AdminLoginPage() {
   };
 
   if (checking) {
-    return <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>로딩 중...</div>;
+    return (
+      <div className="crm-admin-login crm-admin-login--checking">
+        <p className="crm-admin-login-checking">로딩 중...</p>
+      </div>
+    );
   }
 
   return (
     <main className="crm-admin-login">
-      <h1 className="crm-admin-login-title">상담관리 로그인</h1>
-      <form onSubmit={onSubmit}>
-        <label htmlFor="login-id" style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}>
-          아이디
-        </label>
-        <input
-          id="login-id"
-          value={id}
-          onChange={(e) => setId(e.target.value)}
-          autoComplete="username"
-          style={{ width: "100%", padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 16, marginBottom: 16 }}
-        />
-        <label htmlFor="login-pw" style={{ display: "block", marginBottom: 6, fontSize: 14, color: "var(--text-secondary)" }}>
-          비밀번호
-        </label>
-        <input
-          id="login-pw"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          style={{ width: "100%", padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 8, fontSize: 16, marginBottom: 20 }}
-        />
-        {error && <p style={{ margin: "0 0 16px", fontSize: 14, color: "#e03131" }}>{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: "100%",
-            padding: 14,
-            background: loading ? "#adb5bd" : "var(--cta-bg)",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            fontSize: 16,
-            fontWeight: 600,
-            cursor: loading ? "default" : "pointer",
-          }}
-        >
-          {loading ? "로그인 중..." : "로그인"}
-        </button>
-      </form>
+      <div className="crm-admin-login-card">
+        <p className="crm-admin-login-brand">Feed Life</p>
+        <h1 className="crm-admin-login-title">상담관리 로그인</h1>
+        <form className="crm-admin-login-form" onSubmit={onSubmit}>
+          <label htmlFor="login-id" className="crm-admin-login-label">
+            아이디
+          </label>
+          <input
+            id="login-id"
+            className="crm-admin-login-input"
+            value={id}
+            onChange={(e) => setId(e.target.value)}
+            autoComplete="username"
+            inputMode="text"
+            enterKeyHint="next"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          <label htmlFor="login-pw" className="crm-admin-login-label">
+            비밀번호
+          </label>
+          <input
+            id="login-pw"
+            className="crm-admin-login-input"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            enterKeyHint="go"
+          />
+          {error && <p className="crm-admin-login-error">{error}</p>}
+          <button type="submit" className="crm-admin-login-submit" disabled={loading}>
+            {loading ? "로그인 중..." : "로그인"}
+          </button>
+        </form>
+      </div>
     </main>
   );
 }
