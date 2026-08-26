@@ -9,4 +9,7 @@ export type LandingEventAggregateRow = {
   section_label?: string | null;
   y_ratio?: number | null;
   device_type?: string | null;
+  viewport_width?: number | null;
+  user_agent?: string | null;
+  landing_key?: string | null;
 };

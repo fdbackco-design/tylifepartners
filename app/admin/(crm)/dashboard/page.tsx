@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DateRangePicker from "@/app/admin/_components/crm/DateRangePicker";
+import { CrmStatRow } from "@/app/admin/_components/crm/ui";
 import { todayYmdLocal } from "@/lib/crm/ui";
 
 type Row = {
@@ -13,6 +14,8 @@ type Row = {
   first_contact_rate: number | null;
 };
 
+type SortMode = "rate_desc" | "rate_asc";
+
 export default function DashboardPage() {
   const t = todayYmdLocal();
   const [from, setFrom] = useState(t);
@@ -20,6 +23,7 @@ export default function DashboardPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sortMode, setSortMode] = useState<SortMode>("rate_desc");
 
   useEffect(() => {
     setLoading(true);
@@ -34,43 +38,149 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, [from, to]);
 
+  const summary = useMemo(() => {
+    const totalAssigned = rows.reduce((sum, r) => sum + (r.assigned || 0), 0);
+    const totalContact = rows.reduce((sum, r) => sum + (r.first_contact || 0), 0);
+    const overallRate =
+      totalAssigned > 0 ? Math.round((totalContact / totalAssigned) * 1000) / 10 : null;
+    return { totalAssigned, totalContact, overallRate };
+  }, [rows]);
+
+  const chartRows = useMemo(() => {
+    const list = rows.filter((r) => r.assigned > 0);
+    list.sort((a, b) => {
+      const ar = a.first_contact_rate ?? -1;
+      const br = b.first_contact_rate ?? -1;
+      if (ar !== br) return sortMode === "rate_desc" ? br - ar : ar - br;
+      if (a.assigned !== b.assigned) return b.assigned - a.assigned;
+      return a.staff_name.localeCompare(b.staff_name, "ko");
+    });
+    return list;
+  }, [rows, sortMode]);
+
+  const maxRate = useMemo(
+    () => Math.max(100, ...chartRows.map((r) => r.first_contact_rate ?? 0)),
+    [chartRows]
+  );
+
   return (
     <div>
       <h1 className="crm-page-title">대시보드</h1>
       <p className="crm-page-desc">영업자별 1차컨택률을 일자 구간으로 조회합니다.</p>
       <div className="crm-toolbar">
-        <DateRangePicker from={from} to={to} onChange={(f, t2) => { setFrom(f || t); setTo(t2 || t); }} />
+        <DateRangePicker
+          from={from}
+          to={to}
+          onChange={(f, t2) => {
+            setFrom(f || t);
+            setTo(t2 || t);
+          }}
+        />
       </div>
+
       {error ? (
-        <div className="crm-empty" role="alert"><strong>오류</strong>{error}</div>
-      ) : loading ? (
-        <div className="crm-skeleton" style={{ height: 240, marginTop: 16 }} />
-      ) : (
-        <div className="crm-table-shell" style={{ marginTop: 16, maxHeight: "none" }}>
-          <table className="crm-table" style={{ minWidth: 640 }}>
-            <thead>
-              <tr>
-                <th>영업자</th>
-                <th>직급</th>
-                <th>배정 건수</th>
-                <th>1차컨택</th>
-                <th>1차컨택률</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.staff_id}>
-                  <td>{r.staff_name}</td>
-                  <td>{r.rank === "manager" ? "매니저" : "영업자"}</td>
-                  <td>{r.assigned}</td>
-                  <td>{r.first_contact}</td>
-                  <td>{r.first_contact_rate == null ? "-" : `${r.first_contact_rate}%`}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {rows.length === 0 && <div className="crm-empty" style={{ border: "none" }}>표시할 데이터가 없습니다.</div>}
+        <div className="crm-empty" role="alert">
+          <strong>오류</strong>
+          {error}
         </div>
+      ) : loading ? (
+        <div className="crm-skeleton" style={{ height: 280, marginTop: 16 }} />
+      ) : (
+        <>
+          <div style={{ marginTop: 16 }}>
+            <CrmStatRow
+              items={[
+                { label: "총 배정 건수", value: summary.totalAssigned.toLocaleString() },
+                { label: "총 1차 컨택 건수", value: summary.totalContact.toLocaleString() },
+                {
+                  label: "전체 1차 컨택률",
+                  value: summary.overallRate == null ? "-" : `${summary.overallRate}%`,
+                },
+              ]}
+            />
+          </div>
+
+          <section className="crm-dash-chart" aria-label="영업자별 1차 컨택률 그래프">
+            <div className="crm-dash-chart-head">
+              <h2 className="crm-dash-chart-title">영업자별 1차 컨택률</h2>
+              <div className="crm-dash-sort" role="group" aria-label="정렬">
+                <button
+                  type="button"
+                  className={`crm-btn${sortMode === "rate_desc" ? " crm-btn-primary" : ""}`}
+                  onClick={() => setSortMode("rate_desc")}
+                >
+                  높은 순
+                </button>
+                <button
+                  type="button"
+                  className={`crm-btn${sortMode === "rate_asc" ? " crm-btn-primary" : ""}`}
+                  onClick={() => setSortMode("rate_asc")}
+                >
+                  낮은 순
+                </button>
+              </div>
+            </div>
+
+            {chartRows.length === 0 ? (
+              <div className="crm-empty" style={{ border: "none", padding: "20px 0" }}>
+                배정 건수가 있는 영업자가 없습니다.
+              </div>
+            ) : (
+              <ul className="crm-dash-bars">
+                {chartRows.map((r) => {
+                  const rate = r.first_contact_rate ?? 0;
+                  const widthPct = Math.min(100, (rate / maxRate) * 100);
+                  return (
+                    <li key={r.staff_id} className="crm-dash-bar-row">
+                      <div className="crm-dash-bar-meta">
+                        <span className="crm-dash-bar-name">{r.staff_name}</span>
+                        <span className="crm-dash-bar-stats">
+                          <strong>{rate}%</strong>
+                          <span>
+                            {r.first_contact.toLocaleString()} / {r.assigned.toLocaleString()}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="crm-dash-bar-track" aria-hidden>
+                        <div className="crm-dash-bar-fill" style={{ width: `${widthPct}%` }} />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <div className="crm-table-shell" style={{ marginTop: 20, maxHeight: "none" }}>
+            <table className="crm-table" style={{ minWidth: 640 }}>
+              <thead>
+                <tr>
+                  <th>영업자</th>
+                  <th>직급</th>
+                  <th>배정 건수</th>
+                  <th>1차컨택</th>
+                  <th>1차컨택률</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.staff_id}>
+                    <td>{r.staff_name}</td>
+                    <td>{r.rank === "manager" ? "매니저" : "영업자"}</td>
+                    <td>{r.assigned}</td>
+                    <td>{r.first_contact}</td>
+                    <td>{r.first_contact_rate == null ? "-" : `${r.first_contact_rate}%`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {rows.length === 0 && (
+              <div className="crm-empty" style={{ border: "none" }}>
+                표시할 데이터가 없습니다.
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

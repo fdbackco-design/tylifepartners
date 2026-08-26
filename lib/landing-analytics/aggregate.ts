@@ -6,6 +6,8 @@ import {
 import { computeHeatScore, computeReachOnlyHeatScore } from "@/lib/landing-analytics/heatScore";
 import { maxDepthToYRatio } from "@/lib/landing-analytics/metrics";
 import type { LandingEventAggregateRow } from "@/lib/landing-analytics/eventRow";
+import { getDeviceType } from "@/lib/landing-analytics/device";
+import { SCROLL_DEPTH_MILESTONES } from "@/lib/landing-analytics/types";
 
 export type SessionSummary = {
   session_id: string;
@@ -66,6 +68,28 @@ export type LandingAnalyticsReport = {
   click_y_buckets: { bucket: string; count: number }[];
 };
 
+function inferDeviceType(ev: LandingEventAggregateRow): string | null {
+  if (ev.device_type && ["mobile", "tablet", "desktop"].includes(ev.device_type)) {
+    return ev.device_type;
+  }
+  if (ev.viewport_width != null && Number.isFinite(ev.viewport_width) && ev.viewport_width > 0) {
+    return getDeviceType(ev.viewport_width);
+  }
+  const ua = String(ev.user_agent ?? "").toLowerCase();
+  if (!ua) return null;
+  if (/ipad|tablet|kindle|silk|playbook/.test(ua)) return "tablet";
+  if (/mobi|iphone|android|webos|blackberry|opera mini|iemobile/.test(ua)) return "mobile";
+  return "desktop";
+}
+
+function applyDepthMilestones(s: SessionSummary, depth: number) {
+  if (!Number.isFinite(depth) || depth <= 0) return;
+  s.max_depth = Math.max(s.max_depth, depth);
+  for (const milestone of SCROLL_DEPTH_MILESTONES) {
+    if (depth >= milestone) s.reached_depths.add(milestone);
+  }
+}
+
 function buildSessionMap(events: LandingEventAggregateRow[]): Map<string, SessionSummary> {
   const map = new Map<string, SessionSummary>();
 
@@ -76,29 +100,35 @@ function buildSessionMap(events: LandingEventAggregateRow[]): Map<string, Sessio
         session_id: ev.session_id,
         max_depth: 0,
         duration_seconds: 0,
-        device_type: ev.device_type ?? "unknown",
+        device_type: "unknown",
         reached_depths: new Set(),
       };
       map.set(ev.session_id, s);
     }
 
-    if (ev.device_type) s.device_type = ev.device_type;
+    const inferred = inferDeviceType(ev);
+    if (inferred) s.device_type = inferred;
 
     if (ev.event_type === "scroll_depth" && ev.depth != null) {
-      s.reached_depths.add(ev.depth);
-      s.max_depth = Math.max(s.max_depth, ev.depth);
+      applyDepthMilestones(s, ev.depth);
+      if (ev.max_depth != null) applyDepthMilestones(s, ev.max_depth);
     }
 
+    // scroll_sample / heartbeat / leave 등에도 max_depth가 실림
     if (ev.max_depth != null) {
-      s.max_depth = Math.max(s.max_depth, ev.max_depth);
+      applyDepthMilestones(s, ev.max_depth);
+    }
+
+    if (
+      (ev.event_type === "scroll_sample" || ev.event_type === "scroll_depth") &&
+      ev.depth != null
+    ) {
+      applyDepthMilestones(s, ev.depth);
     }
 
     if (ev.event_type === "heartbeat" || ev.event_type === "leave") {
       if (ev.duration_seconds != null) {
         s.duration_seconds = Math.max(s.duration_seconds, ev.duration_seconds);
-      }
-      if (ev.max_depth != null) {
-        s.max_depth = Math.max(s.max_depth, ev.max_depth);
       }
     }
   }
@@ -167,13 +197,27 @@ export function aggregateLandingAnalytics(
 
   const clickCounts = new Map<string, { label: string; count: number }>();
   for (const ev of events) {
-    if ((ev.event_type !== "click" && ev.event_type !== "cta_click") || !ev.section_name) continue;
-    const cur = clickCounts.get(ev.section_name) ?? {
-      label: ev.section_label ?? ev.section_name,
+    if (ev.event_type !== "click" && ev.event_type !== "cta_click") continue;
+
+    let name = ev.section_name ?? null;
+    let label = ev.section_label ?? null;
+    if (!name || !sections.some((s) => s.name === name)) {
+      if (ev.y_ratio == null) continue;
+      const matched =
+        sections.find((section) => ev.y_ratio! >= section.start && ev.y_ratio! < section.end) ??
+        sections[sections.length - 1];
+      if (!matched) continue;
+      name = matched.name;
+      label = matched.label;
+    }
+
+    const cur = clickCounts.get(name) ?? {
+      label: label ?? name,
       count: 0,
     };
     cur.count += 1;
-    clickCounts.set(ev.section_name, cur);
+    if (label) cur.label = label;
+    clickCounts.set(name, cur);
   }
 
   const section_clicks = sections.map((sec) => ({

@@ -263,7 +263,7 @@ export async function POST(request: NextRequest) {
           name,
           phone,
           leadId: samePerson.id,
-          entryPage,
+          region: regionForDb,
         })
       );
       return NextResponse.json({ ok: true, reinquiry: true, lead_id: samePerson.id });
@@ -391,7 +391,7 @@ export async function POST(request: NextRequest) {
               name,
               phone,
               leadId: insertedLead.id,
-              entryPage,
+              region: regionForDb,
             });
           }
         }

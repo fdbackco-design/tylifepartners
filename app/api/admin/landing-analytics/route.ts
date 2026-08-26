@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from("landing_events")
       .select(
-        "id, landing_key, session_id, event_type, depth, max_depth, duration_seconds, section_name, section_label, x_ratio, y_ratio, device_type, created_at"
+        "id, landing_key, session_id, event_type, depth, max_depth, duration_seconds, section_name, section_label, x_ratio, y_ratio, device_type, viewport_width, user_agent, created_at"
       )
       .eq("landing_key", landing_key)
       .gte("created_at", from.toISOString())
