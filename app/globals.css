@@ -589,6 +589,259 @@ main.crm-admin-login {
   white-space: nowrap;
 }
 
+.crm-lead-heatmap {
+  padding: 20px max(24px, calc((100vw - 1080px) / 2)) 48px;
+  max-width: none;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 auto;
+}
+
+.crm-lead-heatmap-header {
+  margin-bottom: 20px;
+  max-width: 1080px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.crm-lead-heatmap-meta {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 16px;
+  max-width: 1080px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
+.crm-lead-heatmap-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 20px;
+  align-items: start;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.crm-lead-heatmap-main {
+  min-width: 0;
+}
+
+.crm-lead-heatmap-preview {
+  position: sticky;
+  top: 72px;
+  align-self: start;
+}
+
+.crm-lead-heatmap-preview-head {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--crm-text);
+}
+
+.crm-lead-heatmap-preview-frame {
+  border: 1px solid var(--crm-border);
+  border-radius: 16px;
+  background: #0f172a;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+}
+
+.crm-lead-heatmap-preview-scroll {
+  max-height: min(78vh, 860px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #fff;
+}
+
+.crm-lead-heatmap-preview-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  vertical-align: top;
+}
+
+.crm-heat-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--crm-border, #e5e7eb);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.crm-heat-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.crm-heat-table th,
+.crm-heat-table td {
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid #eee;
+  vertical-align: middle;
+}
+
+.crm-heat-table th {
+  font-weight: 600;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.crm-heat-table-label {
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crm-analytics-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.crm-analytics-stat {
+  padding: 12px;
+  border: 1px solid var(--crm-border, #e5e7eb);
+  border-radius: 8px;
+  background: #fff;
+  min-width: 0;
+}
+
+.crm-analytics-stat-label {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crm-analytics-stat-value {
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.crm-analytics-section {
+  margin-bottom: 28px;
+}
+
+.crm-analytics-section-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  word-break: keep-all;
+}
+
+.crm-analytics-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
+.crm-analytics-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.crm-analytics-bars > li {
+  margin-bottom: 10px;
+}
+
+.crm-analytics-bar-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.crm-analytics-bar-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-analytics-bar-sub {
+  flex-shrink: 0;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.crm-analytics-bar-track {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.crm-analytics-bar-fill {
+  height: 100%;
+  background: var(--cta-bg, #400293);
+  border-radius: 4px;
+}
+
+@media (max-width: 960px) {
+  .crm-lead-heatmap {
+    padding: 16px 12px calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .crm-lead-heatmap-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .crm-lead-heatmap-preview {
+    position: static;
+    order: -1;
+    max-width: 280px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .crm-lead-heatmap-preview-scroll {
+    max-height: 360px;
+  }
+
+  .crm-analytics-stats {
+    gap: 6px;
+  }
+
+  .crm-analytics-stat {
+    padding: 10px 8px;
+  }
+
+  .crm-analytics-stat-value {
+    font-size: 16px;
+  }
+
+  .crm-heat-table {
+    min-width: 480px;
+    font-size: 12px;
+  }
+
+  .crm-heat-table th,
+  .crm-heat-table td {
+    padding: 7px 8px;
+  }
+}
+
 .crm-dash-bar-track {
   height: 10px;
   border-radius: 999px;

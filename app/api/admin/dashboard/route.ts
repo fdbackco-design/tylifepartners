@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
   const to = sp.get("date_to") || from;
   const supabase = getSupabaseAdmin();
   const scoped = await visibleAssigneeIds(session);
+  const rangeStart = startOfKstDayIso(from);
+  const rangeEnd = startOfNextKstDayIso(to);
 
   const { data: staff } = await supabase.from("staff_users").select("id, name, rank, parent_id").eq("is_active", true);
   let people = staff ?? [];
@@ -25,16 +27,51 @@ export async function GET(request: NextRequest) {
     .from("lead_status_logs")
     .select("to_status, assignee_id, changed_at")
     .eq("to_status", "1차컨택")
-    .gte("changed_at", startOfKstDayIso(from))
-    .lt("changed_at", startOfNextKstDayIso(to));
+    .gte("changed_at", rangeStart)
+    .lt("changed_at", rangeEnd);
+
+  let contacted = 0;
+  for (const status of ["1차컨택", "상담완료"] as const) {
+    const { count, error } = await supabase
+      .from("lead_status_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("to_status", status)
+      .gte("changed_at", rangeStart)
+      .lt("changed_at", rangeEnd);
+    if (error) {
+      console.warn(`[dashboard] status count ${status}:`, error.message);
+      continue;
+    }
+    contacted += count ?? 0;
+  }
+
+  let inbound = 0;
+  for (const table of ["leads", "tylife_b2b"] as const) {
+    const { count, error } = await supabase
+      .from(table)
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", rangeStart)
+      .lt("created_at", rangeEnd);
+    if (error) {
+      console.warn(`[dashboard] inbound count ${table}:`, error.message);
+      continue;
+    }
+    inbound += count ?? 0;
+  }
+
+  const summary = {
+    inbound,
+    contacted,
+    rate: inbound > 0 ? Math.round((contacted / inbound) * 1000) / 10 : null,
+  };
 
   const assignedCounts = new Map<string, number>();
   for (const table of ["leads", "tylife_b2b"] as const) {
     let q = supabase
       .from(table)
       .select("assignee_id, assigned_at")
-      .gte("assigned_at", startOfKstDayIso(from))
-      .lt("assigned_at", startOfNextKstDayIso(to));
+      .gte("assigned_at", rangeStart)
+      .lt("assigned_at", rangeEnd);
     if (scoped !== "all") q = q.in("assignee_id", scoped);
     const { data } = await q;
     for (const row of data ?? []) {
@@ -86,5 +123,12 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  return NextResponse.json({ ok: true, date_from: from, date_to: to, by_person, by_date });
+  return NextResponse.json({
+    ok: true,
+    date_from: from,
+    date_to: to,
+    summary,
+    by_person,
+    by_date,
+  });
 }

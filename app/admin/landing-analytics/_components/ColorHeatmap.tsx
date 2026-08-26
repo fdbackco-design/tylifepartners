@@ -9,6 +9,7 @@ const tabular: React.CSSProperties = { fontVariantNumeric: "tabular-nums" };
 export function HeatmapHelpText() {
   return (
     <p
+      className="crm-analytics-hint"
       style={{
         margin: "0 0 16px",
         padding: "12px 14px",
@@ -18,6 +19,7 @@ export function HeatmapHelpText() {
         background: "#fff7ed",
         border: "1px solid #fed7aa",
         borderRadius: 8,
+        wordBreak: "keep-all",
       }}
     >
       따뜻한 색(빨강·주황)은 사용자가 <strong>많이 도달하고 오래 머문</strong> 구간입니다. 차가운
@@ -95,76 +97,25 @@ export function SectionColorHeatmap({ rows, empty }: SectionHeatmapProps) {
   return (
     <>
       <HeatmapLegend />
-      <div
-        className="section-heat-mobile"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-          gap: 12,
-        }}
-      >
-        {rows.map((row) => (
-          <SectionHeatCard key={row.name} row={row} />
-        ))}
-      </div>
-      <div className="section-heat-desktop" style={{ display: "none" }}>
+      <div className="crm-heat-table-wrap">
         <SectionHeatTable rows={rows} />
       </div>
-      <style>{`
-        @media (min-width: 720px) {
-          .section-heat-mobile { display: none !important; }
-          .section-heat-desktop { display: block !important; }
-        }
-      `}</style>
     </>
-  );
-}
-
-function SectionHeatCard({ row }: { row: LandingAnalyticsReport["section_heatmap"][number] }) {
-  const colors = getHeatColorStyle(row.heat_score);
-  return (
-    <article
-      style={{
-        border: `1px solid ${colors.border}`,
-        borderRadius: 8,
-        background: colors.background,
-        overflow: "hidden",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-      }}
-    >
-      <div style={{ display: "flex" }}>
-        <div style={{ width: 6, flexShrink: 0, background: colors.bar }} />
-        <div style={{ flex: 1, padding: "12px 14px" }}>
-          <h3
-            style={{
-              margin: "0 0 10px",
-              fontSize: 14,
-              fontWeight: 600,
-              color: colors.text,
-              lineHeight: 1.35,
-            }}
-          >
-            {row.label}
-          </h3>
-          <SectionHeatMetrics row={row} colors={colors} />
-        </div>
-      </div>
-    </article>
   );
 }
 
 function SectionHeatTable({ rows }: { rows: LandingAnalyticsReport["section_heatmap"] }) {
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+    <table className="crm-heat-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
       <thead>
         <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
           <th style={{ padding: 8, width: 8 }} aria-hidden />
-          <th style={{ padding: 8 }}>구간</th>
-          <th style={{ padding: 8 }}>도달률</th>
-          <th style={{ padding: 8 }}>평균 체류</th>
-          <th style={{ padding: 8 }}>이탈률</th>
-          <th style={{ padding: 8 }}>클릭</th>
-          <th style={{ padding: 8 }}>점수</th>
+          <th style={{ padding: 8, whiteSpace: "nowrap" }}>구간</th>
+          <th style={{ padding: 8, whiteSpace: "nowrap" }}>도달률</th>
+          <th style={{ padding: 8, whiteSpace: "nowrap" }}>평균 체류</th>
+          <th style={{ padding: 8, whiteSpace: "nowrap" }}>이탈률</th>
+          <th style={{ padding: 8, whiteSpace: "nowrap" }}>클릭</th>
+          <th style={{ padding: 8, whiteSpace: "nowrap" }}>점수</th>
         </tr>
       </thead>
       <tbody>
@@ -181,67 +132,21 @@ function SectionHeatTable({ rows }: { rows: LandingAnalyticsReport["section_heat
               <td style={{ padding: 0, width: 6 }}>
                 <div style={{ width: 6, height: "100%", minHeight: 40, background: colors.bar }} />
               </td>
-              <td style={{ padding: 8, fontWeight: 500, color: colors.text }}>{row.label}</td>
-              <td style={{ padding: 8, ...tabular }}>{row.reach_rate.toFixed(1)}%</td>
-              <td style={{ padding: 8, ...tabular }}>
+              <td style={{ padding: 8, fontWeight: 500, color: colors.text, whiteSpace: "nowrap" }}>
+                {row.label}
+              </td>
+              <td style={{ padding: 8, whiteSpace: "nowrap", ...tabular }}>{row.reach_rate.toFixed(1)}%</td>
+              <td style={{ padding: 8, whiteSpace: "nowrap", ...tabular }}>
                 {formatDurationSeconds(row.avg_dwell_seconds)}
               </td>
-              <td style={{ padding: 8, ...tabular }}>{row.dropout_rate.toFixed(1)}%</td>
-              <td style={{ padding: 8, ...tabular }}>{row.click_count}</td>
-              <td style={{ padding: 8, ...tabular }}>{(row.heat_score * 100).toFixed(0)}</td>
+              <td style={{ padding: 8, whiteSpace: "nowrap", ...tabular }}>{row.dropout_rate.toFixed(1)}%</td>
+              <td style={{ padding: 8, whiteSpace: "nowrap", ...tabular }}>{row.click_count}</td>
+              <td style={{ padding: 8, whiteSpace: "nowrap", ...tabular }}>{(row.heat_score * 100).toFixed(0)}</td>
             </tr>
           );
         })}
       </tbody>
     </table>
-  );
-}
-
-function SectionHeatMetrics({
-  row,
-  colors,
-}: {
-  row: LandingAnalyticsReport["section_heatmap"][number];
-  colors: ReturnType<typeof getHeatColorStyle>;
-}) {
-  return (
-    <dl
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: 8,
-        margin: 0,
-        fontSize: 12,
-        ...tabular,
-      }}
-    >
-      <MetricItem label="도달률" value={`${row.reach_rate.toFixed(1)}%`} color={colors.text} />
-      <MetricItem
-        label="평균 체류"
-        value={formatDurationSeconds(row.avg_dwell_seconds)}
-        color={colors.text}
-      />
-      <MetricItem label="이탈률" value={`${row.dropout_rate.toFixed(1)}%`} color={colors.text} />
-      <MetricItem label="클릭" value={String(row.click_count)} color={colors.text} />
-      <MetricItem label="점수" value={`${(row.heat_score * 100).toFixed(0)}`} color={colors.text} />
-    </dl>
-  );
-}
-
-function MetricItem({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string;
-  color: string;
-}) {
-  return (
-    <div>
-      <dt style={{ margin: 0, color: "#64748b", fontSize: 11 }}>{label}</dt>
-      <dd style={{ margin: "2px 0 0", fontWeight: 600, color }}>{value}</dd>
-    </div>
   );
 }
 
