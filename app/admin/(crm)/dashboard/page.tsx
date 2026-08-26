@@ -14,6 +14,12 @@ type Row = {
   first_contact_rate: number | null;
 };
 
+type Summary = {
+  inbound: number;
+  contacted: number;
+  rate: number | null;
+};
+
 type SortMode = "rate_desc" | "rate_asc";
 
 export default function DashboardPage() {
@@ -21,6 +27,7 @@ export default function DashboardPage() {
   const [from, setFrom] = useState(() => addDaysLocal(t, -6));
   const [to, setTo] = useState(t);
   const [rows, setRows] = useState<Row[]>([]);
+  const [summary, setSummary] = useState<Summary>({ inbound: 0, contacted: 0, rate: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("rate_desc");
@@ -31,20 +38,18 @@ export default function DashboardPage() {
     fetch(`/api/admin/dashboard?date_from=${from}&date_to=${to}`)
       .then((r) => r.json())
       .then((d) => {
-        if (d.ok) setRows(d.by_person ?? []);
-        else setError(d.message || "조회 실패");
+        if (d.ok) {
+          setRows(d.by_person ?? []);
+          setSummary({
+            inbound: Number(d.summary?.inbound ?? 0),
+            contacted: Number(d.summary?.contacted ?? 0),
+            rate: d.summary?.rate == null ? null : Number(d.summary.rate),
+          });
+        } else setError(d.message || "조회 실패");
       })
       .catch(() => setError("네트워크 오류"))
       .finally(() => setLoading(false));
   }, [from, to]);
-
-  const summary = useMemo(() => {
-    const totalAssigned = rows.reduce((sum, r) => sum + (r.assigned || 0), 0);
-    const totalContact = rows.reduce((sum, r) => sum + (r.first_contact || 0), 0);
-    const overallRate =
-      totalAssigned > 0 ? Math.round((totalContact / totalAssigned) * 1000) / 10 : null;
-    return { totalAssigned, totalContact, overallRate };
-  }, [rows]);
 
   const chartRows = useMemo(() => {
     const list = rows.filter((r) => r.assigned > 0);
@@ -90,11 +95,11 @@ export default function DashboardPage() {
           <div className="crm-dash-stats" style={{ marginTop: 16 }}>
             <CrmStatRow
               items={[
-                { label: "총 배정 건수", value: summary.totalAssigned.toLocaleString() },
-                { label: "총 1차 컨택 건수", value: summary.totalContact.toLocaleString() },
+                { label: "신규 유입", value: summary.inbound.toLocaleString() },
+                { label: "1차컨택+완료", value: summary.contacted.toLocaleString() },
                 {
-                  label: "전체 1차 컨택률",
-                  value: summary.overallRate == null ? "-" : `${summary.overallRate}%`,
+                  label: "1차컨택·완료률",
+                  value: summary.rate == null ? "-" : `${summary.rate}%`,
                 },
               ]}
             />
