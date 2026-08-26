@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
           name,
           phone,
           leadId: samePerson.id,
-          entryPage,
+          region: location || region || null,
         })
       );
 
@@ -379,7 +379,7 @@ export async function POST(request: NextRequest) {
           name,
           phone,
           leadId: insertedLead.id,
-          entryPage,
+          region: location || region || null,
         })
       );
     }

@@ -197,10 +197,12 @@ export default function PushSubscribeButton() {
         className="crm-push-bell is-on"
         disabled={busy}
         onClick={() => void disable()}
-        title="웹 푸시 알림 끄기"
-        aria-label="알림 끄기"
+        title="알림 ON · 누르면 끕니다"
+        aria-label="알림 ON, 끄기"
+        aria-pressed="true"
       >
         <BellIcon active />
+        <span className="crm-push-bell-label">ON</span>
       </button>
     );
   }
@@ -213,6 +215,7 @@ export default function PushSubscribeButton() {
       onClick={() => void enable()}
       title={status === "off" ? "브라우저에서 알림이 차단되었습니다" : "신규 DB·배정 알림 받기"}
       aria-label="알림 켜기"
+      aria-pressed="false"
     >
       <BellIcon />
     </button>

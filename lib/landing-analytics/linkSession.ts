@@ -64,6 +64,7 @@ export async function linkLandingSessionToLead(opts: {
     page_url: opts.pageUrl ?? null,
     lead_table: opts.leadTable,
     lead_id: opts.leadId,
+    // 서버 삽입 이벤트는 디바이스/깊이 없음 — 집계 시 클라이언트 이벤트·리드 스냅샷으로 보강
   });
   if (submitEvtErr && !/duplicate|unique/i.test(submitEvtErr.message)) {
     console.warn("[landing] lead_submit event:", submitEvtErr.message);

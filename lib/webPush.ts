@@ -117,7 +117,7 @@ export async function notifyAdminsNewLead(opts: {
   name: string;
   phone: string;
   leadId: string;
-  entryPage?: string | null;
+  region?: string | null;
 }): Promise<void> {
   if (!isWebPushConfigured()) return;
   const subs = await loadAdminSubscriptions();
@@ -128,12 +128,11 @@ export async function notifyAdminsNewLead(opts: {
     opts.kind === "candidates"
       ? `/admin/candidates?search=${encodeURIComponent(opts.phone.replace(/\D/g, ""))}`
       : `/admin/consumers?search=${encodeURIComponent(opts.phone.replace(/\D/g, ""))}`;
+  const region = String(opts.region ?? "").trim();
 
   await sendToSubscriptions(subs, {
     title: `신규 ${kindLabel} DB`,
-    body: `${opts.name} · ${formatPhoneKorean(opts.phone)}${
-      opts.entryPage ? ` · ${opts.entryPage}` : ""
-    }`,
+    body: `${opts.name} · ${formatPhoneKorean(opts.phone)}${region ? ` · ${region}` : ""}`,
     url,
     tag: `new-lead-${opts.leadId}`,
   });
