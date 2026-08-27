@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CrmSwitch } from "@/app/admin/_components/crm/ui";
 import PushSubscribeButton from "@/app/admin/_components/PushSubscribeButton";
 import { canAccessAdminPath, defaultAdminHome } from "@/lib/crm/scope";
+import { parseOpenCommentFromUrl, resolveAppUrl, stashPendingOpenComment } from "@/lib/crm/pushDeepLink";
 import type { SessionUser } from "@/lib/crm/types";
 
 const PRIMARY_TABS = [
@@ -67,6 +68,33 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       router.replace(defaultAdminHome(user.rank));
     }
   }, [user, pathname, router]);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || data.type !== "crm-notification-open" || typeof data.url !== "string") return;
+
+      const leadId = parseOpenCommentFromUrl(data.url);
+      if (leadId) stashPendingOpenComment(leadId);
+
+      const nextUrl = resolveAppUrl(data.url);
+      const currentUrl = window.location.href;
+      if (currentUrl === nextUrl) {
+        window.dispatchEvent(
+          new CustomEvent("crm-open-comment-deeplink", {
+            detail: { leadId: leadId ?? undefined, force: true },
+          })
+        );
+        return;
+      }
+      window.location.assign(nextUrl);
+    };
+
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, []);
 
   const logout = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
