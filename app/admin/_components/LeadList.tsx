@@ -116,6 +116,9 @@ export default function LeadList({
   const [hideSaving, setHideSaving] = useState(false);
   const [hideConfirmOpen, setHideConfirmOpen] = useState(false);
   const [toast, setToast] = useState<{ tone: "success" | "danger" | "info"; message: string } | null>(null);
+  const pendingOpenCommentIdRef = useRef<string | null>(searchParams.get("open_comment"));
+  const openCommentDeepLinkDoneRef = useRef(false);
+  const openCommentHandlerRef = useRef<(row: LeadRow) => Promise<void>>(async () => {});
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 860px)");
@@ -496,6 +499,37 @@ export default function LeadList({
       setCommentHistory(history);
     }
   };
+
+  openCommentHandlerRef.current = openComment;
+
+  useEffect(() => {
+    const leadId = pendingOpenCommentIdRef.current;
+    if (!leadId || openCommentDeepLinkDoneRef.current || loading) return;
+
+    void (async () => {
+      const categories: LeadCategory[] =
+        category === "candidates"
+          ? ["candidates"]
+          : category === "consumers"
+            ? ["consumers"]
+            : ["consumers", "candidates"];
+
+      for (const cat of categories) {
+        try {
+          const res = await fetch(`/api/admin/leads/${leadId}?category=${cat}`);
+          const data = await res.json();
+          if (!data.ok || !data.item) continue;
+          openCommentDeepLinkDoneRef.current = true;
+          pendingOpenCommentIdRef.current = null;
+          setSelectedId(data.item.id);
+          await openCommentHandlerRef.current(data.item as LeadRow);
+          return;
+        } catch {
+          // 다음 category 시도
+        }
+      }
+    })();
+  }, [loading, category]);
 
   useEffect(() => {
     commentRowRef.current = commentRow;

@@ -178,10 +178,11 @@ export async function notifyAssigneeAdminComment(opts: {
   if (!subs.length) return;
 
   const kindLabel = opts.kind === "candidates" ? "후보자" : "소비자";
-  const url =
+  const base =
     opts.kind === "candidates"
-      ? `/admin/candidates?search=${encodeURIComponent(opts.phone.replace(/\D/g, ""))}`
-      : `/admin/consumers?search=${encodeURIComponent(opts.phone.replace(/\D/g, ""))}`;
+      ? `/admin/candidates?open_comment=${encodeURIComponent(opts.leadId)}`
+      : `/admin/consumers?open_comment=${encodeURIComponent(opts.leadId)}`;
+  const url = `${base}&search=${encodeURIComponent(opts.phone.replace(/\D/g, ""))}`;
 
   await sendToSubscriptions(subs, {
     title: "담당 고객에 코멘트가 등록되었습니다",
