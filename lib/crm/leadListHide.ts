@@ -59,7 +59,7 @@ export async function hideLeadsFromList(session: SessionUser, items: HideLeadIte
     return { ok: false, message: "선택된 항목이 없습니다.", status: 400 };
   }
   if (items.length > 200) {
-    return { ok: false, message: "한 번에 200건까지 숨길 수 있습니다.", status: 400 };
+    return { ok: false, message: "한 번에 200건까지 삭제할 수 있습니다.", status: 400 };
   }
 
   const supabase = getSupabaseAdmin();
@@ -127,7 +127,7 @@ export async function hideLeadsFromList(session: SessionUser, items: HideLeadIte
   }
 
   if (!hidden && skipped) {
-    return { ok: false, message: "숨길 수 있는 항목이 없습니다.", status: 400 };
+    return { ok: false, message: "삭제할 수 있는 항목이 없습니다.", status: 400 };
   }
 
   return { ok: true, hidden, skipped, hiddenDetails };

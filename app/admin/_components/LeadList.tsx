@@ -518,11 +518,7 @@ export default function LeadList({
   const bulkHide = async () => {
     if (selectedIds.size === 0) return;
     const n = selectedIds.size;
-    if (
-      !window.confirm(
-        `선택한 ${n}건을 목록에서 숨길까요?\n\nDB 데이터는 삭제되지 않으며, 이후 목록·내보내기에서 보이지 않습니다. 활동 로그에 기록됩니다.`
-      )
-    ) {
+    if (!window.confirm(`선택한 ${n}건을 삭제할까요?`)) {
       return;
     }
     setHideSaving(true);
@@ -538,12 +534,12 @@ export default function LeadList({
       });
       const data = await res.json();
       if (!data.ok) {
-        alert(data.message || "숨김 처리에 실패했습니다.");
+        alert(data.message || "삭제에 실패했습니다.");
         return;
       }
       setSelectedIds(new Map());
       await load();
-      alert(data.message || `${data.hidden}건을 목록에서 숨겼습니다.`);
+      alert(data.message || `${data.hidden}건을 삭제했습니다.`);
     } catch {
       alert("네트워크 오류가 발생했습니다.");
     } finally {
@@ -883,7 +879,7 @@ export default function LeadList({
                   disabled={hideSaving}
                   onClick={() => void bulkHide()}
                 >
-                  {hideSaving ? "처리 중…" : "목록에서 숨기기"}
+                  {hideSaving ? "삭제 중…" : "삭제"}
                 </button>
               )}
             </div>

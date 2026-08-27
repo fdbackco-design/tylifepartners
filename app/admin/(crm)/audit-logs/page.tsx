@@ -33,7 +33,7 @@ const ACTION_OPTIONS = [
   { value: "logout", label: "로그아웃" },
   { value: "lead.update", label: "리드 수정" },
   { value: "lead.bulk_assignee", label: "담당자 일괄 변경" },
-  { value: "lead.hide_from_list", label: "목록 숨김" },
+  { value: "lead.hide_from_list", label: "삭제" },
   { value: "user.create", label: "계정 생성" },
   { value: "user.update", label: "계정 수정" },
   { value: "user.reset_password", label: "비밀번호 초기화" },

@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       actor: actorFromSession(session),
       action: "lead.hide_from_list",
       resourceType: "lead",
-      summary: `목록에서 ${result.hidden}건 숨김${result.skipped ? ` (${result.skipped}건 제외)` : ""}`,
+      summary: `${result.hidden}건 삭제${result.skipped ? ` (${result.skipped}건 제외)` : ""}`,
       detail: {
         hidden_count: result.hidden,
         skipped_count: result.skipped,
@@ -52,11 +52,11 @@ export async function POST(request: NextRequest) {
       skipped: result.skipped,
       message:
         result.skipped > 0
-          ? `${result.hidden}건을 목록에서 숨겼습니다. (${result.skipped}건은 권한·상태 때문에 제외)`
-          : `${result.hidden}건을 목록에서 숨겼습니다.`,
+          ? `${result.hidden}건을 삭제했습니다. (${result.skipped}건은 권한·상태 때문에 제외)`
+          : `${result.hidden}건을 삭제했습니다.`,
     });
   } catch (e) {
     console.error("POST /api/admin/leads/hide:", e);
-    return NextResponse.json({ ok: false, message: "숨김 처리 중 오류가 발생했습니다." }, { status: 500 });
+    return NextResponse.json({ ok: false, message: "삭제 처리 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
