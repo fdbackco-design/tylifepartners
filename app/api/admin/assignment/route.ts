@@ -33,16 +33,19 @@ export async function GET() {
 
   try {
     await ensureFixedAssignmentRules();
-    const rules = await loadAssignmentRules();
     const supabase = getSupabaseAdmin();
-    const { data: enabledRow } = await supabase.from("crm_settings").select("value").eq("key", "auto_assign_enabled").maybeSingle();
-    const auto_assign_enabled = enabledRow?.value !== false && enabledRow?.value !== "false";
-    const { data: staff } = await supabase
-      .from("staff_users")
-      .select("id, name, rank, region, is_active")
-      .eq("is_active", true)
-      .in("rank", ["sales", "manager"])
-      .order("name");
+    const [rules, enabledRes, staffRes] = await Promise.all([
+      loadAssignmentRules({ ensure: false }),
+      supabase.from("crm_settings").select("value").eq("key", "auto_assign_enabled").maybeSingle(),
+      supabase
+        .from("staff_users")
+        .select("id, name, rank, region, is_active")
+        .eq("is_active", true)
+        .in("rank", ["sales", "manager"])
+        .order("name"),
+    ]);
+    const auto_assign_enabled =
+      enabledRes.data?.value !== false && enabledRes.data?.value !== "false";
 
     return NextResponse.json({
       ok: true,
@@ -51,7 +54,7 @@ export async function GET() {
         name,
         bases: ZONE_BASE_LABELS[name],
       })),
-      staff: staff ?? [],
+      staff: staffRes.data ?? [],
       rules,
     });
   } catch (e) {

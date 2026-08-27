@@ -100,8 +100,10 @@ function sortRules<T extends { region_group: string; created_at?: string }>(rows
   });
 }
 
-export async function loadAssignmentRules(): Promise<AssignmentRule[]> {
-  await ensureFixedAssignmentRules();
+export async function loadAssignmentRules(opts?: { ensure?: boolean }): Promise<AssignmentRule[]> {
+  if (opts?.ensure !== false) {
+    await ensureFixedAssignmentRules();
+  }
   const supabase = getSupabaseAdmin();
   const { data: rules, error } = await supabase
     .from("assignment_rules")

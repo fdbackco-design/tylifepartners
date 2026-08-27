@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "type-check": "tsc --noEmit",
-    "test": "tsx --test lib/crm/regionZones.test.ts lib/crm/scope.test.ts lib/crm/merge/logic.test.ts lib/crm/excelImport/logic.test.ts lib/utm.meta.test.ts lib/landing-analytics/validate.behavior.test.ts",
+    "test": "tsx --test lib/crm/regionZones.test.ts lib/crm/scope.test.ts lib/crm/merge/logic.test.ts lib/crm/excelImport/logic.test.ts lib/utm.meta.test.ts lib/landing-analytics/validate.behavior.test.ts lib/crm/calendar.test.ts",
     "start": "next start",
     "lint": "next lint"
   },
@@ -14,6 +14,7 @@
     "@supabase/supabase-js": "^2.45.0",
     "@vercel/functions": "^1.6.0",
     "googleapis": "^171.4.0",
+    "html-to-image": "^1.11.13",
     "jose": "^5.2.0",
     "next": "14.2.18",
     "nodemailer": "^8.0.5",

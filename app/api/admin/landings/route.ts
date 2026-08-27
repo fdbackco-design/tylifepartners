@@ -4,15 +4,21 @@ import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import {
   createManagedLanding,
   listManagedLandings,
+  listManagedLandingsLite,
 } from "@/lib/managedLandings/store";
 import type { ManagedCtaPosition, ManagedLandingInput } from "@/lib/managedLandings/types";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
   try {
+    const lite = request.nextUrl.searchParams.get("lite") === "1";
+    if (lite) {
+      const items = await listManagedLandingsLite();
+      return NextResponse.json({ ok: true, items });
+    }
     const items = await listManagedLandings();
     const supabase = (await import("@/lib/supabase")).getSupabaseAdmin();
     const paths = items.map((i) => i.path);

@@ -45,23 +45,26 @@ export default function LandingAnalyticsAdminPage() {
   }, [searchParams]);
 
   const checkAuth = useCallback(async () => {
-    const res = await fetch("/api/admin/leads?limit=1");
-    setLoggedIn(res.ok);
-    if (res.ok) {
-      try {
-        const lr = await fetch("/api/admin/landings");
-        const lj = await lr.json();
-        if (lr.ok && Array.isArray(lj.items)) {
-          setManagedOptions(
-            lj.items.map((it: { slug: string; path: string; title: string }) => ({
-              key: `managed_${it.slug}`,
-              label: `${it.title} (${it.path})`,
-            }))
-          );
-        }
-      } catch {
-        /* ignore */
+    const [meRes, landingsRes] = await Promise.all([
+      fetch("/api/admin/me"),
+      fetch("/api/admin/landings?lite=1"),
+    ]);
+    const data = await meRes.json().catch(() => ({}));
+    const ok = Boolean(data?.ok);
+    setLoggedIn(ok);
+    if (!ok) return;
+    try {
+      const lj = await landingsRes.json();
+      if (landingsRes.ok && Array.isArray(lj.items)) {
+        setManagedOptions(
+          lj.items.map((it: { slug: string; path: string; title: string }) => ({
+            key: `managed_${it.slug}`,
+            label: `${it.title} (${it.path})`,
+          }))
+        );
       }
+    } catch {
+      /* ignore */
     }
   }, []);
 

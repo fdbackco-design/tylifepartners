@@ -54,7 +54,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     if (user?.rank !== "admin") return;
-    fetch("/api/admin/assignment")
+    fetch("/api/admin/assignment/auto-assign")
       .then((r) => r.json())
       .then((d) => {
         if (d.ok) setAutoAssign(d.auto_assign_enabled !== false);
@@ -139,7 +139,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     setAutoAssign(enabled);
     setAutoAssignSaving(true);
     try {
-      const res = await fetch("/api/admin/assignment", {
+      const res = await fetch("/api/admin/assignment/auto-assign", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ auto_assign_enabled: enabled }),
