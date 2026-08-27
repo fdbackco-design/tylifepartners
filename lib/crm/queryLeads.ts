@@ -9,13 +9,22 @@ import { attachMetaCreatives } from "@/lib/meta/ads";
 import { loadActiveBlacklistPhones } from "@/lib/phoneBlacklist";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-async function enrichLeads(items: LeadRow[]): Promise<LeadRow[]> {
-  const withHistory = await attachAssigneeHistories(items);
+async function enrichLeads(items: LeadRow[], session: SessionUser): Promise<LeadRow[]> {
+  // 목록에서는 Meta Graph 동기 호출을 하지 않고 DB 캐시만 사용 (미스분은 백그라운드 채움)
+  let withMeta = items;
   try {
-    return await attachMetaCreatives(withHistory);
+    withMeta = await attachMetaCreatives(items, { cacheOnly: true });
   } catch (e) {
     console.warn("[queryLeads] meta creative attach skipped:", e instanceof Error ? e.message : e);
-    return withHistory;
+  }
+
+  // 담당자 이력 체인은 관리자 목록에서만 표시 → 영업자/매니저는 스킵
+  if (session.rank !== "admin") return withMeta;
+  try {
+    return await attachAssigneeHistories(withMeta);
+  } catch (e) {
+    console.warn("[queryLeads] assignee history skipped:", e instanceof Error ? e.message : e);
+    return withMeta;
   }
 }
 
@@ -39,6 +48,13 @@ export type LeadQueryInput = {
   unassigned?: boolean;
   limit?: number;
   offset?: number;
+};
+
+export type LeadQueryResult = {
+  items: LeadRow[];
+  total: number;
+  staff: Array<{ id: string; name: string; parent_id: string | null; rank?: string; is_active?: boolean }>;
+  scoped: string[] | "all";
 };
 
 function csv(v: string | null | undefined): string[] {
@@ -139,7 +155,7 @@ function applyBlacklistFilter(query: any, blockedPhones: string[]) {
   return query.not("normalized_phone", "in", `(${safe.join(",")})`);
 }
 
-export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promise<{ items: LeadRow[]; total: number }> {
+export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promise<LeadQueryResult> {
   const supabase = getSupabaseAdmin();
   const [scoped, staffMaps, blockedPhones, hiddenLeads] = await Promise.all([
     visibleAssigneeIds(session),
@@ -147,7 +163,7 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
     loadActiveBlacklistPhones(),
     loadHiddenLeadIdMaps(),
   ]);
-  const { staffById, parentNameById } = staffMaps;
+  const { staffById, parentNameById, staff } = staffMaps;
 
   let teamAssigneeIds: string[] | null = null;
   if (q.teamIds?.length) {
@@ -162,12 +178,15 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
     const table = kind === "candidates" ? "tylife_b2b" : "leads";
     const selectFull = kind === "candidates" ? CANDIDATE_SELECT : CONSUMER_SELECT;
     const selectLegacy = selectFull
-      .replace(", meta_ad_id, meta_adset_id, meta_campaign_id", "")
-      .replace("meta_ad_id, meta_adset_id, meta_campaign_id, ", "");
+      .replace(", meta_ad_id", "")
+      .replace("meta_ad_id, ", "")
+      .replace(", admin_comment", "")
+      .replace("admin_comment, ", "");
 
     const run = async (select: string) => {
+      // exact count는 대량 데이터에서 느림 → estimated로 페이지 네비게이션에 충분
       let query = (supabase.from(table) as any)
-        .select(select, { count: "exact" })
+        .select(select, { count: "estimated" })
         .or("merge_status.eq.active,merge_status.is.null")
         .order("created_at", { ascending: false });
       query = applyCommonFilters(query, q, scoped, session.rank);
@@ -193,8 +212,8 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
     };
 
     let { data, error, count } = await run(selectFull);
-    if (error && /meta_ad|schema cache|column/i.test(error.message)) {
-      console.warn(`[queryLeads] meta columns missing on ${table}, falling back:`, error.message);
+    if (error && /meta_ad|admin_comment|schema cache|column/i.test(error.message)) {
+      console.warn(`[queryLeads] column missing on ${table}, falling back:`, error.message);
       ({ data, error, count } = await run(selectLegacy));
     }
     if (error) throw error;
@@ -211,6 +230,13 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
   const applyAdminStatusFilter = (items: LeadRow[]) =>
     items.filter((i) => matchesAdminStatusFilter(i.admin_status, q.adminStatuses));
 
+  const wrap = async (items: LeadRow[], total: number): Promise<LeadQueryResult> => ({
+    items: await enrichLeads(items, session),
+    total,
+    staff,
+    scoped,
+  });
+
   if (q.category === "all") {
     const [a, b] = await Promise.all([fetchTable("consumers"), fetchTable("candidates")]);
     let items = [...a.items, ...b.items].sort((x, y) => (x.created_at_iso < y.created_at_iso ? 1 : -1));
@@ -218,7 +244,7 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
     items = applyAdminStatusFilter(items);
     const total = items.length;
     const page = items.slice(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50));
-    return { items: await enrichLeads(page), total };
+    return wrap(page, total);
   }
 
   const result = await fetchTable(q.category);
@@ -228,10 +254,10 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
     items = applyAdminStatusFilter(items);
     const total = items.length;
     const page = items.slice(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50));
-    return { items: await enrichLeads(page), total };
+    return wrap(page, total);
   }
   if (q.needReassign) {
-    return { items: await enrichLeads(items), total: items.length };
+    return wrap(items, items.length);
   }
-  return { items: await enrichLeads(items), total: result.total };
+  return wrap(items, result.total);
 }
