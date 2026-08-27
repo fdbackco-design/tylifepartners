@@ -47,29 +47,22 @@ export async function GET(request: NextRequest) {
 
   let contacted = 0;
   const contactStatuses = ["1차컨택", "부재(메신저완료)", "상담완료", "대면확정", "가입완료"] as const;
-  for (const status of contactStatuses) {
-    const { data: rows, error } = await supabase
-      .from("lead_status_logs")
-      .select("lead_id, lead_table")
-      .eq("to_status", status)
-      .gte("changed_at", rangeStart)
-      .lt("changed_at", rangeEnd);
+  for (const table of ["leads", "tylife_b2b"] as const) {
+    let q = supabase
+      .from(table)
+      .select("id", { count: "exact", head: true })
+      .gte("assigned_at", rangeStart)
+      .lt("assigned_at", rangeEnd)
+      .in("status", [...contactStatuses])
+      .or("merge_status.eq.active,merge_status.is.null");
+    const hiddenFilter = table === "tylife_b2b" ? hiddenCandidatesFilter : hiddenLeadsFilter;
+    if (hiddenFilter) q = q.not("id", "in", hiddenFilter);
+    const { count, error } = await q;
     if (error) {
-      console.warn(`[dashboard] status count ${status}:`, error.message);
+      console.warn(`[dashboard] contacted count ${table}:`, error.message);
       continue;
     }
-    for (const row of rows ?? []) {
-      const id = String(row.lead_id ?? "");
-      if (!id) {
-        contacted += 1;
-        continue;
-      }
-      if (row.lead_table === "tylife_b2b") {
-        if (!hiddenLeads.tylife_b2b.has(id)) contacted += 1;
-      } else if (!hiddenLeads.leads.has(id)) {
-        contacted += 1;
-      }
-    }
+    contacted += count ?? 0;
   }
 
   let inbound = 0;
