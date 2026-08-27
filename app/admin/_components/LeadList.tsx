@@ -1340,7 +1340,6 @@ export default function LeadList({
                     {showAdmin && <th>관리자상태</th>}
                     <th>상담상태</th>
                     <th>메모</th>
-                    <th>코멘트</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1414,7 +1413,7 @@ export default function LeadList({
                           </div>
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                             <button type="button" className="crm-btn crm-lead-mobile-memo" onClick={() => void openMemo(row)}>
                               메모
                             </button>
@@ -1431,6 +1430,43 @@ export default function LeadList({
                                 랜딩페이지
                               </Link>
                             )}
+                            {row.meta_creative_preview ? (
+                              <button
+                                type="button"
+                                className="crm-meta-creative crm-meta-creative-mobile"
+                                title={
+                                  [row.meta_ad_name, row.meta_ad_id, row.meta_creative_type]
+                                    .filter(Boolean)
+                                    .join(" · ") || "Meta 광고 소재"
+                                }
+                                onClick={() =>
+                                  setPreviewSrc(row.meta_creative_full || row.meta_creative_preview)
+                                }
+                              >
+                                <img
+                                  className="crm-thumb crm-thumb-meta"
+                                  src={row.meta_creative_preview}
+                                  alt={row.meta_ad_name || "광고 소재"}
+                                />
+                                {row.meta_creative_type === "video" && (
+                                  <span className="crm-meta-creative-badge">영상</span>
+                                )}
+                              </button>
+                            ) : row.meta_ad_id ? (
+                              <span
+                                className="crm-cell-plain"
+                                style={{ fontSize: 11, color: "var(--crm-muted)" }}
+                                title={
+                                  row.meta_creative_status === "missing_token"
+                                    ? "META_ACCESS_TOKEN 미설정"
+                                    : row.meta_ad_name || row.meta_ad_id
+                                }
+                              >
+                                {row.meta_ad_name
+                                  ? row.meta_ad_name.slice(0, 12)
+                                  : `ID ${row.meta_ad_id.slice(-6)}`}
+                              </span>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
