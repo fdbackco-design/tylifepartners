@@ -18,7 +18,7 @@ export const CALENDAR_EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
   important: "중요",
   deadline: "마감",
   holiday: "휴무",
-  meeting: "대면확정일",
+  meeting: "대면일",
 };
 
 /** HTML 디자인 토큰에 맞춘 색상 */
@@ -248,4 +248,46 @@ export function staffRankLabel(rank: StaffRank): string {
   if (rank === "admin") return "관리자";
   if (rank === "manager") return "매니저";
   return "영업자";
+}
+
+/**
+ * 일정 등록 알림 대상 staff id (작성자 본인 제외).
+ * canViewCalendarEvent 규칙과 동일하게 열람 가능자만 포함.
+ */
+export function resolveCalendarNotifyStaffIds(
+  ev: Pick<
+    CalendarEventRow,
+    "created_by" | "created_by_rank" | "visibility" | "viewer_ids" | "team_root_id"
+  >,
+  staff: StaffLite[]
+): string[] {
+  const active = staff.filter((s) => s.is_active !== false);
+  const exclude = new Set(ev.created_by ? [ev.created_by] : []);
+  let ids: string[] = [];
+
+  if (ev.created_by_rank === "manager") {
+    const root = ev.team_root_id || ev.created_by;
+    if (!root) return [];
+    const team = teamIdsForManager(root, active);
+    if (ev.visibility === "all") {
+      ids = active.filter((s) => team.has(s.id)).map((s) => s.id);
+    } else if (ev.visibility === "sales") {
+      ids = (ev.viewer_ids ?? []).filter((id) => {
+        const s = active.find((x) => x.id === id);
+        return Boolean(s && s.rank === "sales" && team.has(id));
+      });
+    }
+  } else {
+    if (ev.visibility === "all") {
+      ids = active.map((s) => s.id);
+    } else if (ev.visibility === "admin_plus") {
+      ids = active.filter((s) => s.rank === "admin").map((s) => s.id);
+    } else if (ev.visibility === "managers") {
+      ids = (ev.viewer_ids ?? []).filter((id) => active.some((s) => s.id === id && s.rank === "manager"));
+    } else if (ev.visibility === "sales") {
+      ids = (ev.viewer_ids ?? []).filter((id) => active.some((s) => s.id === id && s.rank === "sales"));
+    }
+  }
+
+  return Array.from(new Set(ids.filter((id) => !exclude.has(id))));
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   CALENDAR_EVENT_TYPES,
   CALENDAR_EVENT_TYPE_COLORS,
@@ -242,27 +243,75 @@ export default function CalendarPage() {
       showToast("이미지로 저장할 일정 종류를 한 개 이상 선택해 주세요.");
       return;
     }
-    setExporting(true);
     setStatus("PNG 생성 중…");
+    // 모바일 CSS는 셀 제목을 숨기고 점으로 바꾸므로, export 전에 PC 레이아웃으로 전환
+    flushSync(() => setExporting(true));
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+
     const source = sheetRef.current;
     const mount = document.createElement("div");
     mount.setAttribute("aria-hidden", "true");
+    // iOS Safari: opacity:0 / 과도한 화면 밖 배치는 텍스트가 비거나 점으로만 캡처되는 경우가 있음
     mount.style.cssText =
-      "position:fixed;left:-12000px;top:0;width:1120px;padding:0;margin:0;background:#F3F0F9;pointer-events:none;z-index:-1;";
+      "position:fixed;left:0;top:0;width:1120px;padding:0;margin:0;background:#F3F0F9;pointer-events:none;z-index:-1;overflow:visible;transform:translateX(-100%);";
     document.body.appendChild(mount);
 
-    try {
-      // 레이아웃 반영 대기 (필터된 그리드)
-      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    const forceDesktopCellStyles = (root: HTMLElement) => {
+      root.querySelectorAll<HTMLElement>(".wc-day__mark, .wc-day__more, .wc-agenda, .wc-nav, .wc-period__pick").forEach((el) => {
+        el.style.setProperty("display", "none", "important");
+      });
+      root.querySelectorAll<HTMLElement>(".wc-day__items").forEach((el) => {
+        el.style.setProperty("display", "flex", "important");
+        el.style.flexDirection = "column";
+        el.style.gap = "3px";
+        el.style.flex = "1";
+        el.style.width = "100%";
+        el.style.overflow = "hidden";
+        el.style.minHeight = "0";
+      });
+      root.querySelectorAll<HTMLElement>(".wc-day").forEach((el) => {
+        el.style.setProperty("min-height", "118px", "important");
+        el.style.setProperty("height", "auto", "important");
+        el.style.setProperty("aspect-ratio", "auto", "important");
+        el.style.setProperty("padding", "8px 8px 10px", "important");
+        el.style.setProperty("align-items", "stretch", "important");
+        el.style.setProperty("justify-content", "flex-start", "important");
+        el.style.setProperty("gap", "4px", "important");
+      });
+      root.querySelectorAll<HTMLElement>(".wc-day__head").forEach((el) => {
+        el.style.setProperty("justify-content", "flex-start", "important");
+        el.style.setProperty("width", "auto", "important");
+      });
+      root.querySelectorAll<HTMLElement>(".wc-ev").forEach((el) => {
+        el.style.setProperty("display", "block", "important");
+        el.style.setProperty("font-size", "11px", "important");
+        el.style.setProperty("line-height", "1.35", "important");
+        el.style.setProperty("white-space", "nowrap", "important");
+        el.style.setProperty("overflow", "hidden", "important");
+        el.style.setProperty("text-overflow", "ellipsis", "important");
+        el.style.setProperty("visibility", "visible", "important");
+        el.style.setProperty("opacity", "1", "important");
+        el.style.setProperty("color", "#33254d", "important");
+      });
+      root.querySelectorAll<HTMLElement>(".wc-ev b").forEach((el) => {
+        el.style.setProperty("display", "inline", "important");
+        el.style.setProperty("font-size", "11px", "important");
+        el.style.setProperty("font-weight", "800", "important");
+        el.style.setProperty("visibility", "visible", "important");
+        el.style.setProperty("opacity", "1", "important");
+      });
+    };
 
+    try {
       const clone = source.cloneNode(true) as HTMLElement;
       clone.classList.add("wc-exporting");
-      // 클론 루트에도 시트 클래스 유지 + export 스타일 범위
       if (!clone.classList.contains("wc-sheet")) clone.classList.add("wc-sheet");
       const exportRoot = document.createElement("div");
       exportRoot.className = "wc wc-exporting";
+      exportRoot.style.width = "1120px";
       exportRoot.appendChild(clone);
       mount.appendChild(exportRoot);
+      forceDesktopCellStyles(exportRoot);
 
       const imgs = Array.from(exportRoot.querySelectorAll("img"));
       await Promise.all(
@@ -350,7 +399,7 @@ export default function CalendarPage() {
         <p className="wc-bar__hint">상단 종류 필터를 선택한 뒤 PNG 저장하면, 선택된 일정만 이미지에 포함됩니다.</p>
       </div>
 
-      <section className="wc-sheet" ref={sheetRef}>
+      <section className={`wc-sheet${exporting ? " wc-exporting" : ""}`} ref={sheetRef}>
         <header className="wc-masthead">
           <div className="wc-masthead__bg" aria-hidden />
           <div className="wc-masthead__row">
@@ -417,7 +466,8 @@ export default function CalendarPage() {
           <div className="wc-cal__grid">
             {monthCells.map((c) => {
               const list = c.inMonth ? byDate.get(c.date) ?? [] : [];
-              const shown = list.slice(0, CELL_MAX);
+              const cellMax = exporting ? 5 : CELL_MAX;
+              const shown = list.slice(0, cellMax);
               const more = list.length - shown.length;
               const primary = list[0];
               const accent = primary ? CALENDAR_EVENT_TYPE_COLORS[primary.event_type].accent : undefined;

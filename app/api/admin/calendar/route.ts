@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   CALENDAR_EVENT_TYPES,
+  CALENDAR_EVENT_TYPE_LABELS,
   canEditCalendar,
   canViewCalendarEvent,
   isCalendarEventType,
   isCalendarVisibility,
   normalizeVisibilityForWriter,
   parseEventDate,
+  resolveCalendarNotifyStaffIds,
   teamIdsForManager,
   type CalendarEventRow,
   type CalendarEventType,
@@ -16,6 +18,7 @@ import { addDaysYmd, kstYmd, startOfKstDayIso } from "@/lib/crm/kst";
 import { visibleAssigneeIds } from "@/lib/crm/scope";
 import { getSession } from "@/lib/adminSession";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { notifyCalendarEventCreated } from "@/lib/webPush";
 
 type StaffLite = {
   id: string;
@@ -295,7 +298,22 @@ export async function POST(request: NextRequest) {
     }
 
     const staffById = new Map(staff.map((s) => [s.id, s]));
-    return NextResponse.json({ ok: true, item: mapDbRow(data as Record<string, unknown>, staffById) });
+    const item = mapDbRow(data as Record<string, unknown>, staffById);
+
+    const notifyIds = resolveCalendarNotifyStaffIds(item, staff);
+    void notifyCalendarEventCreated({
+      eventId: item.id,
+      title: item.title || "(제목 없음)",
+      eventDate: item.event_date,
+      eventTypeLabel: CALENDAR_EVENT_TYPE_LABELS[item.event_type] ?? item.event_type,
+      authorName: session.name || "",
+      staffIds: notifyIds,
+      includeAdminRankSubs:
+        item.created_by_rank === "admin" &&
+        (item.visibility === "all" || item.visibility === "admin_plus"),
+    }).catch((e) => console.warn("[webPush] calendar notify:", e));
+
+    return NextResponse.json({ ok: true, item });
   } catch (e) {
     console.error("POST /api/admin/calendar:", e);
     return NextResponse.json({ ok: false, message: "서버 오류가 발생했습니다." }, { status: 500 });
