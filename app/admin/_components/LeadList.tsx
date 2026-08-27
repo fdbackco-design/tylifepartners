@@ -193,11 +193,13 @@ export default function LeadList({
   ]);
 
   const loadGenRef = useRef(0);
+  const nonSilentInFlightRef = useRef(0);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;
     const gen = ++loadGenRef.current;
     if (!silent) {
+      nonSilentInFlightRef.current += 1;
       setLoading(true);
       setError("");
     }
@@ -227,7 +229,10 @@ export default function LeadList({
       if (gen !== loadGenRef.current) return;
       if (!silent) setError("네트워크 오류가 발생했습니다.");
     } finally {
-      if (gen === loadGenRef.current && !silent) setLoading(false);
+      if (!silent) {
+        nonSilentInFlightRef.current = Math.max(0, nonSilentInFlightRef.current - 1);
+        if (nonSilentInFlightRef.current === 0) setLoading(false);
+      }
     }
   }, [query]);
 
@@ -553,10 +558,15 @@ export default function LeadList({
         showToast("danger", data.message || "삭제에 실패했습니다.");
         return;
       }
+      const hiddenIds = new Set(payloadItems.map((p) => p.id));
+      const hiddenCount = Number(data.hidden) || hiddenIds.size;
       setHideConfirmOpen(false);
       setSelectedIds(new Map());
-      await load();
-      showToast("success", data.message || `${data.hidden}건을 삭제했습니다.`);
+      setItems((prev) => prev.filter((row) => !hiddenIds.has(row.id)));
+      setTotal((prev) => Math.max(0, prev - hiddenCount));
+      showToast("success", data.message || `${hiddenCount}건을 삭제했습니다.`);
+      // 전체 로딩 깜빡임 없이 목록만 재동기화
+      void load({ silent: true });
     } catch {
       showToast("danger", "네트워크 오류가 발생했습니다.");
     } finally {
