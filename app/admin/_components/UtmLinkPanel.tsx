@@ -64,6 +64,9 @@ export default function UtmLinkPanel() {
   const [formSheetLabel, setFormSheetLabel] = useState("");
   const [formError, setFormError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<UtmSourceRow | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const showToast = useCallback((msg: string, error?: boolean) => {
     setToast({ msg, error });
@@ -149,6 +152,43 @@ export default function UtmLinkPanel() {
         item.sheet_label.toLowerCase().includes(q)
     );
   }, [items, sourceSearch]);
+
+  const allFilteredSelected =
+    filteredSources.length > 0 && filteredSources.every((item) => selectedIds.has(item.id));
+  const selectedCount = selectedIds.size;
+
+  useEffect(() => {
+    const valid = new Set(items.map((i) => i.id));
+    setSelectedIds((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      Array.from(prev).forEach((id) => {
+        if (valid.has(id)) next.add(id);
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [items]);
+
+  const toggleSelect = (id: string, next: boolean) => {
+    setSelectedIds((prev) => {
+      const copy = new Set(prev);
+      if (next) copy.add(id);
+      else copy.delete(id);
+      return copy;
+    });
+  };
+
+  const toggleSelectAllFiltered = (next: boolean) => {
+    setSelectedIds((prev) => {
+      const copy = new Set(prev);
+      for (const item of filteredSources) {
+        if (next) copy.add(item.id);
+        else copy.delete(item.id);
+      }
+      return copy;
+    });
+  };
 
   const applyLanding = (id: string) => {
     setSelectedLandingId(id);
@@ -258,6 +298,11 @@ export default function UtmLinkPanel() {
         return;
       }
       if (selectedValue === confirmDelete.value) setSelectedValue("");
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(confirmDelete.id);
+        return next;
+      });
       setConfirmDelete(null);
       await fetchItems();
       showToast("소스가 삭제되었습니다.");
@@ -265,6 +310,35 @@ export default function UtmLinkPanel() {
       showToast("네트워크 오류가 발생했습니다.", true);
     } finally {
       setActionId(null);
+    }
+  };
+
+  const bulkDeleteSources = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const res = await fetch("/api/admin/utm-sources/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        showToast(data.message || "삭제에 실패했습니다.", true);
+        setBulkConfirmOpen(false);
+        return;
+      }
+      const deletedValues: string[] = data.deleted_values ?? [];
+      if (deletedValues.includes(selectedValue)) setSelectedValue("");
+      setSelectedIds(new Set());
+      setBulkConfirmOpen(false);
+      await fetchItems();
+      showToast(data.message || `${data.deleted ?? 0}개 소스를 삭제했습니다.`);
+    } catch {
+      showToast("네트워크 오류가 발생했습니다.", true);
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -483,7 +557,21 @@ export default function UtmLinkPanel() {
               aria-label="소스 검색"
             />
           </div>
-          <CrmBadge tone="primary">{items.length}개 등록</CrmBadge>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {selectedCount > 0 ? (
+              <div className="crm-bulk-bar">
+                <span>{selectedCount}개 선택</span>
+                <CrmButton
+                  variant="danger"
+                  disabled={bulkDeleting || !!actionId}
+                  onClick={() => setBulkConfirmOpen(true)}
+                >
+                  선택 삭제
+                </CrmButton>
+              </div>
+            ) : null}
+            <CrmBadge tone="primary">{items.length}개 등록</CrmBadge>
+          </div>
         </div>
 
         {loading ? (
@@ -504,6 +592,14 @@ export default function UtmLinkPanel() {
           <CrmTable>
             <thead>
               <tr>
+                <th style={{ width: 44 }}>
+                  <input
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    onChange={(e) => toggleSelectAllFiltered(e.target.checked)}
+                    aria-label="현재 목록 전체 선택"
+                  />
+                </th>
                 <th>이름</th>
                 <th>실제 값</th>
                 <th>구글 시트 표시명</th>
@@ -514,6 +610,14 @@ export default function UtmLinkPanel() {
             <tbody>
               {filteredSources.map((item) => (
                 <tr key={item.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(item.id)}
+                      onChange={(e) => toggleSelect(item.id, e.target.checked)}
+                      aria-label={`${item.label} 선택`}
+                    />
+                  </td>
                   <td style={{ fontWeight: 600 }}>{item.label}</td>
                   <td style={{ fontFamily: "ui-monospace, monospace", color: "var(--crm-muted)" }}>{item.value}</td>
                   <td>{item.sheet_label}</td>
@@ -526,13 +630,20 @@ export default function UtmLinkPanel() {
                   </td>
                   <td>
                     <CrmMenu trigger={<IconDots />} align="right">
-                      <CrmMenuItem onClick={() => openEditSource(item)} disabled={!!actionId}>
+                      <CrmMenuItem onClick={() => openEditSource(item)} disabled={!!actionId || bulkDeleting}>
                         수정
                       </CrmMenuItem>
-                      <CrmMenuItem onClick={() => void toggleActive(item)} disabled={actionId === item.id}>
+                      <CrmMenuItem
+                        onClick={() => void toggleActive(item)}
+                        disabled={actionId === item.id || bulkDeleting}
+                      >
                         {item.is_active === false ? "활성화" : "비활성화"}
                       </CrmMenuItem>
-                      <CrmMenuItem tone="danger" onClick={() => setConfirmDelete(item)} disabled={!!actionId}>
+                      <CrmMenuItem
+                        tone="danger"
+                        onClick={() => setConfirmDelete(item)}
+                        disabled={!!actionId || bulkDeleting}
+                      >
                         삭제
                       </CrmMenuItem>
                     </CrmMenu>
@@ -612,6 +723,29 @@ export default function UtmLinkPanel() {
             {confirmDelete?.label} ({confirmDelete?.value})
           </strong>
           을(를) 삭제할까요? 고객 데이터에서 사용 중이면 삭제되지 않으며, 비활성화를 안내합니다.
+        </p>
+      </CrmDialog>
+
+      <CrmDialog
+        open={bulkConfirmOpen}
+        onClose={() => {
+          if (!bulkDeleting) setBulkConfirmOpen(false);
+        }}
+        title="선택 소스 삭제"
+        footer={
+          <>
+            <CrmButton variant="secondary" disabled={bulkDeleting} onClick={() => setBulkConfirmOpen(false)}>
+              취소
+            </CrmButton>
+            <CrmButton variant="danger" disabled={bulkDeleting} onClick={() => void bulkDeleteSources()}>
+              {bulkDeleting ? "삭제 중…" : `${selectedCount}개 삭제`}
+            </CrmButton>
+          </>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
+          선택한 <strong>{selectedCount}</strong>개 소스를 삭제할까요? 고객 데이터에서 사용 중인 항목은
+          제외되며, 비활성화를 권장합니다.
         </p>
       </CrmDialog>
     </div>
