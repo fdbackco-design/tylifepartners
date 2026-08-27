@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
+import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { formatPhoneKorean } from "@/lib/phone";
 import { normalizePhoneDigits } from "@/lib/phoneBlacklist";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -84,6 +85,15 @@ export async function POST(request: NextRequest) {
         console.error("POST lead_blacklist update:", error);
         return NextResponse.json({ ok: false, message: "블랙리스트 갱신에 실패했습니다." }, { status: 500 });
       }
+      void writeAdminAudit({
+        actor: actorFromSession(session),
+        action: "blacklist.upsert",
+        resourceType: "blacklist",
+        resourceId: data.id,
+        summary: `블랙리스트 갱신: ${data.name}`,
+        detail: { phone: data.phone, name: data.name },
+        request,
+      });
       return NextResponse.json({
         ok: true,
         item: data,
@@ -100,6 +110,15 @@ export async function POST(request: NextRequest) {
       console.error("POST lead_blacklist:", error);
       return NextResponse.json({ ok: false, message: "블랙리스트 등록에 실패했습니다." }, { status: 500 });
     }
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "blacklist.create",
+      resourceType: "blacklist",
+      resourceId: data.id,
+      summary: `블랙리스트 등록: ${data.name}`,
+      detail: { phone: data.phone, name: data.name },
+      request,
+    });
     return NextResponse.json({ ok: true, item: data, message: "블랙리스트에 등록했습니다." });
   } catch (e) {
     console.error("POST /api/admin/blacklist:", e);

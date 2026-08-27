@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
+import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -30,10 +31,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ ok: false, message: "수정에 실패했습니다." }, { status: 500 });
   }
   if (!data) return NextResponse.json({ ok: false, message: "항목을 찾을 수 없습니다." }, { status: 404 });
+
+  void writeAdminAudit({
+    actor: actorFromSession(session),
+    action: "blacklist.update",
+    resourceType: "blacklist",
+    resourceId: id,
+    summary: `블랙리스트 수정: ${data.name}`,
+    detail: { patch },
+    request,
+  });
+
   return NextResponse.json({ ok: true, item: data });
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session || session.rank !== "admin") {
     return NextResponse.json({ ok: false, message: "관리자만 사용할 수 있습니다." }, { status: 403 });
@@ -41,13 +53,25 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const { id } = await params;
   const supabase = getSupabaseAdmin();
   // 하드 삭제 대신 비활성화 (이력 유지)
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("lead_blacklist")
     .update({ is_active: false, updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id, name")
+    .maybeSingle();
   if (error) {
     console.error("DELETE lead_blacklist:", error);
     return NextResponse.json({ ok: false, message: "삭제에 실패했습니다." }, { status: 500 });
   }
+
+  void writeAdminAudit({
+    actor: actorFromSession(session),
+    action: "blacklist.deactivate",
+    resourceType: "blacklist",
+    resourceId: id,
+    summary: `블랙리스트 비활성화: ${data?.name || id}`,
+    request,
+  });
+
   return NextResponse.json({ ok: true });
 }

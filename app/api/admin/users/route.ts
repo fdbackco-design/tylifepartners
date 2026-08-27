@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
+import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { credentialsFromPhone, hashPassword, verifyPassword } from "@/lib/crm/password";
 import { isRegionZoneName } from "@/lib/crm/regionZones";
 import { canManageAccounts } from "@/lib/crm/scope";
@@ -114,6 +115,16 @@ export async function POST(request: NextRequest) {
       console.error("POST staff_users:", error);
       return NextResponse.json({ ok: false, message: "계정 생성에 실패했습니다." }, { status: 500 });
     }
+
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "user.create",
+      resourceType: "user",
+      resourceId: data.id,
+      summary: `계정 생성: ${data.name} (${data.rank})`,
+      detail: { name: data.name, rank: data.rank, login_id: data.login_id, region: data.region },
+      request,
+    });
 
     return NextResponse.json({
       ok: true,
