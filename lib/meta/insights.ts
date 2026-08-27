@@ -1,4 +1,4 @@
-import { startOfKstDayIso, startOfNextKstDayIso } from "@/lib/crm/kst";
+import { addDaysYmd, kstYmd, startOfKstDayIso, startOfNextKstDayIso } from "@/lib/crm/kst";
 import { getMetaAccessToken, isMetaAdsConfigured, normalizeMetaAdAccountId } from "@/lib/meta/ads";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -341,7 +341,7 @@ async function upsertInsightRows(
   }
 }
 
-/** 해당 일자 CRM DB 유입 (소비자+후보자, daangn 제외, active) */
+/** 해당 일자(KST) CRM DB 유입 — 소비자+후보자, 당근(daangn) 제외, active만 */
 export async function countDbInflowsExcludingDaangn(ymd: string): Promise<number> {
   const start = startOfKstDayIso(ymd);
   const end = startOfNextKstDayIso(ymd);
@@ -361,16 +361,28 @@ export async function countDbInflowsExcludingDaangn(ymd: string): Promise<number
       console.warn(`[meta/insights] count ${table}:`, totalErr.message);
       return 0;
     }
-    const { count: daangn, error: daangnErr } = await base().ilike("utm_source", "daangn");
+
+    // utm_source 가 daangn / 당근 인 건 제외
+    const { count: daangn, error: daangnErr } = await base().or(
+      "utm_source.ilike.%daangn%,utm_source.ilike.%당근%"
+    );
     if (daangnErr) {
       console.warn(`[meta/insights] count daangn ${table}:`, daangnErr.message);
-      return total ?? 0;
+      // 폴백: 정확히 daangn 만 제외
+      const { count: exact, error: exactErr } = await base().ilike("utm_source", "daangn");
+      if (exactErr) return total ?? 0;
+      return Math.max(0, (total ?? 0) - (exact ?? 0));
     }
     return Math.max(0, (total ?? 0) - (daangn ?? 0));
   };
 
   const [a, b] = await Promise.all([countTable("leads"), countTable("tylife_b2b")]);
   return a + b;
+}
+
+/** DB건별 비용 산출에 쓰는 기준일 = 어제(KST) */
+export function yesterdayMetricsDateKst(now: Date = new Date()): string {
+  return addDaysYmd(kstYmd(now), -1);
 }
 
 export async function sumMetaSpendForDate(ymd: string): Promise<{
@@ -503,8 +515,7 @@ async function syncInsightsForDate(
 }
 
 /**
- * Meta Insights 동기화 — 어제(오늘의 DB 비용용) + 오늘.
- * 날짜는 광고계정 시간대 기준.
+ * Meta Insights 동기화 — KST 어제(DB건별 비용용) + 오늘.
  */
 export async function syncMetaAdDailyInsights(): Promise<SyncMetaInsightsResult> {
   if (!isMetaAdsConfigured()) {
@@ -519,51 +530,45 @@ export async function syncMetaAdDailyInsights(): Promise<SyncMetaInsightsResult>
 
   const accountId = normalizeMetaAdAccountId();
   const { timezone, currency } = await resolveAccountTimezone(accountId);
-  const today = ymdInTimeZone(new Date(), timezone);
-  const yesterday = addCalendarDaysYmd(today, -1);
+  // DB건별 비용 기준일은 항상 KST 어제
+  const yesterday = yesterdayMetricsDateKst();
+  const today = kstYmd();
   const crmAdIds = await collectCrmMetaAdIds();
 
   try {
-    // 어제 우선 (오늘의 DB 비용 산출 기준)
     const y = await syncInsightsForDate(yesterday, timezone, currency, accountId, crmAdIds);
     const t = await syncInsightsForDate(today, timezone, currency, accountId, crmAdIds);
     const ok = y.ok || t.ok;
     return {
       ok,
       insight_date: yesterday,
-      timezone,
+      timezone: "Asia/Seoul",
       upserted: (y.upserted || 0) + (t.upserted || 0),
       message: y.ok ? t.message : y.message || t.message,
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("[meta/insights] sync failed:", message);
-    return { ok: false, insight_date: yesterday, timezone, upserted: 0, message };
+    return { ok: false, insight_date: yesterday, timezone: "Asia/Seoul", upserted: 0, message };
   }
 }
 
 /**
- * 오늘의 DB 비용 = 어제(광고계정 TZ) Meta 지출 ÷ 어제 CRM DB 유입(daangn 제외)
+ * 오늘의 DB 비용(건별) = 어제(KST) Meta 광고비 ÷ 어제 CRM DB 유입 건수
+ * - 유입: 소비자+후보자, utm_source daangn/당근 제외
  * 호출 측에서 admin 여부 검증 필수.
  */
 export async function getTodayDbCost(): Promise<TodayDbCost> {
-  const accountId = normalizeMetaAdAccountId();
-  const { timezone } = await resolveAccountTimezone(accountId);
-  const today = ymdInTimeZone(new Date(), timezone);
-  const metricsDate = addCalendarDaysYmd(today, -1);
+  const metricsDate = yesterdayMetricsDateKst();
 
-  const supabase = getSupabaseAdmin();
-  const { data: cached } = await supabase
-    .from("meta_daily_db_cost")
-    .select("metrics_date, spend, db_inflow_count, cost_per_db, sync_status, synced_at")
-    .eq("metrics_date", metricsDate)
-    .maybeSingle();
-
+  // 분모는 항상 어제 CRM 실유입을 실시간 집계 (당근 제외)
+  const dbInflowCount = await countDbInflowsExcludingDaangn(metricsDate);
   const spendInfo = await sumMetaSpendForDate(metricsDate);
+
   const stale =
-    !cached?.synced_at ||
-    Date.now() - new Date(cached.synced_at).getTime() > META_INSIGHTS_STALE_MS ||
-    !spendInfo.rowCount;
+    !spendInfo.rowCount ||
+    !spendInfo.syncedAt ||
+    Date.now() - new Date(spendInfo.syncedAt).getTime() > META_INSIGHTS_STALE_MS;
 
   if (stale && isMetaAdsConfigured()) {
     void syncMetaAdDailyInsights().catch((e) => {
@@ -571,31 +576,19 @@ export async function getTodayDbCost(): Promise<TodayDbCost> {
     });
   }
 
-  if (cached && String(cached.sync_status) === "ok" && spendInfo.rowCount > 0) {
-    return buildTodayDbCost({
-      metricsDate,
-      spend: Number(cached.spend) || 0,
-      dbInflowCount: Number(cached.db_inflow_count) || 0,
-      syncedAt: cached.synced_at ? String(cached.synced_at) : null,
-      syncStatus: "ok",
-      hasInsightRows: true,
-    });
-  }
-
   if (!spendInfo.rowCount) {
     return buildTodayDbCost({
       metricsDate,
       spend: null,
-      dbInflowCount: null,
+      dbInflowCount,
       syncedAt: null,
       syncStatus: "pending",
       hasInsightRows: false,
     });
   }
 
-  // 캐시 없거나 오류 → 실시간 재계산
-  const dbInflowCount = await countDbInflowsExcludingDaangn(metricsDate);
   void recomputeDailyDbCost(metricsDate, spendInfo.currency);
+
   return buildTodayDbCost({
     metricsDate,
     spend: spendInfo.spend,

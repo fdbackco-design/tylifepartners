@@ -34,11 +34,11 @@ function visibleInStaffFilter(s: { name: string }) {
 function TodayDbCostBadge({ cost }: { cost: TodayDbCost | null }) {
   if (!cost) return null;
   const tip = [
-    "오늘의 DB 비용 = 어제 Meta 광고비 ÷ 어제 DB 유입 건수",
-    "유입경로 daangn 제외",
-    cost.metrics_date ? `기준일(어제) ${cost.metrics_date}` : null,
-    cost.spend != null ? `광고비 ${Math.round(cost.spend).toLocaleString("ko-KR")}원` : null,
-    cost.db_inflow_count != null ? `DB유입 ${cost.db_inflow_count}건` : null,
+    "DB건별 비용 = 어제 광고비 ÷ 어제 DB 유입 건수",
+    "utm_source daangn·당근 제외",
+    cost.metrics_date ? `기준일 ${cost.metrics_date}` : null,
+    cost.spend != null ? `어제 광고비 ${Math.round(cost.spend).toLocaleString("ko-KR")}원` : null,
+    cost.db_inflow_count != null ? `어제 DB유입 ${cost.db_inflow_count}건` : null,
   ]
     .filter(Boolean)
     .join(" · ");

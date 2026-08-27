@@ -7,6 +7,7 @@ import {
   extractLeadCountFromActions,
   formatDbCostWon,
   isDaangnUtmSource,
+  yesterdayMetricsDateKst,
   ymdInTimeZone,
 } from "@/lib/meta/insights";
 
@@ -44,6 +45,13 @@ describe("isDaangnUtmSource", () => {
     assert.equal(isDaangnUtmSource("DAANGN"), true);
     assert.equal(isDaangnUtmSource("facebook"), false);
     assert.equal(isDaangnUtmSource(null), false);
+  });
+});
+
+describe("yesterdayMetricsDateKst", () => {
+  it("returns the previous KST calendar day", () => {
+    const ymd = yesterdayMetricsDateKst(new Date("2026-08-27T12:00:00+09:00"));
+    assert.equal(ymd, "2026-08-26");
   });
 });
 
