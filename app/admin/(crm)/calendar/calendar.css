@@ -24,7 +24,7 @@
   line-height: 1.5;
   color: var(--wc-text);
   -webkit-font-smoothing: antialiased;
-  margin: -8px -4px 0;
+  margin: 0;
 }
 
 .wc * {
@@ -32,11 +32,9 @@
 }
 
 .wc-bar {
-  position: sticky;
-  top: 0;
-  z-index: 40;
+  position: relative;
+  z-index: 1;
   background: rgba(16, 16, 16, 0.96);
-  backdrop-filter: blur(8px);
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -793,6 +791,10 @@
   cursor: pointer;
 }
 
+.wc-ed__search {
+  margin-bottom: 8px;
+}
+
 .wc-ed__pick {
   max-height: 140px;
   overflow: auto;
@@ -1028,14 +1030,61 @@
   }
 }
 
-.wc-exporting .wc-day__more {
+.wc-exporting .wc-day__more,
+.wc-exporting .wc-agenda,
+.wc-exporting .wc-nav,
+.wc-exporting .wc-period__pick {
   display: none !important;
 }
 
-.wc-exporting .wc-agenda {
+/* PNG에는 선택된 필터만 표시 */
+.wc-exporting .wc-filters .wc-chip:not(.is-on) {
   display: none !important;
 }
 
-.wc-exporting .wc-filters {
-  /* keep filters visible in PNG so legend of active types is clear */
+.wc-exporting .wc-legend b:not(.is-on) {
+  display: none !important;
+}
+
+.wc-exporting .wc-legend em {
+  display: none !important;
+}
+
+.wc-exporting .wc-sheet {
+  max-width: 1120px;
+  margin: 0;
+  overflow: visible;
+  box-shadow: none;
+}
+
+.wc-exporting .wc-masthead {
+  overflow: visible;
+  padding-right: 180px;
+}
+
+.wc-exporting .wc-mascot {
+  right: 16px;
+  bottom: 0;
+  width: 140px;
+}
+
+.wc-exporting .wc-period {
+  padding-right: 0;
+}
+
+.wc-exporting .wc-day {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.wc-exporting .wc-day:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.wc-bar__hint {
+  flex: 1 1 100%;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 0;
 }

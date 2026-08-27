@@ -71,6 +71,7 @@ export default function CalendarPage() {
   const [formBody, setFormBody] = useState("");
   const [formVis, setFormVis] = useState<CalendarVisibility>("all");
   const [formViewers, setFormViewers] = useState<string[]>([]);
+  const [viewerSearch, setViewerSearch] = useState("");
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -158,6 +159,7 @@ export default function CalendarPage() {
     setFormBody("");
     setFormVis("all");
     setFormViewers([]);
+    setViewerSearch("");
     setModal({ mode: "edit", date, event: null });
   };
 
@@ -176,6 +178,7 @@ export default function CalendarPage() {
     setFormBody(ev.body);
     setFormVis(ev.visibility);
     setFormViewers(ev.viewer_ids ?? []);
+    setViewerSearch("");
     setModal({ mode: "edit", date: ev.event_date, event: ev });
   };
 
@@ -235,30 +238,85 @@ export default function CalendarPage() {
 
   const downloadPng = async () => {
     if (!sheetRef.current) return;
+    if (typeFilter.size === 0) {
+      showToast("이미지로 저장할 일정 종류를 한 개 이상 선택해 주세요.");
+      return;
+    }
     setExporting(true);
     setStatus("PNG 생성 중…");
+    const source = sheetRef.current;
+    const mount = document.createElement("div");
+    mount.setAttribute("aria-hidden", "true");
+    mount.style.cssText =
+      "position:fixed;left:-12000px;top:0;width:1120px;padding:0;margin:0;background:#F3F0F9;pointer-events:none;z-index:-1;";
+    document.body.appendChild(mount);
+
     try {
+      // 레이아웃 반영 대기 (필터된 그리드)
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+
+      const clone = source.cloneNode(true) as HTMLElement;
+      clone.classList.add("wc-exporting");
+      // 클론 루트에도 시트 클래스 유지 + export 스타일 범위
+      if (!clone.classList.contains("wc-sheet")) clone.classList.add("wc-sheet");
+      const exportRoot = document.createElement("div");
+      exportRoot.className = "wc wc-exporting";
+      exportRoot.appendChild(clone);
+      mount.appendChild(exportRoot);
+
+      const imgs = Array.from(exportRoot.querySelectorAll("img"));
+      await Promise.all(
+        imgs.map(
+          (img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise<void>((resolve) => {
+                  img.onload = () => resolve();
+                  img.onerror = () => resolve();
+                })
+        )
+      );
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
       const { toPng } = await import("html-to-image");
-      const dataUrl = await toPng(sheetRef.current, {
+      const width = Math.max(exportRoot.scrollWidth, exportRoot.offsetWidth, clone.scrollWidth, 1120);
+      const height = Math.max(exportRoot.scrollHeight, exportRoot.offsetHeight, clone.scrollHeight);
+      const dataUrl = await toPng(exportRoot, {
         cacheBust: true,
         pixelRatio: 2,
         backgroundColor: "#F3F0F9",
-        filter: (node) => {
-          if (!(node instanceof HTMLElement)) return true;
-          return !node.classList.contains("wc-agenda");
+        width,
+        height,
+        style: {
+          width: `${width}px`,
+          height: `${height}px`,
+          transform: "none",
+          margin: "0",
         },
       });
+
+      const filterSlug =
+        typeFilter.size === CALENDAR_EVENT_TYPES.length
+          ? "전체"
+          : Array.from(typeFilter)
+              .map((t) => CALENDAR_EVENT_TYPE_LABELS[t])
+              .join("+");
       const a = document.createElement("a");
       a.href = dataUrl;
-      a.download = `FEEDLIFE_업무캘린더_${month.replace("-", "")}.png`;
+      a.download = `FEEDLIFE_업무캘린더_${month.replace("-", "")}_${filterSlug}.png`;
       a.click();
       setStatus("PNG 저장 완료");
-      showToast("월간 캘린더 PNG를 저장했습니다.");
+      showToast(
+        typeFilter.size === CALENDAR_EVENT_TYPES.length
+          ? "월간 캘린더 PNG를 저장했습니다."
+          : `선택한 종류(${filterSlug})만 PNG로 저장했습니다.`
+      );
     } catch (e) {
       console.error(e);
       setStatus("PNG 저장 실패");
       showToast("PNG 저장에 실패했습니다.");
     } finally {
+      mount.remove();
       setExporting(false);
     }
   };
@@ -266,28 +324,30 @@ export default function CalendarPage() {
   const visibilityChoices: CalendarVisibility[] =
     rank === "manager" ? ["all", "sales"] : ["all", "admin_plus", "managers", "sales"];
 
-  const pickerList =
-    formVis === "managers" ? viewerOptions.managers : formVis === "sales" ? viewerOptions.sales : [];
+  const pickerList = useMemo(() => {
+    const base =
+      formVis === "managers" ? viewerOptions.managers : formVis === "sales" ? viewerOptions.sales : [];
+    const q = viewerSearch.trim().toLowerCase();
+    if (!q) return base;
+    return base.filter((u) => u.name.toLowerCase().includes(q));
+  }, [formVis, viewerOptions.managers, viewerOptions.sales, viewerSearch]);
 
   const dayEvents = modal ? byDate.get(modal.date) ?? [] : [];
 
   return (
-    <div className={`wc${exporting ? " wc-exporting" : ""}`}>
+    <div className="wc">
       <div className="wc-bar">
         <div className="wc-bar__brand">FEED LIFE · Work Calendar</div>
         <div className="wc-bar__status">{loading ? "로딩 중…" : status}</div>
-        {canEdit && (
-          <button
-            type="button"
-            className="wc-btn wc-btn--ghost"
-            onClick={() => openCreate(`${month}-01`)}
-          >
-            일정 추가
-          </button>
-        )}
-        <button type="button" className="wc-btn wc-btn--point" disabled={exporting || loading} onClick={() => void downloadPng()}>
-          PNG 저장
+        <button
+          type="button"
+          className="wc-btn wc-btn--point"
+          disabled={exporting || loading}
+          onClick={() => void downloadPng()}
+        >
+          {exporting ? "저장 중…" : "PNG 저장"}
         </button>
+        <p className="wc-bar__hint">상단 종류 필터를 선택한 뒤 PNG 저장하면, 선택된 일정만 이미지에 포함됩니다.</p>
       </div>
 
       <section className="wc-sheet" ref={sheetRef}>
@@ -418,7 +478,7 @@ export default function CalendarPage() {
 
           <div className="wc-legend">
             {CALENDAR_EVENT_TYPES.map((t) => (
-              <b key={t}>
+              <b key={t} className={typeFilter.has(t) ? "is-on" : undefined}>
                 <i style={{ background: CALENDAR_EVENT_TYPE_COLORS[t].accent }} />
                 {CALENDAR_EVENT_TYPE_LABELS[t]}
               </b>
@@ -584,6 +644,7 @@ export default function CalendarPage() {
                         onChange={() => {
                           setFormVis(v);
                           setFormViewers([]);
+                          setViewerSearch("");
                         }}
                       />
                       {rank === "manager" && v === "all"
@@ -600,10 +661,25 @@ export default function CalendarPage() {
 
                 {(formVis === "managers" || formVis === "sales") && (
                   <>
-                    <div className="wc-ed__lab">열람 대상 (복수 선택)</div>
+                    <div className="wc-ed__lab">
+                      열람 대상 (복수 선택)
+                      {formViewers.length > 0 ? ` · ${formViewers.length}명 선택` : ""}
+                    </div>
+                    <input
+                      className="wc-ed__field wc-ed__search"
+                      type="search"
+                      value={viewerSearch}
+                      onChange={(e) => setViewerSearch(e.target.value)}
+                      placeholder={formVis === "managers" ? "매니저 이름 검색" : "영업자 이름 검색"}
+                      aria-label={formVis === "managers" ? "매니저 이름 검색" : "영업자 이름 검색"}
+                    />
                     <div className="wc-ed__pick">
                       {pickerList.length === 0 && (
-                        <span style={{ fontSize: 12, color: "var(--wc-muted)" }}>선택 가능한 사용자가 없습니다.</span>
+                        <span style={{ fontSize: 12, color: "var(--wc-muted)" }}>
+                          {viewerSearch.trim()
+                            ? "검색 결과가 없습니다."
+                            : "선택 가능한 사용자가 없습니다."}
+                        </span>
                       )}
                       {pickerList.map((u) => (
                         <label key={u.id}>
