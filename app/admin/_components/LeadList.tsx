@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatPhoneKorean } from "@/lib/phone";
@@ -9,6 +9,7 @@ import { ADMIN_STATUS_FILTER_OPTIONS, allowedStatusesFor, isMemoEditable, rowBac
 import { formatKstDateTime } from "@/lib/crm/kst";
 import { formatYmdDot } from "@/lib/crm/ui";
 import type { LeadCategory, LeadRow, LeadStatus, SessionUser } from "@/lib/crm/types";
+import type { TodayDbCost } from "@/lib/meta/insights";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
 import DateRangePicker from "@/app/admin/_components/crm/DateRangePicker";
 import FilterPopover, { type FilterGroup } from "@/app/admin/_components/crm/FilterPopover";
@@ -28,6 +29,132 @@ const FILTER_HIDDEN_STAFF_NAMES = new Set(["형지수", "중형지수", "이명�
 
 function visibleInStaffFilter(s: { name: string }) {
   return !FILTER_HIDDEN_STAFF_NAMES.has(s.name.trim());
+}
+
+function TodayDbCostBadge({ cost }: { cost: TodayDbCost | null }) {
+  if (!cost) return null;
+  const tip = [
+    "오늘의 DB 비용 = 어제 Meta 광고비 ÷ 어제 DB 유입 건수",
+    "유입경로 daangn 제외",
+    cost.metrics_date ? `기준일(어제) ${cost.metrics_date}` : null,
+    cost.spend != null ? `광고비 ${Math.round(cost.spend).toLocaleString("ko-KR")}원` : null,
+    cost.db_inflow_count != null ? `DB유입 ${cost.db_inflow_count}건` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <div className="crm-daily-db-cost" title={tip}>
+      <span className="crm-daily-db-cost__label">오늘의 DB 비용</span>
+      <strong className={`crm-daily-db-cost__value${cost.status === "ready" ? " is-ready" : " is-muted"}`}>
+        {cost.label}
+      </strong>
+    </div>
+  );
+}
+
+/** PC 목록 열 순서 (유입페이지는 표에서 제외, 내보내기에만 포함) */
+type LeadDesktopColId =
+  | "creative"
+  | "landing"
+  | "customer"
+  | "created_at"
+  | "region"
+  | "available_time"
+  | "age_group"
+  | "job"
+  | "job_rank"
+  | "utm_source"
+  | "assignee"
+  | "assigned_at"
+  | "admin_status"
+  | "status"
+  | "memo"
+  | "comment";
+
+const LEAD_DESKTOP_COL_STORAGE = "crm_lead_desktop_col_order_v1";
+
+const DEFAULT_LEAD_DESKTOP_COLS: LeadDesktopColId[] = [
+  "creative",
+  "landing",
+  "customer",
+  "created_at",
+  "region",
+  "available_time",
+  "age_group",
+  "job",
+  "job_rank",
+  "utm_source",
+  "assignee",
+  "assigned_at",
+  "admin_status",
+  "status",
+  "memo",
+  "comment",
+];
+
+const LEAD_DESKTOP_COL_META: Record<
+  LeadDesktopColId,
+  { label: string; title?: string; thClass?: string; tdClass?: string }
+> = {
+  creative: { label: "광고소재" },
+  landing: { label: "랜딩페이지" },
+  customer: { label: "고객" },
+  created_at: { label: "신청시간" },
+  region: { label: "지역" },
+  available_time: { label: "상담가능시간" },
+  age_group: { label: "연령대" },
+  job: { label: "직업" },
+  job_rank: { label: "직급" },
+  utm_source: { label: "유입경로" },
+  assignee: { label: "담당자" },
+  assigned_at: { label: "배정일" },
+  admin_status: { label: "관리자상태" },
+  status: { label: "상담상태" },
+  memo: { label: "메모", thClass: "crm-col-memo", tdClass: "crm-col-memo" },
+  comment: { label: "코멘트", thClass: "crm-col-comment", tdClass: "crm-col-comment" },
+};
+
+function isLeadDesktopColId(v: string): v is LeadDesktopColId {
+  return (DEFAULT_LEAD_DESKTOP_COLS as string[]).includes(v);
+}
+
+function loadLeadDesktopColOrder(): LeadDesktopColId[] {
+  if (typeof window === "undefined") return DEFAULT_LEAD_DESKTOP_COLS;
+  try {
+    const raw = localStorage.getItem(LEAD_DESKTOP_COL_STORAGE);
+    if (!raw) return DEFAULT_LEAD_DESKTOP_COLS;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return DEFAULT_LEAD_DESKTOP_COLS;
+    const saved = parsed.filter((x): x is LeadDesktopColId => typeof x === "string" && isLeadDesktopColId(x));
+    const missing = DEFAULT_LEAD_DESKTOP_COLS.filter((id) => !saved.includes(id));
+    // 예전 저장에 entry_page가 있으면 무시
+    return [...saved, ...missing];
+  } catch {
+    return DEFAULT_LEAD_DESKTOP_COLS;
+  }
+}
+
+function saveLeadDesktopColOrder(order: LeadDesktopColId[]) {
+  try {
+    localStorage.setItem(LEAD_DESKTOP_COL_STORAGE, JSON.stringify(order));
+  } catch {
+    // ignore
+  }
+}
+
+function moveLeadDesktopCol(
+  order: LeadDesktopColId[],
+  fromId: LeadDesktopColId,
+  toId: LeadDesktopColId
+): LeadDesktopColId[] {
+  if (fromId === toId) return order;
+  const next = [...order];
+  const from = next.indexOf(fromId);
+  const to = next.indexOf(toId);
+  if (from < 0 || to < 0) return order;
+  next.splice(from, 1);
+  next.splice(to, 0, fromId);
+  return next;
 }
 
 function csvParam(v: string | null): string[] {
@@ -99,6 +226,10 @@ export default function LeadList({
   const [dateFrom, setDateFrom] = useState(searchParams.get("date_from") ?? "");
   const [dateTo, setDateTo] = useState(searchParams.get("date_to") ?? "");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [desktopColOrder, setDesktopColOrder] = useState<LeadDesktopColId[]>(DEFAULT_LEAD_DESKTOP_COLS);
+  const [dragColId, setDragColId] = useState<LeadDesktopColId | null>(null);
+  const [dragOverColId, setDragOverColId] = useState<LeadDesktopColId | null>(null);
+  const [dailyDbCost, setDailyDbCost] = useState<TodayDbCost | null>(null);
   const [memoRow, setMemoRow] = useState<LeadRow | null>(null);
   const [memoLogs, setMemoLogs] = useState<{ id: string; assignee_name: string; memo: string; created_at: string }[]>([]);
   const [memoSaveStatus, setMemoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -274,6 +405,8 @@ export default function LeadList({
       if (!silent) setSelectedIds(new Map());
       if (data.session) setSession(data.session);
       if (data.options) setOptions(data.options);
+      if (data.daily_db_cost) setDailyDbCost(data.daily_db_cost as TodayDbCost);
+      else if (data.session?.rank && data.session.rank !== "admin") setDailyDbCost(null);
     } catch {
       if (gen !== loadGenRef.current) return;
       if (!silent) setError("네트워크 오류가 발생했습니다.");
@@ -647,6 +780,48 @@ export default function LeadList({
   const showSelectColumn = canDeleteLeads || canBulkAssign;
   const showHeatmapFor = (_row: LeadRow) => category === "candidates" || category === "consumers" || category === "all";
 
+  useEffect(() => {
+    setDesktopColOrder(loadLeadDesktopColOrder());
+  }, []);
+
+  const visibleDesktopCols = useMemo(
+    () =>
+      desktopColOrder.filter((id) => {
+        if (id === "admin_status") return Boolean(showAdmin);
+        return true;
+      }),
+    [desktopColOrder, isAdmin, showAdmin]
+  );
+
+  const onDesktopColDragStart = (colId: LeadDesktopColId) => (e: DragEvent) => {
+    setDragColId(colId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", colId);
+  };
+
+  const onDesktopColDragOver = (colId: LeadDesktopColId) => (e: DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverColId !== colId) setDragOverColId(colId);
+  };
+
+  const onDesktopColDrop = (colId: LeadDesktopColId) => (e: DragEvent) => {
+    e.preventDefault();
+    const from = (e.dataTransfer.getData("text/plain") as LeadDesktopColId) || dragColId;
+    setDragColId(null);
+    setDragOverColId(null);
+    if (!from || !isLeadDesktopColId(from)) return;
+    setDesktopColOrder((prev) => {
+      const next = moveLeadDesktopCol(prev, from, colId);
+      saveLeadDesktopColOrder(next);
+      return next;
+    });
+  };
+
+  const onDesktopColDragEnd = () => {
+    setDragColId(null);
+    setDragOverColId(null);
+  };
   useEffect(() => {
     if (!commentRow || !canEditComment || !session) return;
     const combined = buildAdminCommentValue(commentHistory, commentDraft, session.rank);
@@ -1030,6 +1205,8 @@ export default function LeadList({
         </div>
       )}
 
+      {isAdmin && dailyDbCost && <TodayDbCostBadge cost={dailyDbCost} />}
+
       <div className="crm-toolbar">
         <div className="crm-search">
           <span className="crm-search-icon" aria-hidden>
@@ -1184,11 +1361,11 @@ export default function LeadList({
       ) : (
         <>
           <div className="crm-table-shell crm-table-desktop">
-            <table className="crm-table">
+            <table className="crm-table crm-table--reorderable">
               <thead>
                 <tr>
                   {showSelectColumn && (
-                    <th style={{ width: 40 }}>
+                    <th style={{ width: 40 }} className="crm-col-fixed">
                       <input
                         type="checkbox"
                         checked={allPageSelected}
@@ -1197,23 +1374,30 @@ export default function LeadList({
                       />
                     </th>
                   )}
-                  <th>광고소재</th>
-                  <th>랜딩페이지</th>
-                  <th>고객</th>
-                  <th>신청시간</th>
-                  <th>유입페이지</th>
-                  <th>지역</th>
-                  <th>상담가능시간</th>
-                  <th>연령대</th>
-                  <th>직업</th>
-                  <th>직급</th>
-                  <th>유입경로</th>
-                  <th>담당자</th>
-                  <th>배정일</th>
-                  {showAdmin && <th>관리자상태</th>}
-                  <th>상담상태</th>
-                  <th className="crm-col-memo">메모</th>
-                  <th className="crm-col-comment">코멘트</th>
+                  {visibleDesktopCols.map((colId) => {
+                    const meta = LEAD_DESKTOP_COL_META[colId];
+                    return (
+                      <th
+                        key={colId}
+                        className={[
+                          meta.thClass,
+                          "crm-col-draggable",
+                          dragColId === colId ? "is-dragging" : "",
+                          dragOverColId === colId && dragColId !== colId ? "is-drag-over" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        title={(meta.title ? `${meta.title}\n` : "") + "드래그하여 열 순서 변경"}
+                        draggable
+                        onDragStart={onDesktopColDragStart(colId)}
+                        onDragOver={onDesktopColDragOver(colId)}
+                        onDrop={onDesktopColDrop(colId)}
+                        onDragEnd={onDesktopColDragEnd}
+                      >
+                        {meta.label}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -1227,7 +1411,7 @@ export default function LeadList({
                       onClick={() => setSelectedId(row.id)}
                     >
                       {showSelectColumn && (
-                        <td onClick={(e) => e.stopPropagation()}>
+                        <td onClick={(e) => e.stopPropagation()} className="crm-col-fixed">
                           <input
                             type="checkbox"
                             checked={selectedIds.has(row.id)}
@@ -1236,161 +1420,246 @@ export default function LeadList({
                           />
                         </td>
                       )}
-                      <td onClick={(e) => e.stopPropagation()}>
-                        {row.meta_creative_preview ? (
-                          <button
-                            type="button"
-                            className="crm-meta-creative"
-                            title={
-                              [row.meta_ad_name, row.meta_ad_id, row.meta_creative_type]
-                                .filter(Boolean)
-                                .join(" · ") || "Meta 광고 소재"
-                            }
-                            onClick={() =>
-                              setPreviewSrc(row.meta_creative_full || row.meta_creative_preview)
-                            }
-                          >
-                            <img
-                              className="crm-thumb crm-thumb-meta"
-                              src={row.meta_creative_preview}
-                              alt={row.meta_ad_name || "광고 소재"}
-                            />
-                            {row.meta_creative_type === "video" && (
-                              <span className="crm-meta-creative-badge">영상</span>
-                            )}
-                          </button>
-                        ) : row.meta_ad_id ? (
-                          <span
-                            className="crm-cell-plain"
-                            style={{ fontSize: 11, color: "var(--crm-muted)" }}
-                            title={
-                              row.meta_creative_status === "missing_token"
-                                ? "META_ACCESS_TOKEN 미설정"
-                                : row.meta_ad_name || row.meta_ad_id
-                            }
-                          >
-                            {row.meta_ad_name
-                              ? row.meta_ad_name.slice(0, 18)
-                              : `ID ${row.meta_ad_id.slice(-6)}`}
-                          </span>
-                        ) : (
-                          <span className="crm-cell-plain" style={{ color: "var(--crm-muted)" }}>
-                            -
-                          </span>
-                        )}
-                      </td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        {showHeatmapFor(row) ? (
-                          <Link
-                            href={heatmapHref(row)}
-                            className="crm-btn"
-                            style={{ fontSize: 12 }}
-                            title="이 고객의 랜딩 스크롤 히트맵"
-                          >
-                            랜딩페이지
-                          </Link>
-                        ) : (
-                          <span className="crm-cell-plain" style={{ color: "var(--crm-muted)" }}>
-                            -
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <div className="crm-customer">
-                          <span className="crm-customer-name">{row.name}</span>
-                          <span className="crm-customer-phone">{formatPhoneKorean(row.phone)}</span>
-                        </div>
-                      </td>
-                      <td className="crm-cell-plain" style={{ color: "var(--crm-muted)", fontSize: 12 }}>{row.created_at}</td>
-                      <td className="crm-cell-plain">{row.entry_page || "-"}</td>
-                      <td className="crm-cell-plain">{row.region || "-"}</td>
-                      <td className="crm-cell-plain">{row.available_time || "-"}</td>
-                      <td className="crm-cell-plain">{row.age_group || "-"}</td>
-                      <td className="crm-cell-plain">{row.job || "-"}</td>
-                      <td className="crm-cell-plain">{row.job_rank || "-"}</td>
-                      <td className="crm-cell-plain" title={`${row.utm_source}/${row.utm_medium}/${row.utm_campaign}`}>{row.utm_source || "-"}</td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        {showAdmin ? (
-                          <AssigneePicker
-                            value={row.assignee_id}
-                            staff={staff}
-                            teamName={row.team_name}
-                            history={isAdmin ? row.assignee_history : undefined}
-                            busy={patchingAssigneeIds.has(row.id)}
-                            onChange={(id) => void patchAssignee(row, id)}
-                          />
-                        ) : (
-                          <div>
-                            <div>{formatAssigneeWithTeam(row.assignee_name, row.team_name)}</div>
-                          </div>
-                        )}
-                      </td>
-                      <td
-                        className="crm-cell-plain"
-                        style={{ color: "var(--crm-muted)", fontSize: 12, whiteSpace: "nowrap" }}
-                        title={row.assignee_id ? "현재 담당자 배정 시각" : undefined}
-                      >
-                        {row.assignee_id ? formatAssignedAt(row.assigned_at) : "-"}
-                      </td>
-                      {showAdmin && (
-                        <td className="crm-cell-admin-status">
-                          {row.admin_status ? <span className="admin-tag">{row.admin_status.label}</span> : "-"}
-                        </td>
-                      )}
-                      <td className="crm-cell-status" onClick={(e) => e.stopPropagation()}>
-                        <StatusBadgeMenu
-                          value={row.status}
-                          options={allowed}
-                          onChange={(status) => void patch(row, { status })}
-                        />
-                        {row.status === "대면확정" && (
-                          <input
-                            className="crm-input"
-                            type="datetime-local"
-                            step={3600}
-                            value={toKstHourLocalInput(row.meeting_at)}
-                            onChange={(e) =>
-                              void patch(row, { meeting_at: fromKstHourLocalInput(e.target.value) })
-                            }
-                            style={{ display: "block", marginTop: 6, height: 32, fontSize: 12, minWidth: 180 }}
-                          />
-                        )}
-                      </td>
-                      <td
-                        className="crm-col-memo"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div
-                          className="crm-memo-preview"
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => void openMemo(row)}
-                          onDoubleClick={() => void openMemo(row)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") void openMemo(row);
-                          }}
-                          title={isMemoEditable(row.status) ? "클릭하여 메모 편집" : "배정전·대기 상태에서는 메모를 편집할 수 없습니다"}
-                        >
-                          {row.memo?.trim() || "메모 없음"}
-                        </div>
-                      </td>
-                      <td
-                        className="crm-col-comment"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div
-                          className="crm-memo-preview"
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => void openComment(row)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") void openComment(row);
-                          }}
-                          title={canEditComment ? "클릭하여 코멘트 작성" : "클릭하여 코멘트 보기"}
-                        >
-                          {row.admin_comment?.trim() || "코멘트 없음"}
-                        </div>
-                      </td>
+                      {visibleDesktopCols.map((colId) => {
+                        const meta = LEAD_DESKTOP_COL_META[colId];
+                        switch (colId) {
+                          case "creative":
+                            return (
+                              <td key={colId} onClick={(e) => e.stopPropagation()} className={meta.tdClass}>
+                                {row.meta_creative_preview ? (
+                                  <button
+                                    type="button"
+                                    className="crm-meta-creative"
+                                    title={
+                                      [row.meta_ad_name, row.meta_ad_id, row.meta_creative_type]
+                                        .filter(Boolean)
+                                        .join(" · ") || "Meta 광고 소재"
+                                    }
+                                    onClick={() =>
+                                      setPreviewSrc(row.meta_creative_full || row.meta_creative_preview)
+                                    }
+                                  >
+                                    <img
+                                      className="crm-thumb crm-thumb-meta"
+                                      src={row.meta_creative_preview}
+                                      alt={row.meta_ad_name || "광고 소재"}
+                                    />
+                                    {row.meta_creative_type === "video" && (
+                                      <span className="crm-meta-creative-badge">영상</span>
+                                    )}
+                                  </button>
+                                ) : row.meta_ad_id ? (
+                                  <span
+                                    className="crm-cell-plain"
+                                    style={{ fontSize: 11, color: "var(--crm-muted)" }}
+                                    title={
+                                      row.meta_creative_status === "missing_token"
+                                        ? "META_ACCESS_TOKEN 미설정"
+                                        : row.meta_ad_name || row.meta_ad_id
+                                    }
+                                  >
+                                    {row.meta_ad_name
+                                      ? row.meta_ad_name.slice(0, 18)
+                                      : `ID ${row.meta_ad_id.slice(-6)}`}
+                                  </span>
+                                ) : (
+                                  <span className="crm-cell-plain" style={{ color: "var(--crm-muted)" }}>
+                                    -
+                                  </span>
+                                )}
+                              </td>
+                            );
+                          case "landing":
+                            return (
+                              <td key={colId} onClick={(e) => e.stopPropagation()} className={meta.tdClass}>
+                                {showHeatmapFor(row) ? (
+                                  <Link
+                                    href={heatmapHref(row)}
+                                    className="crm-btn"
+                                    style={{ fontSize: 12 }}
+                                    title="이 고객의 랜딩 스크롤 히트맵"
+                                  >
+                                    랜딩페이지
+                                  </Link>
+                                ) : (
+                                  <span className="crm-cell-plain" style={{ color: "var(--crm-muted)" }}>
+                                    -
+                                  </span>
+                                )}
+                              </td>
+                            );
+                          case "customer":
+                            return (
+                              <td key={colId} className={meta.tdClass}>
+                                <div className="crm-customer">
+                                  <span className="crm-customer-name">{row.name}</span>
+                                  <span className="crm-customer-phone">{formatPhoneKorean(row.phone)}</span>
+                                </div>
+                              </td>
+                            );
+                          case "created_at":
+                            return (
+                              <td
+                                key={colId}
+                                className={`crm-cell-plain ${meta.tdClass ?? ""}`}
+                                style={{ color: "var(--crm-muted)", fontSize: 12 }}
+                              >
+                                {row.created_at}
+                              </td>
+                            );
+                          case "region":
+                            return (
+                              <td key={colId} className={`crm-cell-plain ${meta.tdClass ?? ""}`}>
+                                {row.region || "-"}
+                              </td>
+                            );
+                          case "available_time":
+                            return (
+                              <td key={colId} className={`crm-cell-plain ${meta.tdClass ?? ""}`}>
+                                {row.available_time || "-"}
+                              </td>
+                            );
+                          case "age_group":
+                            return (
+                              <td key={colId} className={`crm-cell-plain ${meta.tdClass ?? ""}`}>
+                                {row.age_group || "-"}
+                              </td>
+                            );
+                          case "job":
+                            return (
+                              <td key={colId} className={`crm-cell-plain ${meta.tdClass ?? ""}`}>
+                                {row.job || "-"}
+                              </td>
+                            );
+                          case "job_rank":
+                            return (
+                              <td key={colId} className={`crm-cell-plain ${meta.tdClass ?? ""}`}>
+                                {row.job_rank || "-"}
+                              </td>
+                            );
+                          case "utm_source":
+                            return (
+                              <td
+                                key={colId}
+                                className={`crm-cell-plain ${meta.tdClass ?? ""}`}
+                                title={`${row.utm_source}/${row.utm_medium}/${row.utm_campaign}`}
+                              >
+                                {row.utm_source || "-"}
+                              </td>
+                            );
+                          case "assignee":
+                            return (
+                              <td key={colId} onClick={(e) => e.stopPropagation()} className={meta.tdClass}>
+                                {showAdmin ? (
+                                  <AssigneePicker
+                                    value={row.assignee_id}
+                                    staff={staff}
+                                    teamName={row.team_name}
+                                    history={isAdmin ? row.assignee_history : undefined}
+                                    busy={patchingAssigneeIds.has(row.id)}
+                                    onChange={(id) => void patchAssignee(row, id)}
+                                  />
+                                ) : (
+                                  <div>
+                                    <div>{formatAssigneeWithTeam(row.assignee_name, row.team_name)}</div>
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          case "assigned_at":
+                            return (
+                              <td
+                                key={colId}
+                                className={`crm-cell-plain ${meta.tdClass ?? ""}`}
+                                style={{ color: "var(--crm-muted)", fontSize: 12, whiteSpace: "nowrap" }}
+                                title={row.assignee_id ? "현재 담당자 배정 시각" : undefined}
+                              >
+                                {row.assignee_id ? formatAssignedAt(row.assigned_at) : "-"}
+                              </td>
+                            );
+                          case "admin_status":
+                            return (
+                              <td key={colId} className={`crm-cell-admin-status ${meta.tdClass ?? ""}`}>
+                                {row.admin_status ? <span className="admin-tag">{row.admin_status.label}</span> : "-"}
+                              </td>
+                            );
+                          case "status":
+                            return (
+                              <td
+                                key={colId}
+                                className={`crm-cell-status ${meta.tdClass ?? ""}`}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <StatusBadgeMenu
+                                  value={row.status}
+                                  options={allowed}
+                                  onChange={(status) => void patch(row, { status })}
+                                />
+                                {row.status === "대면확정" && (
+                                  <input
+                                    className="crm-input"
+                                    type="datetime-local"
+                                    step={3600}
+                                    value={toKstHourLocalInput(row.meeting_at)}
+                                    onChange={(e) =>
+                                      void patch(row, { meeting_at: fromKstHourLocalInput(e.target.value) })
+                                    }
+                                    style={{ display: "block", marginTop: 6, height: 32, fontSize: 12, minWidth: 180 }}
+                                  />
+                                )}
+                              </td>
+                            );
+                          case "memo":
+                            return (
+                              <td
+                                key={colId}
+                                className={meta.tdClass}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div
+                                  className="crm-memo-preview"
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => void openMemo(row)}
+                                  onDoubleClick={() => void openMemo(row)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") void openMemo(row);
+                                  }}
+                                  title={
+                                    isMemoEditable(row.status)
+                                      ? "클릭하여 메모 편집"
+                                      : "배정전·대기 상태에서는 메모를 편집할 수 없습니다"
+                                  }
+                                >
+                                  {row.memo?.trim() || "메모 없음"}
+                                </div>
+                              </td>
+                            );
+                          case "comment":
+                            return (
+                              <td
+                                key={colId}
+                                className={meta.tdClass}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div
+                                  className="crm-memo-preview"
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => void openComment(row)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") void openComment(row);
+                                  }}
+                                  title={canEditComment ? "클릭하여 코멘트 작성" : "클릭하여 코멘트 보기"}
+                                >
+                                  {row.admin_comment?.trim() || "코멘트 없음"}
+                                </div>
+                              </td>
+                            );
+                          default:
+                            return null;
+                        }
+                      })}
                     </tr>
                   );
                 })}

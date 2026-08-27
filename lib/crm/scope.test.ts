@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { descendantAssigneeIds } from "@/lib/crm/scope";
+import { canSeeMetaAdSpend, descendantAssigneeIds } from "@/lib/crm/scope";
+import type { SessionUser } from "@/lib/crm/types";
 
 describe("descendantAssigneeIds", () => {
   const staff = [
@@ -32,5 +33,22 @@ describe("descendantAssigneeIds", () => {
       { id: "c", parent_id: "b" },
     ];
     assert.deepEqual(descendantAssigneeIds("a", nested).sort(), ["a", "b", "c"]);
+  });
+});
+
+describe("canSeeMetaAdSpend", () => {
+  const base: SessionUser = {
+    rank: "sales",
+    userId: "u1",
+    name: "테스트",
+    loginId: "t",
+    region: null,
+    parentId: null,
+  };
+
+  it("allows admin only", () => {
+    assert.equal(canSeeMetaAdSpend({ ...base, rank: "admin" }), true);
+    assert.equal(canSeeMetaAdSpend({ ...base, rank: "manager" }), false);
+    assert.equal(canSeeMetaAdSpend({ ...base, rank: "sales" }), false);
   });
 });
