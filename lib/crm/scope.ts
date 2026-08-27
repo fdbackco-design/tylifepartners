@@ -51,6 +51,10 @@ export function canChangeAssignee(session: SessionUser): boolean {
   return session.rank === "admin" || session.rank === "manager";
 }
 
+export function canEditAdminComment(session: SessionUser): boolean {
+  return session.rank === "admin" || session.rank === "manager";
+}
+
 /** CRM 탭·보조 메뉴 접근 가능 여부 */
 export function canAccessAdminPath(rank: SessionUser["rank"], pathname: string): boolean {
   const path = pathname.split("?")[0] || pathname;

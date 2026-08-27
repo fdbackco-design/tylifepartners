@@ -3,6 +3,8 @@ import { SignJWT, jwtVerify } from "jose";
 import type { SessionUser } from "@/lib/crm/types";
 
 const COOKIE_NAME = "admin_session";
+export const SESSION_EXPIRES_IN = "30d";
+export const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30;
 
 const getSecret = () => {
   const secret = process.env.ADMIN_SESSION_SECRET;
@@ -12,7 +14,7 @@ const getSecret = () => {
   return new TextEncoder().encode(secret);
 };
 
-export async function createSession(user: SessionUser): Promise<string> {
+export async function createSession(user: SessionUser, expiresIn = SESSION_EXPIRES_IN): Promise<string> {
   return new SignJWT({
     rank: user.rank,
     role: user.rank === "admin" ? "admin" : user.rank,
@@ -24,7 +26,7 @@ export async function createSession(user: SessionUser): Promise<string> {
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime(expiresIn)
     .sign(getSecret());
 }
 
@@ -92,7 +94,7 @@ export async function requireRank(...ranks: SessionUser["rank"][]): Promise<Sess
   return s;
 }
 
-export function getCookieConfig(token: string) {
+export function getCookieConfig(token: string, maxAge = SESSION_MAX_AGE_SEC) {
   const isProd = process.env.NODE_ENV === "production";
   return {
     name: COOKIE_NAME,
@@ -101,7 +103,7 @@ export function getCookieConfig(token: string) {
     secure: isProd,
     sameSite: "lax" as const,
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge,
   };
 }
 

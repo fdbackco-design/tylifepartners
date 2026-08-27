@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSession } from "@/lib/adminSession";
+import { getSession } from "@/lib/adminSession";
+import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import {
   parseUtmSourceInput,
@@ -18,8 +19,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const valid = await verifyAdminSession();
-  if (!valid) {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
 
@@ -48,6 +49,15 @@ export async function PATCH(
       if (!data) {
         return NextResponse.json({ ok: false, message: "해당 utm_source를 찾을 수 없습니다." }, { status: 404 });
       }
+      void writeAdminAudit({
+        actor: actorFromSession(session),
+        action: "utm.update",
+        resourceType: "utm_source",
+        resourceId: id,
+        summary: `UTM 소스 ${data.is_active ? "활성화" : "비활성화"}: ${data.label}`,
+        detail: { value: data.value, is_active: data.is_active },
+        request,
+      });
       return NextResponse.json({ ok: true, item: data });
     }
 
@@ -104,6 +114,16 @@ export async function PATCH(
       return NextResponse.json({ ok: false, message: "해당 utm_source를 찾을 수 없습니다." }, { status: 404 });
     }
 
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "utm.update",
+      resourceType: "utm_source",
+      resourceId: id,
+      summary: `UTM 소스 수정: ${data.label} (${data.value})`,
+      detail: { value: data.value, label: data.label, sheet_label: data.sheet_label, is_active: data.is_active },
+      request,
+    });
+
     return NextResponse.json({ ok: true, item: data });
   } catch (e) {
     console.error("PATCH /api/admin/utm-sources/[id] error:", e);
@@ -112,11 +132,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const valid = await verifyAdminSession();
-  if (!valid) {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
 
@@ -129,7 +149,7 @@ export async function DELETE(
     const supabase = getSupabaseAdmin();
     const { data: existing } = await supabase
       .from("utm_sources")
-      .select("id, value")
+      .select("id, value, label")
       .eq("id", id)
       .maybeSingle();
 
@@ -154,6 +174,16 @@ export async function DELETE(
         { status: 500 }
       );
     }
+
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "utm.delete",
+      resourceType: "utm_source",
+      resourceId: id,
+      summary: `UTM 소스 삭제: ${existing.label} (${existing.value})`,
+      detail: { value: existing.value, used_leads: used },
+      request,
+    });
 
     return NextResponse.json({
       ok: true,

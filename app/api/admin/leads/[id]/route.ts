@@ -5,7 +5,7 @@ import { appendStatusMemo } from "@/lib/crm/memo";
 import { changeLeadAssignee } from "@/lib/crm/assignLead";
 import { attachAssigneeHistories } from "@/lib/crm/assigneeHistory";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
-import { visibleAssigneeIds } from "@/lib/crm/scope";
+import { visibleAssigneeIds, canEditAdminComment } from "@/lib/crm/scope";
 import { allowedStatusesFor, isLeadStatus, isMemoEditable, normalizeStatus, tableForCategory } from "@/lib/crm/status";
 import type { LeadCategory, LeadRow } from "@/lib/crm/types";
 import { attachMetaCreatives } from "@/lib/meta/ads";
@@ -148,7 +148,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     assigneeChanged = true;
 
     // 담당자만 바꾼 경우: 재조회·스태프·이력을 병렬로 끝내고 즉시 응답
-    if (body.status == null && body.memo == null && body.meeting_at === undefined) {
+    if (body.status == null && body.memo == null && body.admin_comment == null && body.meeting_at === undefined) {
       const [{ data: fresh }, { staffById, parentNameById }] = await Promise.all([
         (supabase.from(table) as any).select(select).eq("id", id).maybeSingle(),
         loadStaffMaps(),
@@ -219,6 +219,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     patch.memo = String(body.memo);
   }
 
+  if (body.admin_comment != null && body.status == null) {
+    if (!canEditAdminComment(session)) {
+      return NextResponse.json({ ok: false, message: "코멘트는 관리자·매니저만 수정할 수 있습니다." }, { status: 403 });
+    }
+    patch.admin_comment = String(body.admin_comment);
+  }
+
   if (body.meeting_at !== undefined) {
     if (nextStatus !== "대면확정" && body.meeting_at) {
       return NextResponse.json({ ok: false, message: "대면확정 상태에서만 일정을 지정할 수 있습니다." }, { status: 400 });
@@ -255,6 +262,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         assignee_id: body.assignee_id !== undefined ? body.assignee_id : undefined,
         status: body.status != null ? body.status : undefined,
         memo: body.memo != null ? true : undefined,
+        admin_comment: body.admin_comment != null ? true : undefined,
         meeting_at: body.meeting_at !== undefined ? body.meeting_at : undefined,
       },
     },

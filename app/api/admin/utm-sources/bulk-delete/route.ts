@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSession } from "@/lib/adminSession";
+import { getSession } from "@/lib/adminSession";
+import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { utmSourcesDbErrorMessage } from "@/lib/utmSourceMapping";
 
@@ -19,8 +20,8 @@ async function usageCount(supabase: ReturnType<typeof getSupabaseAdmin>, value: 
  * 리드/B2B의 utm_source 문자열은 그대로 유지됩니다.
  */
 export async function POST(request: NextRequest) {
-  const valid = await verifyAdminSession();
-  if (!valid) {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
 
@@ -93,6 +94,15 @@ export async function POST(request: NextRequest) {
     if (failed.length > 0) {
       parts.push(`${failed.length}개는 삭제하지 못했습니다.`);
     }
+
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "utm.bulk_delete",
+      resourceType: "utm_source",
+      summary: `UTM 소스 ${deleted}개 일괄 삭제`,
+      detail: { deleted, deleted_values: deletedValues, failed_count: failed.length, used_total: usedTotal },
+      request,
+    });
 
     return NextResponse.json({
       ok: true,
