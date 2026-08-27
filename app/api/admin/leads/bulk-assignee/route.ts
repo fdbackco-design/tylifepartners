@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
+import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { changeLeadAssignee } from "@/lib/crm/assignLead";
 import type { LeadCategory } from "@/lib/crm/types";
 
@@ -36,6 +37,16 @@ export async function POST(request: NextRequest) {
     if (!updated && errors.length) {
       return NextResponse.json({ ok: false, message: errors[0] || "변경에 실패했습니다." }, { status: 400 });
     }
+
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "lead.bulk_assignee",
+      resourceType: "lead",
+      summary: `담당자 일괄 변경 ${updated}건`,
+      detail: { assignee_id: assigneeId, updated, failed: errors.length, item_count: items.length },
+      request,
+    });
+
     return NextResponse.json({ ok: true, updated, failed: errors.length });
   } catch (e) {
     console.error("bulk-assignee:", e);

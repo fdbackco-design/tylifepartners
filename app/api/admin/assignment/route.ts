@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, requireRank } from "@/lib/adminSession";
+import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import {
   ensureFixedAssignmentRules,
   loadAssignmentRules,
@@ -130,6 +131,23 @@ export async function PUT(request: NextRequest) {
         await replaceMembers(supabase, rule.id, members);
       }
     }
+
+    const parts: string[] = [];
+    if (body.auto_assign_enabled != null) {
+      parts.push(`자동분배 ${Boolean(body.auto_assign_enabled) ? "ON" : "OFF"}`);
+    }
+    if (Array.isArray(body.rules)) parts.push("배정 규칙 저장");
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "assignment.update",
+      resourceType: "assignment",
+      summary: parts.join(", ") || "자동 분배 설정 변경",
+      detail: {
+        auto_assign_enabled: body.auto_assign_enabled ?? null,
+        rules_count: Array.isArray(body.rules) ? body.rules.length : null,
+      },
+      request,
+    });
 
     return NextResponse.json({ ok: true, rules: await loadAssignmentRules() });
   } catch (e) {

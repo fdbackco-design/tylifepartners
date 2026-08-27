@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
+import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { credentialsFromPhone, hashPassword } from "@/lib/crm/password";
 import { isRegionZoneName } from "@/lib/crm/regionZones";
 import { canManageAccounts } from "@/lib/crm/scope";
@@ -96,6 +97,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       );
     }
   }
+
+  const changes: string[] = [];
+  if (body.name != null) changes.push("이름");
+  if (body.region !== undefined) changes.push("권역");
+  if (body.rank != null) changes.push(`직급→${nextRank}`);
+  if (body.parent_id !== undefined) changes.push("소속");
+  if (body.is_active != null) changes.push(Boolean(body.is_active) ? "활성화" : "비활성화");
+  if (body.reset_password) changes.push("비밀번호 초기화");
+
+  void writeAdminAudit({
+    actor: actorFromSession(session),
+    action: body.reset_password ? "user.reset_password" : "user.update",
+    resourceType: "user",
+    resourceId: id,
+    summary: `계정 수정: ${existing.name} (${changes.join(", ") || "변경"})`,
+    detail: { name: existing.name, patch, next_rank: nextRank },
+    request,
+  });
 
   return NextResponse.json({ ok: true });
 }

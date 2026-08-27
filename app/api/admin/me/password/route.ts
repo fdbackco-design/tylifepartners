@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
+import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { credentialsFromPhone, hashPassword, verifyPassword } from "@/lib/crm/password";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -88,6 +89,15 @@ export async function POST(request: NextRequest) {
       console.error("POST /api/admin/me/password:", updateErr);
       return NextResponse.json({ ok: false, message: "비밀번호 변경에 실패했습니다." }, { status: 500 });
     }
+
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "user.change_password",
+      resourceType: "user",
+      resourceId: user.id,
+      summary: `${session.name || session.loginId} 비밀번호 변경`,
+      request,
+    });
 
     return NextResponse.json({ ok: true, message: "비밀번호가 변경되었습니다." });
   } catch (e) {

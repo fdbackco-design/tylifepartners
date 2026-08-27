@@ -19,6 +19,7 @@ const PRIMARY_TABS = [
 const SECONDARY_TABS = [
   { href: "/admin/password", label: "비밀번호 변경", ranks: ["admin", "manager", "sales"] as const },
   { href: "/admin/accounts", label: "계정 관리", ranks: ["admin", "manager"] as const },
+  { href: "/admin/audit-logs", label: "활동 로그", ranks: ["admin"] as const },
   { href: "/admin/assignment", label: "자동 분배 설정", ranks: ["admin"] as const },
   { href: "/admin/blacklist", label: "블랙리스트", ranks: ["admin"] as const },
   { href: "/admin/utm", label: "UTM", ranks: ["admin"] as const },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
+import { actorFromSession, summarizeLeadPatch, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { appendStatusMemo } from "@/lib/crm/memo";
 import { changeLeadAssignee } from "@/lib/crm/assignLead";
 import { attachAssigneeHistories } from "@/lib/crm/assigneeHistory";
@@ -154,6 +155,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       ]);
       const item = mapLeadRow((fresh ?? current) as Record<string, unknown>, category, staffById, parentNameById);
       const withHistory = await enrichLeadItem(item);
+      void writeAdminAudit({
+        actor: actorFromSession(session),
+        action: "lead.update",
+        resourceType: category === "candidates" ? "candidate" : "consumer",
+        resourceId: id,
+        summary: `${withHistory.name || id}: ${summarizeLeadPatch(body)}`,
+        detail: {
+          category,
+          name: withHistory.name,
+          changes: {
+            assignee_id: body.assignee_id ?? undefined,
+          },
+        },
+        request,
+      });
       return NextResponse.json({
         ok: true,
         item: withHistory,
@@ -226,5 +242,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { staffById, parentNameById } = await loadStaffMaps();
   const item = mapLeadRow((fresh ?? current) as Record<string, unknown>, category, staffById, parentNameById);
   const withHistory = await enrichLeadItem(item);
+  void writeAdminAudit({
+    actor: actorFromSession(session),
+    action: "lead.update",
+    resourceType: category === "candidates" ? "candidate" : "consumer",
+    resourceId: id,
+    summary: `${withHistory.name || id}: ${summarizeLeadPatch(body)}`,
+    detail: {
+      category,
+      name: withHistory.name,
+      changes: {
+        assignee_id: body.assignee_id !== undefined ? body.assignee_id : undefined,
+        status: body.status != null ? body.status : undefined,
+        memo: body.memo != null ? true : undefined,
+        meeting_at: body.meeting_at !== undefined ? body.meeting_at : undefined,
+      },
+    },
+    request,
+  });
   return NextResponse.json({ ok: true, item: withHistory, allowed_statuses: allowedStatusesFor(session, withHistory.status) });
 }
