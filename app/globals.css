@@ -1063,7 +1063,7 @@ main.crm-admin-login {
 }
 
 .crm-table {
-  width: 100%;
+  width: max-content;
   min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
@@ -1089,6 +1089,81 @@ main.crm-admin-login {
   padding: 10px 12px;
   border-bottom: 1px solid var(--crm-border);
   vertical-align: middle;
+}
+
+/* 좁은 PC 폭에서도 메모·코멘트 열이 항상 보이도록 우측 고정 */
+.crm-table .crm-col-comment {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  width: 180px;
+  min-width: 160px;
+  max-width: 200px;
+  background: var(--crm-surface);
+  box-shadow: -6px 0 10px -8px rgba(17, 24, 39, 0.18);
+}
+
+.crm-table .crm-col-memo {
+  position: sticky;
+  right: 180px;
+  z-index: 3;
+  width: 200px;
+  min-width: 160px;
+  max-width: 240px;
+  background: var(--crm-surface);
+  box-shadow: -6px 0 10px -8px rgba(17, 24, 39, 0.12);
+}
+
+.crm-table thead .crm-col-comment,
+.crm-table thead .crm-col-memo {
+  z-index: 4;
+  background: #f9fafb;
+}
+
+.crm-table tbody tr:hover .crm-col-comment,
+.crm-table tbody tr:hover .crm-col-memo {
+  background: #fafafa;
+}
+
+.crm-table tbody tr.is-selected .crm-col-comment,
+.crm-table tbody tr.is-selected .crm-col-memo {
+  background: var(--crm-primary-soft);
+}
+
+@media (max-width: 1280px) {
+  .crm-table .crm-col-comment {
+    width: 140px;
+    min-width: 120px;
+    max-width: 160px;
+  }
+  .crm-table .crm-col-memo {
+    right: 140px;
+    width: 160px;
+    min-width: 140px;
+    max-width: 180px;
+  }
+  .crm-table th,
+  .crm-table td {
+    padding: 8px 10px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .crm-main {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .crm-table .crm-col-comment {
+    width: 120px;
+    min-width: 110px;
+    max-width: 140px;
+  }
+  .crm-table .crm-col-memo {
+    right: 120px;
+    width: 140px;
+    min-width: 120px;
+    max-width: 160px;
+  }
 }
 
 .crm-table tbody tr {
@@ -1206,9 +1281,6 @@ main.crm-admin-login {
 }
 
 .crm-memo-preview {
-  min-width: 280px;
-  width: 100%;
-  max-width: none;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -1216,9 +1288,11 @@ main.crm-admin-login {
   color: var(--crm-muted);
   font-size: 12px;
   line-height: 1.45;
+  max-height: calc(1.45em * 2);
   cursor: pointer;
-  white-space: pre-wrap;
-  word-break: break-word;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   text-align: left;
 }
 

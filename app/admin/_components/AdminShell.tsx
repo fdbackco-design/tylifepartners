@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CrmSwitch } from "@/app/admin/_components/crm/ui";
 import PushSubscribeButton from "@/app/admin/_components/PushSubscribeButton";
 import { canAccessAdminPath, defaultAdminHome } from "@/lib/crm/scope";
-import { parseOpenCommentFromUrl, resolveAppUrl, stashPendingOpenComment } from "@/lib/crm/pushDeepLink";
+import { parseOpenCommentFromUrl, peekPendingOpenComment, resolveAppUrl, stashPendingOpenComment } from "@/lib/crm/pushDeepLink";
 import type { SessionUser } from "@/lib/crm/types";
 
 const PRIMARY_TABS = [
@@ -72,16 +72,22 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
-    const onMessage = (event: MessageEvent) => {
-      const data = event.data;
-      if (!data || data.type !== "crm-notification-open" || typeof data.url !== "string") return;
-
-      const leadId = parseOpenCommentFromUrl(data.url);
+    const openFromNotificationUrl = (rawUrl: string) => {
+      const leadId = parseOpenCommentFromUrl(rawUrl);
       if (leadId) stashPendingOpenComment(leadId);
 
-      const nextUrl = resolveAppUrl(data.url);
-      const currentUrl = window.location.href;
-      if (currentUrl === nextUrl) {
+      const nextUrl = resolveAppUrl(rawUrl);
+      let currentPath = "";
+      let nextPath = "";
+      try {
+        currentPath = `${window.location.pathname}${window.location.search}`;
+        nextPath = `${new URL(nextUrl).pathname}${new URL(nextUrl).search}`;
+      } catch {
+        currentPath = window.location.href;
+        nextPath = nextUrl;
+      }
+
+      if (currentPath === nextPath) {
         window.dispatchEvent(
           new CustomEvent("crm-open-comment-deeplink", {
             detail: { leadId: leadId ?? undefined, force: true },
@@ -92,8 +98,34 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       window.location.assign(nextUrl);
     };
 
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || data.type !== "crm-notification-open" || typeof data.url !== "string") return;
+      openFromNotificationUrl(data.url);
+    };
+
+    // 백그라운드→포그라운드 복귀 시 URL/세션에 남은 딥링크 처리
+    const onResume = () => {
+      if (document.visibilityState === "hidden") return;
+      const fromUrl = new URLSearchParams(window.location.search).get("open_comment");
+      const fromStore = peekPendingOpenComment();
+      const leadId = fromUrl || fromStore;
+      if (!leadId) return;
+      window.dispatchEvent(
+        new CustomEvent("crm-open-comment-deeplink", {
+          detail: { leadId, force: true },
+        })
+      );
+    };
+
     navigator.serviceWorker.addEventListener("message", onMessage);
-    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("pageshow", onResume);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", onMessage);
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("pageshow", onResume);
+    };
   }, []);
 
   const logout = async () => {
