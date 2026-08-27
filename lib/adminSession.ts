@@ -49,14 +49,21 @@ export async function getSession(): Promise<SessionUser | null> {
     const { payload } = await jwtVerify(cookie.value, getSecret());
     const rankRaw = String(payload.rank ?? payload.role ?? "");
     const userId = payload.userId ? String(payload.userId) : null;
-    // staff 세션(userId 있음)은 절대 admin으로 승격되지 않음
-    const rank: SessionUser["rank"] = userId
-      ? rankRaw === "manager"
-        ? "manager"
-        : "sales"
-      : rankRaw === "manager" || rankRaw === "sales"
-        ? rankRaw
-        : "admin";
+
+    let rank: SessionUser["rank"];
+    if (rankRaw === "admin") {
+      rank = "admin";
+    } else if (rankRaw === "manager") {
+      rank = "manager";
+    } else if (rankRaw === "sales") {
+      rank = "sales";
+    } else if (!userId) {
+      // ENV 관리자 세션 하위 호환 (userId 없음)
+      rank = "admin";
+    } else {
+      rank = "sales";
+    }
+
     return {
       rank,
       userId,

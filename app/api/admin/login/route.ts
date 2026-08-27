@@ -37,7 +37,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: false, message: "아이디 또는 비밀번호가 올바르지 않습니다." }, { status: 401 });
       }
       token = await createSession({
-        rank: user.rank === "manager" ? "manager" : "sales",
+        rank:
+          user.rank === "admin" ? "admin" : user.rank === "manager" ? "manager" : "sales",
         userId: user.id,
         name: user.name,
         loginId: user.login_id,

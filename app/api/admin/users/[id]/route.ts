@@ -37,8 +37,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ ok: false, message: "직급 변경은 관리자만 가능합니다." }, { status: 403 });
     }
     const rank = String(body.rank).trim();
-    if (rank !== "manager" && rank !== "sales") {
-      return NextResponse.json({ ok: false, message: "직급은 매니저 또는 영업자만 가능합니다." }, { status: 400 });
+    if (rank !== "admin" && rank !== "manager" && rank !== "sales") {
+      return NextResponse.json(
+        { ok: false, message: "직급은 관리자·매니저·영업자만 가능합니다." },
+        { status: 400 }
+      );
     }
     nextRank = rank;
     patch.rank = rank;
@@ -49,7 +52,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   // 직급 전환 시 소속 관계 정리
-  if (nextRank === "manager") {
+  if (nextRank === "manager" || nextRank === "admin") {
     patch.parent_id = null;
   } else if (nextRank === "sales" && body.parent_id !== undefined && session.rank === "admin") {
     const parentId = body.parent_id ? String(body.parent_id) : null;
@@ -79,8 +82,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ ok: false, message: "수정에 실패했습니다." }, { status: 500 });
   }
 
-  // 매니저 → 영업자로 내리면 기존 산하의 parent_id 해제
-  if (existing.rank === "manager" && nextRank === "sales") {
+  // 매니저에서 다른 직급으로 바꾸면 기존 산하의 parent_id 해제
+  if (existing.rank === "manager" && nextRank !== "manager") {
     const { error: clearErr } = await supabase
       .from("staff_users")
       .update({ parent_id: null })

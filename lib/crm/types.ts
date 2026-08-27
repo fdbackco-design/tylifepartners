@@ -28,7 +28,7 @@ export type StaffUser = {
   name: string;
   phone: string;
   region: string | null;
-  rank: "manager" | "sales";
+  rank: StaffRank;
   login_id: string;
   parent_id: string | null;
   parent_name?: string | null;
