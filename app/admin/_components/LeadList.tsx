@@ -16,6 +16,10 @@ import StatusBadgeMenu from "@/app/admin/_components/crm/StatusBadgeMenu";
 import { CrmAlert, CrmButton, CrmDialog } from "@/app/admin/_components/crm/ui";
 import { formatAssigneeWithTeam } from "@/lib/crm/assigneeHistoryFormat";
 import { buildAdminCommentValue, formatAdminCommentPrefix } from "@/lib/crm/adminComment";
+import {
+  peekPendingOpenComment,
+  takePendingOpenComment,
+} from "@/lib/crm/pushDeepLink";
 
 type StaffOpt = { id: string; name: string; parent_id: string | null; rank?: string };
 
@@ -116,9 +120,31 @@ export default function LeadList({
   const [hideSaving, setHideSaving] = useState(false);
   const [hideConfirmOpen, setHideConfirmOpen] = useState(false);
   const [toast, setToast] = useState<{ tone: "success" | "danger" | "info"; message: string } | null>(null);
-  const pendingOpenCommentIdRef = useRef<string | null>(searchParams.get("open_comment"));
-  const openCommentDeepLinkDoneRef = useRef(false);
+  const pendingOpenCommentIdRef = useRef<string | null>(
+    takePendingOpenComment() ?? searchParams.get("open_comment")
+  );
+  const openCommentDeepLinkHandledIdRef = useRef<string | null>(null);
   const openCommentHandlerRef = useRef<(row: LeadRow) => Promise<void>>(async () => {});
+
+  const queueOpenCommentDeepLink = useCallback((leadId: string | null | undefined, force = false) => {
+    const id = String(leadId ?? "").trim();
+    if (!id) return;
+    if (!force && openCommentDeepLinkHandledIdRef.current === id) return;
+    pendingOpenCommentIdRef.current = id;
+  }, []);
+
+  useEffect(() => {
+    queueOpenCommentDeepLink(searchParams.get("open_comment"));
+  }, [searchParams, queueOpenCommentDeepLink]);
+
+  useEffect(() => {
+    const onDeepLink = (event: Event) => {
+      const detail = (event as CustomEvent<{ leadId?: string; force?: boolean }>).detail;
+      queueOpenCommentDeepLink(detail?.leadId ?? takePendingOpenComment(), detail?.force === true);
+    };
+    window.addEventListener("crm-open-comment-deeplink", onDeepLink);
+    return () => window.removeEventListener("crm-open-comment-deeplink", onDeepLink);
+  }, [queueOpenCommentDeepLink]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 860px)");
@@ -145,6 +171,16 @@ export default function LeadList({
     if (entryPages.length) sp.set("entry_pages", entryPages.join(","));
     if (page > 0) sp.set("page", String(page));
     if (pageSize !== 20) sp.set("limit", String(pageSize));
+    const pendingComment =
+      pendingOpenCommentIdRef.current ||
+      searchParams.get("open_comment") ||
+      peekPendingOpenComment();
+    if (
+      pendingComment &&
+      openCommentDeepLinkHandledIdRef.current !== pendingComment
+    ) {
+      sp.set("open_comment", pendingComment);
+    }
     const qs = sp.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [
@@ -164,6 +200,7 @@ export default function LeadList({
     pageSize,
     pathname,
     router,
+    searchParams,
   ]);
 
   const query = useMemo(() => {
@@ -503,8 +540,8 @@ export default function LeadList({
   openCommentHandlerRef.current = openComment;
 
   useEffect(() => {
-    const leadId = pendingOpenCommentIdRef.current;
-    if (!leadId || openCommentDeepLinkDoneRef.current || loading) return;
+    const leadId = pendingOpenCommentIdRef.current ?? searchParams.get("open_comment");
+    if (!leadId || openCommentDeepLinkHandledIdRef.current === leadId || loading) return;
 
     void (async () => {
       const categories: LeadCategory[] =
@@ -519,17 +556,24 @@ export default function LeadList({
           const res = await fetch(`/api/admin/leads/${leadId}?category=${cat}`);
           const data = await res.json();
           if (!data.ok || !data.item) continue;
-          openCommentDeepLinkDoneRef.current = true;
+          openCommentDeepLinkHandledIdRef.current = leadId;
           pendingOpenCommentIdRef.current = null;
           setSelectedId(data.item.id);
           await openCommentHandlerRef.current(data.item as LeadRow);
+
+          const sp = new URLSearchParams(window.location.search);
+          if (sp.has("open_comment")) {
+            sp.delete("open_comment");
+            const qs = sp.toString();
+            router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+          }
           return;
         } catch {
           // 다음 category 시도
         }
       }
     })();
-  }, [loading, category]);
+  }, [loading, category, searchParams, pathname, router]);
 
   useEffect(() => {
     commentRowRef.current = commentRow;
