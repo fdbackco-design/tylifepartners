@@ -14,6 +14,9 @@ async function usageCount(supabase: ReturnType<typeof getSupabaseAdmin>, value: 
 /**
  * POST /api/admin/utm-sources/bulk-delete
  * body: { ids: string[] }
+ *
+ * 고객 데이터에서 사용 중이어도 카탈로그 삭제를 허용합니다.
+ * 리드/B2B의 utm_source 문자열은 그대로 유지됩니다.
  */
 export async function POST(request: NextRequest) {
   const valid = await verifyAdminSession();
@@ -54,45 +57,50 @@ export async function POST(request: NextRequest) {
     }
 
     let deleted = 0;
-    const blocked: { id: string; label: string; value: string; used: number }[] = [];
+    let usedTotal = 0;
+    const failed: { id: string; label: string; value: string }[] = [];
     const deletedValues: string[] = [];
 
     for (const row of found) {
       const used = await usageCount(supabase, row.value);
-      if (used > 0) {
-        blocked.push({ id: row.id, label: row.label, value: row.value, used });
-        continue;
-      }
       const { error: delErr } = await supabase.from("utm_sources").delete().eq("id", row.id);
       if (delErr) {
         console.error("bulk-delete utm_sources:", delErr);
+        failed.push({ id: row.id, label: row.label, value: row.value });
         continue;
       }
       deleted += 1;
+      usedTotal += used;
       deletedValues.push(row.value);
     }
 
-    if (!deleted && blocked.length) {
+    if (!deleted) {
       return NextResponse.json(
         {
           ok: false,
-          message: `선택한 소스가 고객 데이터에서 사용 중입니다. 삭제 대신 비활성화를 사용해 주세요.`,
+          message: "삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.",
           deleted: 0,
-          blocked,
+          failed,
         },
-        { status: 409 }
+        { status: 500 }
       );
+    }
+
+    const parts = [`${deleted}개 소스를 삭제했습니다.`];
+    if (usedTotal > 0) {
+      parts.push(`기존 고객 데이터의 utm_source 값은 그대로 유지됩니다.`);
+    }
+    if (failed.length > 0) {
+      parts.push(`${failed.length}개는 삭제하지 못했습니다.`);
     }
 
     return NextResponse.json({
       ok: true,
       deleted,
-      blocked,
+      failed,
+      used_total: usedTotal,
       deleted_values: deletedValues,
-      message:
-        blocked.length > 0
-          ? `${deleted}개 삭제, ${blocked.length}개는 사용 중이라 제외되었습니다.`
-          : `${deleted}개 소스를 삭제했습니다.`,
+      message: parts.join(" "),
     });
   } catch (e) {
     console.error("POST /api/admin/utm-sources/bulk-delete:", e);

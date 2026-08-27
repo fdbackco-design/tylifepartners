@@ -266,19 +266,23 @@ export default function UtmLinkPanel() {
 
   const toggleActive = async (item: UtmSourceRow) => {
     setActionId(item.id);
+    const nextActive = item.is_active === false;
     try {
       const res = await fetch(`/api/admin/utm-sources/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_active: item.is_active === false }),
+        body: JSON.stringify({ is_active: nextActive }),
       });
       const data = await res.json();
       if (!data.ok) {
         showToast(data.message || "상태 변경에 실패했습니다.", true);
         return;
       }
+      if (!nextActive && selectedValue === item.value) {
+        setSelectedValue("");
+      }
       await fetchItems();
-      showToast(item.is_active === false ? "소스를 활성화했습니다." : "소스를 비활성화했습니다.");
+      showToast(nextActive ? "소스를 활성화했습니다." : "소스를 비활성화했습니다. 링크 생성 목록에서 제외됩니다.");
     } catch {
       showToast("네트워크 오류가 발생했습니다.", true);
     } finally {
@@ -305,7 +309,7 @@ export default function UtmLinkPanel() {
       });
       setConfirmDelete(null);
       await fetchItems();
-      showToast("소스가 삭제되었습니다.");
+      showToast(data.message || "소스가 삭제되었습니다.");
     } catch {
       showToast("네트워크 오류가 발생했습니다.", true);
     } finally {
@@ -722,7 +726,8 @@ export default function UtmLinkPanel() {
           <strong>
             {confirmDelete?.label} ({confirmDelete?.value})
           </strong>
-          을(를) 삭제할까요? 고객 데이터에서 사용 중이면 삭제되지 않으며, 비활성화를 안내합니다.
+          을(를) 삭제할까요? 이미 유입된 고객의 utm_source 값은 유지되며, 링크 생성·소스 목록에서만
+          사라집니다.
         </p>
       </CrmDialog>
 
@@ -744,8 +749,8 @@ export default function UtmLinkPanel() {
         }
       >
         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
-          선택한 <strong>{selectedCount}</strong>개 소스를 삭제할까요? 고객 데이터에서 사용 중인 항목은
-          제외되며, 비활성화를 권장합니다.
+          선택한 <strong>{selectedCount}</strong>개 소스를 삭제할까요? 사용 중인 소스도 삭제되며, 기존
+          고객 데이터의 utm_source 값은 그대로 유지됩니다.
         </p>
       </CrmDialog>
     </div>

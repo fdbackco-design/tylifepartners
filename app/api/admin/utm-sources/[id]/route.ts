@@ -137,17 +137,8 @@ export async function DELETE(
       return NextResponse.json({ ok: false, message: "해당 utm_source를 찾을 수 없습니다." }, { status: 404 });
     }
 
+    // 리드/B2B에 남은 utm_source 문자열은 유지됩니다. 카탈로그만 제거합니다.
     const used = await usageCount(supabase, existing.value);
-    if (used > 0) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message: `고객 데이터에서 ${used}건 사용 중입니다. 삭제 대신 비활성화를 사용해 주세요.`,
-          used,
-        },
-        { status: 409 }
-      );
-    }
 
     const { data, error } = await supabase
       .from("utm_sources")
@@ -164,7 +155,15 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json({ ok: true, item: data });
+    return NextResponse.json({
+      ok: true,
+      item: data,
+      used,
+      message:
+        used > 0
+          ? `소스를 삭제했습니다. 기존 고객 ${used}건의 utm_source 값은 그대로 유지됩니다.`
+          : "소스가 삭제되었습니다.",
+    });
   } catch (e) {
     console.error("DELETE /api/admin/utm-sources/[id] error:", e);
     return NextResponse.json({ ok: false, message: "서버 오류가 발생했습니다." }, { status: 500 });
