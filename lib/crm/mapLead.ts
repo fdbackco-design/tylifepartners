@@ -63,24 +63,27 @@ export function mapLeadRow(
 }
 
 export const CONSUMER_SELECT =
-  "id, name, phone, created_at, status, memo, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, meta_adset_id, meta_campaign_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, location, desired_time, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, merged_into_id, merged_at, normalized_phone";
+  "id, name, phone, created_at, status, memo, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, location, desired_time, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, normalized_phone";
 
 export const CANDIDATE_SELECT =
-  "id, name, phone, created_at, status, memo, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, meta_adset_id, meta_campaign_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, merged_into_id, merged_at, normalized_phone";
+  "id, name, phone, created_at, status, memo, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, normalized_phone";
 
 export async function loadStaffMaps() {
   const supabase = getSupabaseAdmin();
-  const { data } = await supabase.from("staff_users").select("id, name, parent_id, rank, is_active").eq("is_active", true);
+  // active + inactive를 한 번에 읽어 부모 이름 매핑과 목록용 staff를 함께 구성
+  const { data: all } = await supabase
+    .from("staff_users")
+    .select("id, name, parent_id, rank, is_active");
   const staffById = new Map<string, StaffLite>();
   const parentNameById = new Map<string, string>();
-  for (const r of data ?? []) {
-    staffById.set(r.id, r);
-    parentNameById.set(r.id, r.name);
-  }
-  const { data: all } = await supabase.from("staff_users").select("id, name, parent_id, rank, is_active");
+  const active: Array<StaffLite & { rank?: string; is_active?: boolean }> = [];
   for (const r of all ?? []) {
+    const lite = { id: r.id, name: r.name, parent_id: r.parent_id };
+    staffById.set(r.id, lite);
     parentNameById.set(r.id, r.name);
-    if (!staffById.has(r.id)) staffById.set(r.id, { id: r.id, name: r.name, parent_id: r.parent_id });
+    if (r.is_active !== false) {
+      active.push({ ...lite, rank: r.rank, is_active: true });
+    }
   }
-  return { staffById, parentNameById, staff: (data ?? []) as Array<StaffLite & { rank?: string; is_active?: boolean }> };
+  return { staffById, parentNameById, staff: active };
 }

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
-import { loadStaffMaps } from "@/lib/crm/mapLead";
 import { parseLeadQuery, queryLeads } from "@/lib/crm/queryLeads";
-import { canSeeAdminStatus, visibleAssigneeIds } from "@/lib/crm/scope";
+import { canSeeAdminStatus } from "@/lib/crm/scope";
 import { allowedStatusesFor } from "@/lib/crm/status";
 import { LEAD_STATUSES } from "@/lib/crm/types";
 
@@ -17,9 +16,7 @@ export async function GET(request: NextRequest) {
     if (q.needReassign && session.rank === "sales") {
       return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
     }
-    const { items, total } = await queryLeads(session, q);
-    const { staff } = await loadStaffMaps();
-    const scoped = await visibleAssigneeIds(session);
+    const { items, total, staff, scoped } = await queryLeads(session, q);
     const visibleStaff =
       scoped === "all" ? staff : staff.filter((s) => scoped.includes(s.id));
     const showAdmin = canSeeAdminStatus(session);

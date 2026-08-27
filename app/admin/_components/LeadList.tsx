@@ -291,7 +291,7 @@ export default function LeadList({
 
   // 열려 있는 DB 탭에서 새 상담신청이 목록에 자동 반영되도록 조용히 갱신
   useEffect(() => {
-    const POLL_MS = 15_000;
+    const POLL_MS = 30_000;
     let timer: ReturnType<typeof setInterval> | null = null;
 
     const clear = () => {

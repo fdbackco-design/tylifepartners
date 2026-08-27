@@ -183,7 +183,8 @@ export async function attachMetaCreatives<T extends {
   meta_ad_id?: string | null;
   utm_content?: string | null;
 }>(
-  items: T[]
+  items: T[],
+  opts?: { cacheOnly?: boolean }
 ): Promise<Array<T & MetaCreativeAttach>> {
   const idByIndex = items.map((item) =>
     pickMetaAdId({ meta_ad_id: item.meta_ad_id, utm_content: item.utm_content })
@@ -191,23 +192,38 @@ export async function attachMetaCreatives<T extends {
   const unique = Array.from(new Set(idByIndex.filter(Boolean) as string[]));
   const map = new Map<string, MetaCreativeCache>();
 
-  // 캐시 일괄 로드
+  // 캐시 일괄 로드 (목록 응답을 막지 않도록 raw JSON 제외)
   if (unique.length) {
     const supabase = getSupabaseAdmin();
-    const { data } = await supabase.from("meta_ad_creatives").select("*").in("ad_id", unique);
+    const { data } = await supabase
+      .from("meta_ad_creatives")
+      .select(
+        "ad_id, ad_name, creative_id, creative_type, thumbnail_url, image_url, video_id, permalink_url, fetch_status, fetch_error, fetched_at"
+      )
+      .in("ad_id", unique);
     for (const row of data ?? []) {
       const c = row as MetaCreativeCache;
       if (isFresh(c)) map.set(c.ad_id, c);
     }
   }
 
-  // 미캐시만 제한 병렬 조회
   const missing = unique.filter((id) => !map.has(id));
-  const concurrency = 4;
-  for (let i = 0; i < missing.length; i += concurrency) {
-    const chunk = missing.slice(i, i + concurrency);
-    const rows = await Promise.all(chunk.map((id) => resolveMetaAdCreative(id)));
-    for (const row of rows) map.set(row.ad_id, row);
+  if (missing.length && !opts?.cacheOnly) {
+    const concurrency = 4;
+    for (let i = 0; i < missing.length; i += concurrency) {
+      const chunk = missing.slice(i, i + concurrency);
+      const rows = await Promise.all(chunk.map((id) => resolveMetaAdCreative(id)));
+      for (const row of rows) map.set(row.ad_id, row);
+    }
+  } else if (missing.length && opts?.cacheOnly) {
+    // 목록은 캐시만 쓰고, 미스분은 백그라운드로 채워 다음 새로고침에 반영
+    void Promise.all(
+      missing.slice(0, 12).map((id) =>
+        fetchAndCacheMetaAdCreative(id).catch((e) => {
+          console.warn("[meta/ads] background fill:", e instanceof Error ? e.message : e);
+        })
+      )
+    );
   }
 
   return items.map((item, idx) => {
