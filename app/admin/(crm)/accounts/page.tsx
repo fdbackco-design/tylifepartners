@@ -135,6 +135,7 @@ export default function AccountsPage() {
 
   const stats = {
     total: items.length,
+    admins: items.filter((u) => u.rank === "admin").length,
     managers: items.filter((u) => u.rank === "manager").length,
     sales: items.filter((u) => u.rank === "sales").length,
   };
@@ -202,7 +203,8 @@ export default function AccountsPage() {
             phone: phoneDigits,
             region: region.trim() || null,
             rank: me?.rank === "manager" ? "sales" : rank,
-            parent_id: parentId || null,
+            parent_id:
+              me?.rank === "manager" || rank !== "sales" ? null : parentId || null,
           }),
         });
         const data = await res.json();
@@ -256,7 +258,7 @@ export default function AccountsPage() {
     <div className="crm-ui-content">
       <CrmPageHeader
         title="계정 관리"
-        description="매니저·영업자 계정을 발급하고 상태를 관리합니다."
+        description="관리자·매니저·영업자 계정을 발급하고 상태를 관리합니다."
         actions={
           <CrmButton variant="primary" onClick={openCreate}>
             <IconPlus /> 계정 추가
@@ -266,6 +268,7 @@ export default function AccountsPage() {
           <CrmStatRow
             items={[
               { label: "전체 계정", value: stats.total },
+              ...(me?.rank === "admin" ? [{ label: "관리자", value: stats.admins }] : []),
               { label: "매니저", value: stats.managers },
               { label: "영업자", value: stats.sales },
             ]}
@@ -298,6 +301,7 @@ export default function AccountsPage() {
         </div>
         <CrmSelect value={filterRank} onChange={(e) => setFilterRank(e.target.value)} aria-label="직급 필터" style={{ width: 140 }}>
           <option value="all">직급 전체</option>
+          {me?.rank === "admin" ? <option value="admin">관리자</option> : null}
           <option value="manager">매니저</option>
           <option value="sales">영업자</option>
         </CrmSelect>
@@ -331,7 +335,7 @@ export default function AccountsPage() {
       ) : items.length === 0 ? (
         <CrmEmptyState
           title="아직 계정이 없습니다"
-          description="첫 매니저 또는 영업자 계정을 발급해 상담 배정을 시작하세요."
+          description="첫 관리자·매니저 또는 영업자 계정을 발급해 상담 배정을 시작하세요."
           action={
             <CrmButton variant="primary" onClick={openCreate}>
               <IconPlus /> 첫 계정 추가
@@ -359,7 +363,9 @@ export default function AccountsPage() {
             {filtered.map((u) => (
               <tr key={u.id}>
                 <td style={{ fontWeight: 600 }} className="crm-cell-nowrap">{u.name}</td>
-                <td className="crm-cell-nowrap">{u.rank === "manager" ? "매니저" : "영업자"}</td>
+                <td className="crm-cell-nowrap">
+                  {u.rank === "admin" ? "관리자" : u.rank === "manager" ? "매니저" : "영업자"}
+                </td>
                 <td className="crm-cell-nowrap">{u.login_id}</td>
                 <td className="crm-cell-nowrap">{formatPhoneKorean(u.phone)}</td>
                 <td>
@@ -433,9 +439,11 @@ export default function AccountsPage() {
             label="직급"
             htmlFor="acc-rank"
             hint={
-              editUser?.rank === "manager" && rank === "sales"
-                ? "매니저 → 영업자로 바꾸면 기존 산하 영업자의 소속이 해제됩니다."
-                : undefined
+              editUser?.rank === "manager" && rank !== "manager"
+                ? "매니저에서 다른 직급으로 바꾸면 기존 산하 영업자의 소속이 해제됩니다."
+                : rank === "admin"
+                  ? "관리자는 대시보드·설정·계정 관리 등 전체 메뉴에 접근할 수 있습니다."
+                  : undefined
             }
           >
             <CrmSelect
@@ -444,9 +452,10 @@ export default function AccountsPage() {
               onChange={(e) => {
                 const next = e.target.value;
                 setRank(next);
-                if (next === "manager") setParentId("");
+                if (next === "manager" || next === "admin") setParentId("");
               }}
             >
+              <option value="admin">관리자</option>
               <option value="manager">매니저</option>
               <option value="sales">영업자</option>
             </CrmSelect>

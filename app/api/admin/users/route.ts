@@ -74,10 +74,17 @@ export async function POST(request: NextRequest) {
     if (session.rank === "manager") {
       rank = "sales";
       parentId = session.userId;
-    } else if (rank !== "manager" && rank !== "sales") {
-      return NextResponse.json({ ok: false, message: "직급은 매니저 또는 영업자만 가능합니다." }, { status: 400 });
+    } else if (session.rank === "admin") {
+      if (rank !== "admin" && rank !== "manager" && rank !== "sales") {
+        return NextResponse.json(
+          { ok: false, message: "직급은 관리자·매니저·영업자만 가능합니다." },
+          { status: 400 }
+        );
+      }
+    } else {
+      return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
     }
-    if (rank === "manager") parentId = null;
+    if (rank === "manager" || rank === "admin") parentId = null;
 
     const loginId = credentialsFromPhone(phone);
     if (loginId.length < 8) {
