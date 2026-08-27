@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   CALENDAR_EVENT_TYPES,
   CALENDAR_EVENT_TYPE_COLORS,
@@ -12,6 +13,10 @@ import {
   type CalendarEventType,
   type CalendarVisibility,
 } from "@/lib/crm/calendar";
+import {
+  peekPendingOpenCalendarEvent,
+  takePendingOpenCalendarEvent,
+} from "@/lib/crm/pushDeepLink";
 import { todayYmdLocal } from "@/lib/crm/ui";
 import "./calendar.css";
 
@@ -24,6 +29,7 @@ type DayModal =
 
 const WD = ["일", "월", "화", "수", "목", "금", "토"];
 const CELL_MAX = 2;
+const MONTH_RE = /^\d{4}-\d{2}$/;
 
 function shiftMonth(ym: string, delta: number) {
   const [y, m] = ym.split("-").map(Number);
@@ -48,9 +54,23 @@ function formatDayTitle(iso: string) {
 }
 
 export default function CalendarPage() {
+  return (
+    <Suspense fallback={<div className="wc" style={{ padding: 24, color: "var(--wc-muted, #867a9c)" }}>캘린더 불러오는 중…</div>}>
+      <CalendarPageInner />
+    </Suspense>
+  );
+}
+
+function CalendarPageInner() {
   const today = todayYmdLocal();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const sheetRef = useRef<HTMLElement>(null);
-  const [month, setMonth] = useState(() => today.slice(0, 7));
+  const [month, setMonth] = useState(() => {
+    const fromUrl = searchParams.get("month");
+    return fromUrl && MONTH_RE.test(fromUrl) ? fromUrl : today.slice(0, 7);
+  });
   const [items, setItems] = useState<CalendarEventRow[]>([]);
   const [canEdit, setCanEdit] = useState(false);
   const [rank, setRank] = useState<string>("sales");
@@ -65,6 +85,12 @@ export default function CalendarPage() {
   const [modal, setModal] = useState<DayModal>(null);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const pendingOpenEventIdRef = useRef<string | null>(
+    takePendingOpenCalendarEvent() ?? searchParams.get("open_event")
+  );
+  const openEventDeepLinkHandledIdRef = useRef<string | null>(null);
+  const widenTypesForDeepLinkRef = useRef(false);
+  const [deepLinkNonce, setDeepLinkNonce] = useState(0);
 
   // form state
   const [formType, setFormType] = useState<CalendarEventType>("general");
@@ -79,6 +105,50 @@ export default function CalendarPage() {
     window.setTimeout(() => setToast(""), 2200);
   };
 
+  const queueOpenEventDeepLink = useCallback((eventId: string | null | undefined, force = false) => {
+    const id = String(eventId ?? "").trim();
+    if (!id) return;
+    if (!force && openEventDeepLinkHandledIdRef.current === id) return;
+    pendingOpenEventIdRef.current = id;
+    if (force) openEventDeepLinkHandledIdRef.current = null;
+    widenTypesForDeepLinkRef.current = false;
+    setDeepLinkNonce((n) => n + 1);
+  }, []);
+
+  useEffect(() => {
+    const fromUrl = searchParams.get("month");
+    if (fromUrl && MONTH_RE.test(fromUrl)) {
+      setMonth((prev) => (prev === fromUrl ? prev : fromUrl));
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    queueOpenEventDeepLink(searchParams.get("open_event"));
+  }, [searchParams, queueOpenEventDeepLink]);
+
+  useEffect(() => {
+    const onDeepLink = (event: Event) => {
+      const detail = (event as CustomEvent<{ eventId?: string; force?: boolean }>).detail;
+      queueOpenEventDeepLink(detail?.eventId ?? takePendingOpenCalendarEvent(), detail?.force === true);
+    };
+    window.addEventListener("crm-open-calendar-deeplink", onDeepLink);
+    return () => window.removeEventListener("crm-open-calendar-deeplink", onDeepLink);
+  }, [queueOpenEventDeepLink]);
+
+  const setMonthAndUrl = useCallback(
+    (next: string | ((prev: string) => string)) => {
+      setMonth((prev) => {
+        const value = typeof next === "function" ? next(prev) : next;
+        if (!MONTH_RE.test(value)) return prev;
+        const sp = new URLSearchParams(window.location.search);
+        sp.set("month", value);
+        const qs = sp.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+        return value;
+      });
+    },
+    [pathname, router]
+  );
   const load = useCallback(async () => {
     setLoading(true);
     setStatus("불러오는 중…");
@@ -182,6 +252,48 @@ export default function CalendarPage() {
     setViewerSearch("");
     setModal({ mode: "edit", date: ev.event_date, event: ev });
   };
+
+  const openEditRef = useRef(openEdit);
+  openEditRef.current = openEdit;
+
+  const clearOpenEventParam = useCallback(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (!sp.has("open_event")) return;
+    sp.delete("open_event");
+    if (!sp.get("month")) sp.set("month", month);
+    const qs = sp.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [month, pathname, router]);
+
+  // 푸시 알림 탭 → 해당 일정 모달 열기 (코멘트 딥링크와 동일 패턴)
+  useEffect(() => {
+    const eventId =
+      pendingOpenEventIdRef.current ||
+      searchParams.get("open_event") ||
+      peekPendingOpenCalendarEvent();
+    if (!eventId || openEventDeepLinkHandledIdRef.current === eventId || loading) return;
+
+    const ev = items.find((it) => it.id === eventId);
+    if (!ev) {
+      if (typeFilter.size < CALENDAR_EVENT_TYPES.length && !widenTypesForDeepLinkRef.current) {
+        widenTypesForDeepLinkRef.current = true;
+        setTypeFilter(new Set(CALENDAR_EVENT_TYPES));
+        return;
+      }
+      openEventDeepLinkHandledIdRef.current = eventId;
+      pendingOpenEventIdRef.current = null;
+      takePendingOpenCalendarEvent();
+      clearOpenEventParam();
+      showToast("해당 일정을 찾을 수 없습니다.");
+      return;
+    }
+
+    openEventDeepLinkHandledIdRef.current = eventId;
+    pendingOpenEventIdRef.current = null;
+    takePendingOpenCalendarEvent();
+    openEditRef.current(ev);
+    clearOpenEventParam();
+  }, [loading, items, searchParams, typeFilter, clearOpenEventParam, deepLinkNonce]);
 
   const saveEvent = async () => {
     if (!modal || modal.mode !== "edit") return;
@@ -418,10 +530,10 @@ export default function CalendarPage() {
             </div>
             <span className="wc-period__label">MONTHLY PLAN</span>
             <div className="wc-nav">
-              <button type="button" aria-label="이전 달" onClick={() => setMonth((m) => shiftMonth(m, -1))}>
+              <button type="button" aria-label="이전 달" onClick={() => setMonthAndUrl((m) => shiftMonth(m, -1))}>
                 ‹
               </button>
-              <button type="button" aria-label="다음 달" onClick={() => setMonth((m) => shiftMonth(m, 1))}>
+              <button type="button" aria-label="다음 달" onClick={() => setMonthAndUrl((m) => shiftMonth(m, 1))}>
                 ›
               </button>
             </div>
@@ -430,7 +542,7 @@ export default function CalendarPage() {
               type="month"
               value={month}
               aria-label="연월 선택"
-              onChange={(e) => e.target.value && setMonth(e.target.value)}
+              onChange={(e) => e.target.value && setMonthAndUrl(e.target.value)}
             />
           </div>
 

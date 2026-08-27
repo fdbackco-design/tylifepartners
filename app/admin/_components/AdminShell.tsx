@@ -6,7 +6,15 @@ import { useEffect, useMemo, useState } from "react";
 import { CrmSwitch } from "@/app/admin/_components/crm/ui";
 import PushSubscribeButton from "@/app/admin/_components/PushSubscribeButton";
 import { canAccessAdminPath, defaultAdminHome } from "@/lib/crm/scope";
-import { parseOpenCommentFromUrl, peekPendingOpenComment, resolveAppUrl, stashPendingOpenComment } from "@/lib/crm/pushDeepLink";
+import {
+  parseOpenCalendarEventFromUrl,
+  parseOpenCommentFromUrl,
+  peekPendingOpenCalendarEvent,
+  peekPendingOpenComment,
+  resolveAppUrl,
+  stashPendingOpenCalendarEvent,
+  stashPendingOpenComment,
+} from "@/lib/crm/pushDeepLink";
 import type { SessionUser } from "@/lib/crm/types";
 
 const PRIMARY_TABS = [
@@ -80,6 +88,8 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     const openFromNotificationUrl = (rawUrl: string) => {
       const leadId = parseOpenCommentFromUrl(rawUrl);
       if (leadId) stashPendingOpenComment(leadId);
+      const eventId = parseOpenCalendarEventFromUrl(rawUrl);
+      if (eventId) stashPendingOpenCalendarEvent(eventId);
 
       const nextUrl = resolveAppUrl(rawUrl);
       let currentPath = "";
@@ -93,11 +103,19 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       }
 
       if (currentPath === nextPath) {
-        window.dispatchEvent(
-          new CustomEvent("crm-open-comment-deeplink", {
-            detail: { leadId: leadId ?? undefined, force: true },
-          })
-        );
+        if (eventId) {
+          window.dispatchEvent(
+            new CustomEvent("crm-open-calendar-deeplink", {
+              detail: { eventId, force: true },
+            })
+          );
+        } else if (leadId) {
+          window.dispatchEvent(
+            new CustomEvent("crm-open-comment-deeplink", {
+              detail: { leadId, force: true },
+            })
+          );
+        }
         return;
       }
       window.location.assign(nextUrl);
@@ -112,9 +130,17 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     // 백그라운드→포그라운드 복귀 시 URL/세션에 남은 딥링크 처리
     const onResume = () => {
       if (document.visibilityState === "hidden") return;
-      const fromUrl = new URLSearchParams(window.location.search).get("open_comment");
-      const fromStore = peekPendingOpenComment();
-      const leadId = fromUrl || fromStore;
+      const sp = new URLSearchParams(window.location.search);
+      const calendarEventId = sp.get("open_event") || peekPendingOpenCalendarEvent();
+      if (calendarEventId) {
+        window.dispatchEvent(
+          new CustomEvent("crm-open-calendar-deeplink", {
+            detail: { eventId: calendarEventId, force: true },
+          })
+        );
+        return;
+      }
+      const leadId = sp.get("open_comment") || peekPendingOpenComment();
       if (!leadId) return;
       window.dispatchEvent(
         new CustomEvent("crm-open-comment-deeplink", {
