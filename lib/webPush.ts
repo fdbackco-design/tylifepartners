@@ -254,7 +254,7 @@ export async function notifyCalendarEventCreated(opts: {
   if (!subs.length) return;
 
   const month = opts.eventDate.slice(0, 7);
-  const url = `/admin/calendar?month=${encodeURIComponent(month)}`;
+  const url = `/admin/calendar?month=${encodeURIComponent(month)}&open_event=${encodeURIComponent(opts.eventId)}`;
   const dateLabel = opts.eventDate.replace(/-/g, ".");
 
   await sendToSubscriptions(subs, {

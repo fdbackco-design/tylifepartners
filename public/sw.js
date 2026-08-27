@@ -1,6 +1,6 @@
 /* global self, clients */
 /* FEED LIFE CRM Web Push Service Worker */
-/* sw-version: 2026-08-27-ios-navigate */
+/* sw-version: 2026-08-27-calendar-deeplink */
 
 function resolveNotificationUrl(raw) {
   try {
