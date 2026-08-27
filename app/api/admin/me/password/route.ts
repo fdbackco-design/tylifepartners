@@ -82,10 +82,19 @@ export async function POST(request: NextRequest) {
 
     const { error: updateErr } = await supabase
       .from("staff_users")
-      .update({ password_hash: hashPassword(newPassword) })
+      .update({ password_hash: hashPassword(newPassword), must_change_password: false })
       .eq("id", user.id);
 
-    if (updateErr) {
+    if (updateErr && /must_change_password|schema cache|column/i.test(updateErr.message)) {
+      const retry = await supabase
+        .from("staff_users")
+        .update({ password_hash: hashPassword(newPassword) })
+        .eq("id", user.id);
+      if (retry.error) {
+        console.error("POST /api/admin/me/password:", retry.error);
+        return NextResponse.json({ ok: false, message: "비밀번호 변경에 실패했습니다." }, { status: 500 });
+      }
+    } else if (updateErr) {
       console.error("POST /api/admin/me/password:", updateErr);
       return NextResponse.json({ ok: false, message: "비밀번호 변경에 실패했습니다." }, { status: 500 });
     }

@@ -1,48 +1,83 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
-import { credentialsFromPhone, hashPassword, verifyPassword } from "@/lib/crm/password";
+import { credentialsFromPhone, hashPassword } from "@/lib/crm/password";
 import { isRegionZoneName } from "@/lib/crm/regionZones";
 import { canManageAccounts } from "@/lib/crm/scope";
 import { getSupabaseAdmin } from "@/lib/supabase";
+
+type StaffListRow = {
+  id: string;
+  name: string;
+  phone: string;
+  region: string | null;
+  rank: string;
+  login_id: string;
+  parent_id: string | null;
+  is_active: boolean;
+  created_at: string;
+  must_change_password?: boolean;
+};
 
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
 
-  const supabase = getSupabaseAdmin();
-  let query = supabase
-    .from("staff_users")
-    .select("id, name, phone, region, rank, login_id, parent_id, is_active, created_at, password_hash")
-    .order("created_at", { ascending: false });
-
   if (session.rank === "sales") {
     return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
   }
-  if (session.rank === "manager" && session.userId) {
-    query = query.or(`id.eq.${session.userId},parent_id.eq.${session.userId}`);
-  }
 
-  const { data, error } = await query;
+  const supabase = getSupabaseAdmin();
+  const selectWithFlag =
+    "id, name, phone, region, rank, login_id, parent_id, is_active, created_at, must_change_password";
+  const selectLegacy =
+    "id, name, phone, region, rank, login_id, parent_id, is_active, created_at";
+
+  const runList = async (select: string) => {
+    let q = supabase.from("staff_users").select(select).order("created_at", { ascending: false });
+    if (session.rank === "manager" && session.userId) {
+      q = q.or(`id.eq.${session.userId},parent_id.eq.${session.userId}`);
+    }
+    return q;
+  };
+
+  let data: StaffListRow[] = [];
+  let { data: raw, error } = await runList(selectWithFlag);
+  if (error && /must_change_password|schema cache|column/i.test(error.message)) {
+    const fallback = await runList(selectLegacy);
+    raw = fallback.data;
+    error = fallback.error;
+  }
   if (error) {
     console.error("GET staff_users:", error);
     return NextResponse.json({ ok: false, message: "계정 목록을 불러오지 못했습니다." }, { status: 500 });
   }
 
-  const byId = new Map((data ?? []).map((u) => [u.id, u.name]));
-  const { data: parents } = await supabase.from("staff_users").select("id, name").eq("rank", "manager");
-  for (const p of parents ?? []) byId.set(p.id, p.name);
+  data = ((raw ?? []) as unknown as StaffListRow[]).map((u) => ({
+    ...u,
+    must_change_password: Boolean(u.must_change_password),
+  }));
 
-  const items = (data ?? []).map((u) => {
-    const { password_hash, ...rest } = u as typeof u & { password_hash?: string };
+  const byId = new Map(data.map((u) => [u.id, u.name]));
+  for (const u of data) {
+    if (u.rank === "manager") byId.set(u.id, u.name);
+  }
+
+  const items = data.map((u) => {
     let account_status: "active" | "invite_pending" | "inactive" = "active";
-    if (!rest.is_active) account_status = "inactive";
-    else if (password_hash && verifyPassword(credentialsFromPhone(String(rest.phone ?? "")), password_hash)) {
-      account_status = "invite_pending";
-    }
+    if (!u.is_active) account_status = "inactive";
+    else if (u.must_change_password) account_status = "invite_pending";
     return {
-      ...rest,
-      parent_name: rest.parent_id ? byId.get(rest.parent_id) ?? null : null,
+      id: u.id,
+      name: u.name,
+      phone: u.phone,
+      region: u.region,
+      rank: u.rank,
+      login_id: u.login_id,
+      parent_id: u.parent_id,
+      is_active: u.is_active,
+      created_at: u.created_at,
+      parent_name: u.parent_id ? byId.get(u.parent_id) ?? null : null,
       account_status,
       last_login_at: null as string | null,
     };
@@ -93,26 +128,40 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
+    const baseRow = {
+      name,
+      phone,
+      region,
+      rank,
+      login_id: loginId,
+      password_hash: hashPassword(loginId),
+      parent_id: parentId,
+      is_active: true,
+    };
+    let { data, error } = await supabase
       .from("staff_users")
-      .insert({
-        name,
-        phone,
-        region,
-        rank,
-        login_id: loginId,
-        password_hash: hashPassword(loginId),
-        parent_id: parentId,
-        is_active: true,
-      })
+      .insert({ ...baseRow, must_change_password: true })
       .select("id, name, phone, region, rank, login_id, parent_id, is_active, created_at")
       .single();
+
+    if (error && /must_change_password|schema cache|column/i.test(error.message)) {
+      const fallback = await supabase
+        .from("staff_users")
+        .insert(baseRow)
+        .select("id, name, phone, region, rank, login_id, parent_id, is_active, created_at")
+        .single();
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) {
       if (String(error.message).includes("duplicate") || error.code === "23505") {
         return NextResponse.json({ ok: false, message: "이미 등록된 휴대폰번호 또는 아이디입니다." }, { status: 409 });
       }
       console.error("POST staff_users:", error);
+      return NextResponse.json({ ok: false, message: "계정 생성에 실패했습니다." }, { status: 500 });
+    }
+    if (!data) {
       return NextResponse.json({ ok: false, message: "계정 생성에 실패했습니다." }, { status: 500 });
     }
 

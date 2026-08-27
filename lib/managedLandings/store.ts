@@ -73,6 +73,25 @@ export async function listManagedLandings(): Promise<ManagedLandingRow[]> {
   return (data ?? []).map((r) => mapRow(r as Record<string, unknown>));
 }
 
+/** 드롭다운용 — sections/hero 등 대용량 JSON 제외 */
+export async function listManagedLandingsLite(): Promise<
+  Array<{ id: string; path: string; slug: string; title: string; published: boolean }>
+> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("managed_landings")
+    .select("id, path, slug, title, published")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    id: String(r.id),
+    path: String(r.path),
+    slug: String(r.slug),
+    title: String(r.title ?? "상담 안내"),
+    published: Boolean(r.published),
+  }));
+}
+
 export async function getManagedLandingById(id: string): Promise<ManagedLandingRow | null> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
@@ -116,8 +135,29 @@ export async function getManagedLandingSectionsByKey(
   if (!landingKey.startsWith("managed_")) return null;
   const slug = landingKey.slice("managed_".length);
   if (!slug) return null;
-  const row = await getManagedLandingBySlug(slug);
-  return row?.sections?.length ? row.sections : null;
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("managed_landings")
+    .select("sections")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  const sections = normalizeSections(data.sections);
+  return sections.length ? sections : null;
+}
+
+/** analytics 제출 집계용 — path만 */
+export async function getManagedLandingPathBySlug(slug: string): Promise<string | null> {
+  if (!slug) return null;
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("managed_landings")
+    .select("path")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.path != null ? String(data.path) : null;
 }
 
 export async function createManagedLanding(

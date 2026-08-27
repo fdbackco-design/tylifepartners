@@ -75,9 +75,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   if (body.reset_password) {
     patch.password_hash = hashPassword(credentialsFromPhone(existing.phone));
+    patch.must_change_password = true;
   }
 
-  const { error } = await supabase.from("staff_users").update(patch).eq("id", id);
+  let { error } = await supabase.from("staff_users").update(patch).eq("id", id);
+  if (
+    error &&
+    patch.must_change_password != null &&
+    /must_change_password|schema cache|column/i.test(error.message)
+  ) {
+    const { must_change_password: _drop, ...withoutFlag } = patch;
+    const retry = await supabase.from("staff_users").update(withoutFlag).eq("id", id);
+    error = retry.error;
+  }
   if (error) {
     console.error("PATCH staff_users:", error);
     return NextResponse.json({ ok: false, message: "수정에 실패했습니다." }, { status: 500 });
