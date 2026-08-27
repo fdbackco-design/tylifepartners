@@ -38,6 +38,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const [user, setUser] = useState<SessionUser | null>(null);
   const [autoAssign, setAutoAssign] = useState(true);
   const [autoAssignSaving, setAutoAssignSaving] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/me")
@@ -68,6 +69,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       router.replace(defaultAdminHome(user.rank));
     }
   }, [user, pathname, router]);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
@@ -207,7 +212,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                 />
               </div>
             )}
-            <span>
+            <span className="crm-header-user">
               {user.name} · {rankLabel}
             </span>
             <div className="crm-header-actions">
@@ -215,10 +220,20 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               <button type="button" className="crm-btn" onClick={logout}>
                 로그아웃
               </button>
+              <button
+                type="button"
+                className="crm-nav-toggle"
+                aria-expanded={mobileNavOpen}
+                aria-controls="crm-mobile-nav"
+                onClick={() => setMobileNavOpen((v) => !v)}
+              >
+                {mobileNavOpen ? "닫기" : "메뉴"}
+              </button>
             </div>
           </div>
         </div>
-        <nav className="crm-tabs" aria-label="주요 메뉴">
+
+        <nav className="crm-tabs crm-tabs--desktop" aria-label="주요 메뉴">
           {primaryTabs.map((t) => (
             <Link key={t.href} href={t.href} className={`crm-tab${isActiveTab(pathname, t.href) ? " active" : ""}`}>
               {t.label}
@@ -235,6 +250,60 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             </>
           )}
         </nav>
+
+        <nav className="crm-tabs crm-tabs--scroll" aria-label="주요 메뉴(스크롤)">
+          {primaryTabs.map((t) => (
+            <Link key={t.href} href={t.href} className={`crm-tab${isActiveTab(pathname, t.href) ? " active" : ""}`}>
+              {t.label}
+            </Link>
+          ))}
+        </nav>
+
+        {mobileNavOpen && (
+          <div className="crm-mobile-nav" id="crm-mobile-nav">
+            {user.rank === "admin" && (
+              <div className="crm-mobile-nav__group crm-mobile-nav__assign">
+                <div className="crm-mobile-nav__label">설정</div>
+                <div className="crm-mobile-nav__switch">
+                  <CrmSwitch
+                    checked={autoAssign}
+                    disabled={autoAssignSaving}
+                    onChange={(v) => void setAutoAssignEnabled(v)}
+                    label="자동 분배로직"
+                  />
+                </div>
+              </div>
+            )}
+            <div className="crm-mobile-nav__group">
+              <div className="crm-mobile-nav__label">주요 메뉴</div>
+              {primaryTabs.map((t) => (
+                <Link
+                  key={t.href}
+                  href={t.href}
+                  className={`crm-mobile-nav__link${isActiveTab(pathname, t.href) ? " is-active" : ""}`}
+                  onClick={() => setMobileNavOpen(false)}
+                >
+                  {t.label}
+                </Link>
+              ))}
+            </div>
+            {secondaryTabs.length > 0 && (
+              <div className="crm-mobile-nav__group">
+                <div className="crm-mobile-nav__label">더보기</div>
+                {secondaryTabs.map((t) => (
+                  <Link
+                    key={t.href}
+                    href={t.href}
+                    className={`crm-mobile-nav__link${isActiveTab(pathname, t.href) ? " is-active" : ""}`}
+                    onClick={() => setMobileNavOpen(false)}
+                  >
+                    {t.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </header>
       <div className="crm-main">{children}</div>
     </div>

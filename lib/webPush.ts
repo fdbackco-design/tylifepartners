@@ -228,3 +228,39 @@ export async function notifyAssigneeAdminComment(opts: {
     tag: `admin-comment-${opts.leadId}`,
   });
 }
+
+/** 업무 캘린더 일정 등록 → 열람 권한 대상자 */
+export async function notifyCalendarEventCreated(opts: {
+  eventId: string;
+  title: string;
+  eventDate: string;
+  eventTypeLabel: string;
+  authorName: string;
+  staffIds: string[];
+  /** admin_plus 등 — staff_user_id 없는 ENV 관리자 구독 포함 */
+  includeAdminRankSubs?: boolean;
+}): Promise<void> {
+  if (!isWebPushConfigured()) return;
+
+  const byStaff = await loadSubsByStaffIds(opts.staffIds);
+  const byRank = opts.includeAdminRankSubs ? await loadAdminSubscriptions() : [];
+  const seen = new Set<string>();
+  const subs: SubRow[] = [];
+  for (const s of [...byStaff, ...byRank]) {
+    if (seen.has(s.endpoint)) continue;
+    seen.add(s.endpoint);
+    subs.push(s);
+  }
+  if (!subs.length) return;
+
+  const month = opts.eventDate.slice(0, 7);
+  const url = `/admin/calendar?month=${encodeURIComponent(month)}`;
+  const dateLabel = opts.eventDate.replace(/-/g, ".");
+
+  await sendToSubscriptions(subs, {
+    title: "새 일정이 등록되었습니다",
+    body: `${dateLabel} · ${opts.eventTypeLabel} · ${opts.title}${opts.authorName ? ` · ${opts.authorName}` : ""}`,
+    url,
+    tag: `calendar-${opts.eventId}`,
+  });
+}

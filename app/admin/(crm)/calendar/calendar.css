@@ -108,6 +108,8 @@
   margin: 0 auto 40px;
   background: var(--wc-paper);
   border-radius: var(--wc-r-lg);
+  width: 100%;
+  min-width: 0;
 }
 
 .wc-masthead {
@@ -317,7 +319,7 @@
 
 .wc-cal__dow {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
   padding: 16px 0 8px;
 }
@@ -344,7 +346,7 @@
 
 .wc-cal__grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -912,6 +914,13 @@
 }
 
 @media (max-width: 900px) {
+  .wc {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  .wc-sheet {
+    max-width: 100%;
+  }
   .wc-period {
     padding-right: 110px;
   }
@@ -923,53 +932,139 @@
     right: 12px;
   }
   .wc-day {
-    min-height: 96px;
+    min-height: 88px;
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 720px) {
+  .wc-bar {
+    padding: 8px 10px;
+    gap: 6px 8px;
+    margin-bottom: 10px;
+    border-radius: 12px;
+  }
+  .wc-bar__brand {
+    flex: 1 1 auto;
+    margin-right: 0;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+  .wc-bar__status {
+    font-size: 11px;
+    margin-right: 0;
+  }
+  .wc-btn {
+    flex: 0 0 auto;
+    min-height: 34px;
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+  .wc-bar__hint {
+    font-size: 10px;
+    line-height: 1.35;
+  }
   .wc-masthead {
-    padding: 18px 16px 16px;
+    padding: 12px 12px 14px;
+    border-radius: 16px 16px 0 0;
   }
   .wc-masthead__row {
-    padding-right: 84px;
+    padding-right: 64px;
+    gap: 10px;
+  }
+  .wc-logo {
+    height: 20px;
+  }
+  .wc-masthead__eyebrow {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+  }
+  .wc-masthead__eyebrow b {
+    font-size: 12px;
+    margin-top: 2px;
   }
   .wc-period {
-    gap: 9px;
-    padding-right: 80px;
-    margin-top: 16px;
+    gap: 6px;
+    padding-right: 56px;
+    margin-top: 10px;
   }
   .wc-period__label {
     display: none;
   }
   .wc-period__month {
-    font-size: 38px;
+    font-size: 30px;
+  }
+  .wc-period__year {
+    font-size: 13px;
+  }
+  .wc-nav {
+    margin-bottom: 0;
+  }
+  .wc-nav button {
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+  }
+  .wc-period__pick {
+    margin-bottom: 0;
+    font-size: 11px;
+    padding: 4px 6px;
+    max-width: 128px;
   }
   .wc-mascot {
-    width: 72px;
-    right: 10px;
-    top: 12px;
+    width: 54px;
+    right: 8px;
+    top: 10px;
     bottom: auto;
   }
+  .wc-filters {
+    gap: 5px;
+    margin-top: 10px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    margin-right: -12px;
+    padding-right: 12px;
+  }
+  .wc-filters::-webkit-scrollbar {
+    display: none;
+  }
+  .wc-chip {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 4px 8px;
+    font-size: 11px;
+    gap: 4px;
+  }
+  .wc-chip i {
+    width: 8px;
+    height: 8px;
+  }
   .wc-cal {
-    padding: 0 8px 12px;
+    padding: 0 6px 10px;
+    border-radius: 0 0 16px 16px;
   }
   .wc-cal__dow {
-    gap: 3px;
-    padding: 10px 0 6px;
+    gap: 2px;
+    padding: 8px 0 4px;
   }
   .wc-cal__dow span {
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0;
-    padding: 6px 0;
+    padding: 5px 0;
+    border-radius: 5px;
   }
   .wc-cal__grid {
-    gap: 3px;
+    gap: 2px;
   }
   .wc-day {
-    min-height: 54px;
-    padding: 6px 3px;
-    border-radius: 9px;
+    min-height: 0;
+    aspect-ratio: 1 / 1.08;
+    padding: 3px 2px 4px;
+    border-radius: 7px;
+    border-left-width: 2px;
+    gap: 0;
     align-items: center;
     justify-content: flex-start;
   }
@@ -978,7 +1073,21 @@
     box-shadow: none;
   }
   .wc-day__head {
+    gap: 2px;
+    min-height: 14px;
     justify-content: center;
+    width: 100%;
+  }
+  .wc-day__n {
+    font-size: 12px;
+  }
+  .wc-day--today .wc-day__n {
+    padding: 0 5px;
+    margin-left: 0;
+  }
+  .wc-day__db {
+    width: 11px;
+    height: 11px;
   }
   .wc-day__items,
   .wc-day__more {
@@ -986,6 +1095,9 @@
   }
   .wc-day__mark {
     display: block;
+    width: 5px;
+    height: 5px;
+    margin-top: 1px;
   }
   .wc-day:not(.has-item) .wc-day__mark {
     visibility: hidden;
@@ -995,17 +1107,47 @@
   }
   .wc-agenda {
     display: block;
+    margin-top: 10px;
+    padding-top: 10px;
   }
-  .wc-bar {
-    padding: 10px 12px;
+  .wc-agenda__tit {
+    font-size: 11px;
+    margin-bottom: 8px;
   }
-  .wc-bar__brand {
+  .wc-ag {
+    padding: 9px 10px;
+    margin-bottom: 6px;
+    gap: 8px;
+  }
+  .wc-ag__d {
+    flex-basis: 36px;
+  }
+  .wc-ag__d b {
+    font-size: 16px;
+  }
+  .wc-ag__body {
+    font-size: 13px;
+  }
+  .wc-legend {
+    gap: 8px;
+    padding: 8px 10px;
+    font-size: 10px;
+    margin-top: 10px;
+  }
+  .wc-legend em {
     flex: 1 1 100%;
-    margin: 0 0 2px;
+    margin: 0;
+    font-size: 10px;
   }
-  .wc-btn {
-    flex: 1 1 0;
-    min-height: 44px;
+  .wc-signoff {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  .wc-signoff img {
+    height: 14px;
+  }
+  .wc-signoff span {
+    font-size: 10px;
   }
   .wc-ov {
     align-items: flex-end;
@@ -1024,20 +1166,121 @@
     background: #d8cfec;
     margin: 9px auto 0;
   }
-  .wc-legend em {
-    flex: 1 1 100%;
-    margin: 0;
+}
+
+@media (max-width: 560px) {
+  /* denser calendar retained from 720px; keep modal/touch extras */
+  .wc-ed__types {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .wc-ed__text {
+    min-height: 120px;
+    font-size: 16px;
   }
 }
 
+/* PNG 내보내기: 모바일 미디어쿼리(점만 표시)를 항상 덮어씀 */
+.wc.wc-exporting .wc-day__more,
+.wc.wc-exporting .wc-agenda,
+.wc.wc-exporting .wc-nav,
+.wc.wc-exporting .wc-period__pick,
+.wc.wc-exporting .wc-day__mark,
 .wc-exporting .wc-day__more,
 .wc-exporting .wc-agenda,
 .wc-exporting .wc-nav,
-.wc-exporting .wc-period__pick {
+.wc-exporting .wc-period__pick,
+.wc-exporting .wc-day__mark {
   display: none !important;
 }
 
+.wc.wc-exporting .wc-day__items,
+.wc-exporting .wc-day__items {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.wc.wc-exporting .wc-day,
+.wc-exporting .wc-day {
+  min-height: 118px !important;
+  height: auto !important;
+  aspect-ratio: auto !important;
+  padding: 8px 8px 10px !important;
+  border-radius: 12px !important;
+  border-left-width: 3px !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  gap: 4px !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.wc.wc-exporting .wc-day__head,
+.wc-exporting .wc-day__head {
+  justify-content: flex-start !important;
+  width: auto !important;
+  min-height: 20px !important;
+}
+
+.wc.wc-exporting .wc-day__n,
+.wc-exporting .wc-day__n {
+  font-size: 14px !important;
+}
+
+.wc.wc-exporting .wc-ev,
+.wc-exporting .wc-ev {
+  display: block !important;
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: #33254d !important;
+}
+
+.wc.wc-exporting .wc-ev b,
+.wc-exporting .wc-ev b {
+  display: inline !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.wc-exporting .wc-cal__grid {
+  gap: 6px !important;
+}
+
+.wc-exporting .wc-cal__dow {
+  gap: 6px !important;
+  padding: 16px 0 8px !important;
+}
+
+.wc-exporting .wc-cal__dow span {
+  font-size: 11px !important;
+  padding: 8px 0 !important;
+}
+
+.wc-exporting .wc-cal {
+  padding: 0 14px 18px !important;
+}
+
 /* PNG에는 선택된 필터만 표시 */
+.wc-exporting .wc-filters {
+  flex-wrap: wrap;
+  overflow: visible;
+  margin-right: 0;
+  padding-right: 0;
+}
+
 .wc-exporting .wc-filters .wc-chip:not(.is-on) {
   display: none !important;
 }
@@ -1059,22 +1302,25 @@
 
 .wc-exporting .wc-masthead {
   overflow: visible;
-  padding-right: 180px;
+  padding: 28px 30px 30px !important;
+  padding-right: 180px !important;
 }
 
 .wc-exporting .wc-mascot {
-  right: 16px;
-  bottom: 0;
-  width: 140px;
+  position: absolute !important;
+  right: 16px !important;
+  top: auto !important;
+  bottom: 0 !important;
+  width: 140px !important;
 }
 
 .wc-exporting .wc-period {
-  padding-right: 0;
+  padding-right: 0 !important;
+  margin-top: 22px !important;
 }
 
-.wc-exporting .wc-day {
-  transform: none !important;
-  box-shadow: none !important;
+.wc-exporting .wc-period__month {
+  font-size: 56px !important;
 }
 
 .wc-exporting .wc-day:hover {

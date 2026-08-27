@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   canViewCalendarEvent,
   normalizeVisibilityForWriter,
+  resolveCalendarNotifyStaffIds,
   type CalendarEventRow,
 } from "@/lib/crm/calendar";
 import type { SessionUser } from "@/lib/crm/types";
@@ -116,5 +117,52 @@ describe("calendar visibility", () => {
       assert.deepEqual(good.viewer_ids, ["s1"]);
       assert.equal(good.team_root_id, "m1");
     }
+  });
+});
+
+describe("calendar notify recipients", () => {
+  it("admin all excludes creator and includes others", () => {
+    const ids = resolveCalendarNotifyStaffIds(baseEv({ visibility: "all", created_by: "a1" }), staff);
+    assert.deepEqual(ids.sort(), ["m1", "m2", "s1", "s2", "s3"].sort());
+  });
+
+  it("admin_plus only admins except creator", () => {
+    const ids = resolveCalendarNotifyStaffIds(baseEv({ visibility: "admin_plus", created_by: "a1" }), staff);
+    assert.deepEqual(ids, []);
+  });
+
+  it("specific sales", () => {
+    const ids = resolveCalendarNotifyStaffIds(
+      baseEv({ visibility: "sales", viewer_ids: ["s1", "s2"], created_by: "a1" }),
+      staff
+    );
+    assert.deepEqual(ids.sort(), ["s1", "s2"].sort());
+  });
+
+  it("manager team all excludes manager, includes team sales", () => {
+    const ids = resolveCalendarNotifyStaffIds(
+      baseEv({
+        created_by: "m1",
+        created_by_rank: "manager",
+        team_root_id: "m1",
+        visibility: "all",
+      }),
+      staff
+    );
+    assert.deepEqual(ids.sort(), ["s1", "s2"].sort());
+  });
+
+  it("manager specific sales", () => {
+    const ids = resolveCalendarNotifyStaffIds(
+      baseEv({
+        created_by: "m1",
+        created_by_rank: "manager",
+        team_root_id: "m1",
+        visibility: "sales",
+        viewer_ids: ["s1"],
+      }),
+      staff
+    );
+    assert.deepEqual(ids, ["s1"]);
   });
 });
