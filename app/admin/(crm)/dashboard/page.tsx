@@ -96,9 +96,9 @@ export default function DashboardPage() {
             <CrmStatRow
               items={[
                 { label: "신규 유입", value: summary.inbound.toLocaleString() },
-                { label: "1차컨택+완료", value: summary.contacted.toLocaleString() },
+                { label: "1차컨택완료", value: summary.contacted.toLocaleString() },
                 {
-                  label: "1차컨택·완료률",
+                  label: "1차컨택완료률",
                   value: summary.rate == null ? "-" : `${summary.rate}%`,
                 },
               ]}
