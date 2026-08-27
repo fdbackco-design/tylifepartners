@@ -84,10 +84,10 @@ export default function PasswordChangePage() {
       />
 
       {isEnvAdmin ? (
-        <CrmAlert tone="warning">
+        <CrmAlert tone="info">
           환경변수(ADMIN_ID)로 로그인한 관리자 계정은 이 화면에서 비밀번호를 변경할 수 없습니다. 배포
-          설정의 <code>ADMIN_PASSWORD</code>를 변경해 주세요. 계정 관리에서 발급한 관리자 계정은 이
-          화면에서 변경할 수 있습니다.
+          설정의 ADMIN_PASSWORD를 변경해 주세요. 계정 관리에서 발급한 관리자 계정은 이 화면에서 변경할
+          수 있습니다.
         </CrmAlert>
       ) : (
         <form onSubmit={(e) => void onSubmit(e)} style={{ display: "grid", gap: 14 }}>
