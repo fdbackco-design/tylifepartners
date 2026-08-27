@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatPhoneKorean } from "@/lib/phone";
@@ -52,7 +52,7 @@ function TodayDbCostBadge({ cost }: { cost: TodayDbCost | null }) {
   );
 }
 
-/** PC 목록 열 순서 (유입페이지는 표에서 제외, 내보내기에만 포함) */
+/** PC 목록 열 (유입페이지는 표에서 제외, 내보내기에만 포함) */
 type LeadDesktopColId =
   | "creative"
   | "landing"
@@ -70,8 +70,6 @@ type LeadDesktopColId =
   | "status"
   | "memo"
   | "comment";
-
-const LEAD_DESKTOP_COL_STORAGE = "crm_lead_desktop_col_order_v1";
 
 const DEFAULT_LEAD_DESKTOP_COLS: LeadDesktopColId[] = [
   "creative",
@@ -113,49 +111,6 @@ const LEAD_DESKTOP_COL_META: Record<
   memo: { label: "메모", thClass: "crm-col-memo", tdClass: "crm-col-memo" },
   comment: { label: "코멘트", thClass: "crm-col-comment", tdClass: "crm-col-comment" },
 };
-
-function isLeadDesktopColId(v: string): v is LeadDesktopColId {
-  return (DEFAULT_LEAD_DESKTOP_COLS as string[]).includes(v);
-}
-
-function loadLeadDesktopColOrder(): LeadDesktopColId[] {
-  if (typeof window === "undefined") return DEFAULT_LEAD_DESKTOP_COLS;
-  try {
-    const raw = localStorage.getItem(LEAD_DESKTOP_COL_STORAGE);
-    if (!raw) return DEFAULT_LEAD_DESKTOP_COLS;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return DEFAULT_LEAD_DESKTOP_COLS;
-    const saved = parsed.filter((x): x is LeadDesktopColId => typeof x === "string" && isLeadDesktopColId(x));
-    const missing = DEFAULT_LEAD_DESKTOP_COLS.filter((id) => !saved.includes(id));
-    // 예전 저장에 entry_page가 있으면 무시
-    return [...saved, ...missing];
-  } catch {
-    return DEFAULT_LEAD_DESKTOP_COLS;
-  }
-}
-
-function saveLeadDesktopColOrder(order: LeadDesktopColId[]) {
-  try {
-    localStorage.setItem(LEAD_DESKTOP_COL_STORAGE, JSON.stringify(order));
-  } catch {
-    // ignore
-  }
-}
-
-function moveLeadDesktopCol(
-  order: LeadDesktopColId[],
-  fromId: LeadDesktopColId,
-  toId: LeadDesktopColId
-): LeadDesktopColId[] {
-  if (fromId === toId) return order;
-  const next = [...order];
-  const from = next.indexOf(fromId);
-  const to = next.indexOf(toId);
-  if (from < 0 || to < 0) return order;
-  next.splice(from, 1);
-  next.splice(to, 0, fromId);
-  return next;
-}
 
 function csvParam(v: string | null): string[] {
   return (v ?? "")
@@ -226,10 +181,8 @@ export default function LeadList({
   const [dateFrom, setDateFrom] = useState(searchParams.get("date_from") ?? "");
   const [dateTo, setDateTo] = useState(searchParams.get("date_to") ?? "");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [desktopColOrder, setDesktopColOrder] = useState<LeadDesktopColId[]>(DEFAULT_LEAD_DESKTOP_COLS);
-  const [dragColId, setDragColId] = useState<LeadDesktopColId | null>(null);
-  const [dragOverColId, setDragOverColId] = useState<LeadDesktopColId | null>(null);
   const [dailyDbCost, setDailyDbCost] = useState<TodayDbCost | null>(null);
+  const desktopTableShellRef = useRef<HTMLDivElement>(null);
   const [memoRow, setMemoRow] = useState<LeadRow | null>(null);
   const [memoLogs, setMemoLogs] = useState<{ id: string; assignee_name: string; memo: string; created_at: string }[]>([]);
   const [memoSaveStatus, setMemoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -780,48 +733,81 @@ export default function LeadList({
   const showSelectColumn = canDeleteLeads || canBulkAssign;
   const showHeatmapFor = (_row: LeadRow) => category === "candidates" || category === "consumers" || category === "all";
 
-  useEffect(() => {
-    setDesktopColOrder(loadLeadDesktopColOrder());
-  }, []);
-
   const visibleDesktopCols = useMemo(
     () =>
-      desktopColOrder.filter((id) => {
+      DEFAULT_LEAD_DESKTOP_COLS.filter((id) => {
         if (id === "admin_status") return Boolean(showAdmin);
         return true;
       }),
-    [desktopColOrder, isAdmin, showAdmin]
+    [showAdmin]
   );
 
-  const onDesktopColDragStart = (colId: LeadDesktopColId) => (e: DragEvent) => {
-    setDragColId(colId);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", colId);
-  };
+  // PC: 표 영역을 마우스로 끌어 가로 스크롤
+  useEffect(() => {
+    const el = desktopTableShellRef.current;
+    if (!el) return;
 
-  const onDesktopColDragOver = (colId: LeadDesktopColId) => (e: DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    if (dragOverColId !== colId) setDragOverColId(colId);
-  };
+    let dragging = false;
+    let moved = false;
+    let startX = 0;
+    let startScrollLeft = 0;
 
-  const onDesktopColDrop = (colId: LeadDesktopColId) => (e: DragEvent) => {
-    e.preventDefault();
-    const from = (e.dataTransfer.getData("text/plain") as LeadDesktopColId) || dragColId;
-    setDragColId(null);
-    setDragOverColId(null);
-    if (!from || !isLeadDesktopColId(from)) return;
-    setDesktopColOrder((prev) => {
-      const next = moveLeadDesktopCol(prev, from, colId);
-      saveLeadDesktopColOrder(next);
-      return next;
-    });
-  };
+    const isInteractive = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      return Boolean(target.closest("a, button, input, select, textarea, label, [role='button'], [role='menuitem']"));
+    };
 
-  const onDesktopColDragEnd = () => {
-    setDragColId(null);
-    setDragOverColId(null);
-  };
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      if (isInteractive(e.target)) return;
+      dragging = true;
+      moved = false;
+      startX = e.clientX;
+      startScrollLeft = el.scrollLeft;
+      el.classList.add("is-grab-scrolling");
+      el.setPointerCapture?.(e.pointerId);
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 4) moved = true;
+      el.scrollLeft = startScrollLeft - dx;
+      if (moved) e.preventDefault();
+    };
+
+    const endDrag = (e: PointerEvent) => {
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove("is-grab-scrolling");
+      try {
+        el.releasePointerCapture?.(e.pointerId);
+      } catch {
+        // ignore
+      }
+    };
+
+    const onClickCapture = (e: MouseEvent) => {
+      if (!moved) return;
+      // 드래그 직후 클릭(링크/버튼) 방지
+      e.preventDefault();
+      e.stopPropagation();
+      moved = false;
+    };
+
+    el.addEventListener("pointerdown", onPointerDown);
+    el.addEventListener("pointermove", onPointerMove);
+    el.addEventListener("pointerup", endDrag);
+    el.addEventListener("pointercancel", endDrag);
+    el.addEventListener("click", onClickCapture, true);
+    return () => {
+      el.removeEventListener("pointerdown", onPointerDown);
+      el.removeEventListener("pointermove", onPointerMove);
+      el.removeEventListener("pointerup", endDrag);
+      el.removeEventListener("pointercancel", endDrag);
+      el.removeEventListener("click", onClickCapture, true);
+    };
+  }, [items.length, loading]);
   useEffect(() => {
     if (!commentRow || !canEditComment || !session) return;
     const combined = buildAdminCommentValue(commentHistory, commentDraft, session.rank);
@@ -1198,14 +1184,15 @@ export default function LeadList({
         </div>
       ) : null}
 
-      {(title || description) && (
-        <div>
-          {title && <h1 className="crm-page-title">{title}</h1>}
-          {description && <p className="crm-page-desc">{description}</p>}
+      {(title || description || (isAdmin && dailyDbCost)) && (
+        <div className="crm-page-head">
+          <div className="crm-page-head__text">
+            {title && <h1 className="crm-page-title">{title}</h1>}
+            {description && <p className="crm-page-desc">{description}</p>}
+          </div>
+          {isAdmin && dailyDbCost && <TodayDbCostBadge cost={dailyDbCost} />}
         </div>
       )}
-
-      {isAdmin && dailyDbCost && <TodayDbCostBadge cost={dailyDbCost} />}
 
       <div className="crm-toolbar">
         <div className="crm-search">
@@ -1360,12 +1347,12 @@ export default function LeadList({
         </div>
       ) : (
         <>
-          <div className="crm-table-shell crm-table-desktop">
-            <table className="crm-table crm-table--reorderable">
+          <div className="crm-table-shell crm-table-desktop" ref={desktopTableShellRef}>
+            <table className="crm-table">
               <thead>
                 <tr>
                   {showSelectColumn && (
-                    <th style={{ width: 40 }} className="crm-col-fixed">
+                    <th style={{ width: 40 }}>
                       <input
                         type="checkbox"
                         checked={allPageSelected}
@@ -1377,23 +1364,7 @@ export default function LeadList({
                   {visibleDesktopCols.map((colId) => {
                     const meta = LEAD_DESKTOP_COL_META[colId];
                     return (
-                      <th
-                        key={colId}
-                        className={[
-                          meta.thClass,
-                          "crm-col-draggable",
-                          dragColId === colId ? "is-dragging" : "",
-                          dragOverColId === colId && dragColId !== colId ? "is-drag-over" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                        title={(meta.title ? `${meta.title}\n` : "") + "드래그하여 열 순서 변경"}
-                        draggable
-                        onDragStart={onDesktopColDragStart(colId)}
-                        onDragOver={onDesktopColDragOver(colId)}
-                        onDrop={onDesktopColDrop(colId)}
-                        onDragEnd={onDesktopColDragEnd}
-                      >
+                      <th key={colId} className={meta.thClass} title={meta.title}>
                         {meta.label}
                       </th>
                     );
