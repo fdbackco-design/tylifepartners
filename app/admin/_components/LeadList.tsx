@@ -553,6 +553,8 @@ export default function LeadList({
       label: "담당자",
       options: staff.map((s) => ({ value: s.id, label: s.name })),
       selected: assigneeIds,
+      searchable: true,
+      searchPlaceholder: "이름 검색",
     },
     ...(showAdmin
       ? [

@@ -1251,6 +1251,39 @@ main.crm-admin-login {
   overflow: auto;
 }
 
+.crm-filter-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.crm-filter-group-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--crm-muted);
+}
+
+.crm-filter-group-search {
+  flex: 1;
+  min-width: 0;
+  max-width: 140px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  font-size: 12px;
+  background: #fff;
+}
+
+.crm-filter-group-search:focus {
+  outline: none;
+  border-color: var(--crm-primary);
+  box-shadow: 0 0 0 2px var(--crm-primary-soft);
+}
+
 .crm-bulk-bar {
   display: inline-flex;
   flex-wrap: wrap;
