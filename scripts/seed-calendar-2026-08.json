@@ -1,0 +1,222 @@
+[
+  {
+    "event_date": "2026-08-03",
+    "event_type": "important",
+    "title": "영업 단 사업 계획 보고",
+    "body": "영업 단 사업 계획 보고\n\n공지 방 및 업무 소통 및 운영 체제 변화",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-04",
+    "event_type": "deadline",
+    "title": "FEED LIFE",
+    "body": "FEED LIFE\n정책 발표 & 출범",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-05",
+    "event_type": "important",
+    "title": "신규 MKT 시작",
+    "body": "신규 MKT 시작",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-06",
+    "event_type": "general",
+    "title": "2시 : 아산 CIS",
+    "body": "2시 : 아산 CIS\n【황새로미 센터장】\n\n5시 : 리더 회의 , 교육\n【조명희 본부장】",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-07",
+    "event_type": "general",
+    "title": "2시 : 온라인 강의",
+    "body": "2시 : 온라인 강의\nFEED LIFE 본사\n주제 : 영업자 실무 교육",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-08",
+    "event_type": "general",
+    "title": "★부산 1기 N잡 세미나★",
+    "body": "★부산 1기 N잡 세미나★\n\n브리핑 강사 : 박진열\n진행 총괄 : 이재원\n\n2부 영업 관리자 회의\n: 조명희 본부장 진행",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-10",
+    "event_type": "general",
+    "title": "센터장 이상",
+    "body": "센터장 이상\n관리자 온라인 회의",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-11",
+    "event_type": "general",
+    "title": "2시 : 수도권 CIS (강남)",
+    "body": "2시 : 수도권 CIS (강남)\n주제 : 영업채널의 새 비전\n강사 : 김세영 & 박재형",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-13",
+    "event_type": "general",
+    "title": "2시 : 아산 CIS",
+    "body": "2시 : 아산 CIS\n강사 : 이다교",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-14",
+    "event_type": "general",
+    "title": "2시 : 온라인 강의",
+    "body": "2시 : 온라인 강의\n강사 : 김세영\n\n주제 : 올라이프 케어 상품 및 유전자 DB 세일즈 컨셉 완전 정복",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-15",
+    "event_type": "general",
+    "title": "(가안)",
+    "body": "(가안)\n2시 : 수도권 브리핑\n강사 : 지정 예정",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-17",
+    "event_type": "important",
+    "title": "썸머 마감 전 최종 확인",
+    "body": "썸머 마감 전 최종 확인",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-18",
+    "event_type": "general",
+    "title": "2시 : 수도권 N잡 세미나",
+    "body": "2시 : 수도권 N잡 세미나\n주제 : 새로운 도약\n강사 : 안성준",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-19",
+    "event_type": "general",
+    "title": "2시 : 진주 CIS",
+    "body": "2시 : 진주 CIS\n강사 : 조명희 본부장",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-20",
+    "event_type": "important",
+    "title": "오전 11시: 천안 축구 센터",
+    "body": "오전 11시: 천안 축구 센터\n(가안)브리핑 영업\n강사 : 이주희\n(주제 회의 중)\n\n2시 : 아산 CIS\n【조명희 본부장】",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-21",
+    "event_type": "general",
+    "title": "2시: 온라인 강의",
+    "body": "2시: 온라인 강의\n강사: 박재형\n주제: 온라인 cis\n(보험 대리점 지점장의 또 다른 세일즈 노하우)",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-22",
+    "event_type": "important",
+    "title": "★브리핑 데이",
+    "body": "★브리핑 데이\n(주제 선정 예정) ★\n부제: 부산 센터 출범식\n\n강의 : 브리핑 강사\nMC : 황솜결\n진행 총괄 : 이재원\n\n2부 ▶ N잡세미나 &\n리더 스피치\n: 안성준 진행",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-24",
+    "event_type": "important",
+    "title": "★신 계약 마감 일★",
+    "body": "★신 계약 마감 일★",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-25",
+    "event_type": "deadline",
+    "title": "★해피콜 마감 일★",
+    "body": "★해피콜 마감 일★",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  },
+  {
+    "event_date": "2026-08-27",
+    "event_type": "general",
+    "title": "오전 11시 : 천안 CIS",
+    "body": "오전 11시 : 천안 CIS\n강사 : 이주희\n\n오후 2시 : 아산 CIS\n강사 : 조명희",
+    "visibility": "all",
+    "viewer_ids": [],
+    "created_by_rank": "admin",
+    "team_root_id": null,
+    "all_day": true
+  }
+]
