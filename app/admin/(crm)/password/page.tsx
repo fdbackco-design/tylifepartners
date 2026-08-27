@@ -36,8 +36,8 @@ export default function PasswordChangePage() {
     setError("");
     setSuccess("");
 
-    if (newPassword.length < 8) {
-      setError("새 비밀번호는 8자 이상이어야 합니다.");
+    if (newPassword.length < 6) {
+      setError("새 비밀번호는 6자 이상이어야 합니다.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -111,7 +111,7 @@ export default function PasswordChangePage() {
           <CrmField
             label="새 비밀번호"
             htmlFor="pw-new"
-            hint="8자 이상, 초기 비밀번호(휴대폰 뒤 8자리)와 달라야 합니다."
+            hint="6자 이상, 초기 비밀번호(휴대폰 뒤 8자리)와 달라야 합니다."
           >
             <CrmInput
               id="pw-new"
@@ -120,7 +120,7 @@ export default function PasswordChangePage() {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={6}
             />
           </CrmField>
 
@@ -132,7 +132,7 @@ export default function PasswordChangePage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={6}
             />
           </CrmField>
 

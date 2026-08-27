@@ -3,7 +3,7 @@ import { getSession } from "@/lib/adminSession";
 import { credentialsFromPhone, hashPassword, verifyPassword } from "@/lib/crm/password";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-const MIN_LEN = 8;
+const MIN_LEN = 6;
 
 /**
  * POST /api/admin/me/password
