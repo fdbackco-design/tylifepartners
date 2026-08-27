@@ -1,5 +1,6 @@
 import { startOfKstDayIso, startOfNextKstDayIso } from "@/lib/crm/kst";
 import { attachAssigneeHistories } from "@/lib/crm/assigneeHistory";
+import { applyHiddenLeadFilter, loadHiddenLeadIdMaps } from "@/lib/crm/leadListHide";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
 import { visibleAssigneeIds } from "@/lib/crm/scope";
 import { getAdminStatus, matchesAdminStatusFilter } from "@/lib/crm/status";
@@ -140,10 +141,11 @@ function applyBlacklistFilter(query: any, blockedPhones: string[]) {
 
 export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promise<{ items: LeadRow[]; total: number }> {
   const supabase = getSupabaseAdmin();
-  const [scoped, staffMaps, blockedPhones] = await Promise.all([
+  const [scoped, staffMaps, blockedPhones, hiddenLeads] = await Promise.all([
     visibleAssigneeIds(session),
     loadStaffMaps(),
     loadActiveBlacklistPhones(),
+    loadHiddenLeadIdMaps(),
   ]);
   const { staffById, parentNameById } = staffMaps;
 
@@ -170,6 +172,7 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
         .order("created_at", { ascending: false });
       query = applyCommonFilters(query, q, scoped, session.rank);
       query = applyBlacklistFilter(query, blockedPhones);
+      query = applyHiddenLeadFilter(query, table, hiddenLeads);
       if (teamAssigneeIds) {
         let ids = teamAssigneeIds;
         if (scoped !== "all") ids = ids.filter((id) => scoped.includes(id));
