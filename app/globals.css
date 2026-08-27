@@ -1722,6 +1722,11 @@ main.crm-admin-login {
   font-size: 12px;
 }
 
+.crm-meta-creative-mobile .crm-thumb-meta {
+  width: 44px;
+  height: 44px;
+}
+
 .crm-lead-mobile-table .crm-input[type="datetime-local"] {
   width: auto;
   max-width: 150px;
