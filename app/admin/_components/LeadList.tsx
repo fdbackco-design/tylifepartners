@@ -17,6 +17,13 @@ import { formatAssigneeWithTeam } from "@/lib/crm/assigneeHistoryFormat";
 
 type StaffOpt = { id: string; name: string; parent_id: string | null; rank?: string };
 
+/** 소비자·후보자 DB 필터 담당자/팀 목록에서 제외 */
+const FILTER_HIDDEN_STAFF_NAMES = new Set(["형지수", "중형지수", "이명진", "송해민", "정성현"]);
+
+function visibleInStaffFilter(s: { name: string }) {
+  return !FILTER_HIDDEN_STAFF_NAMES.has(s.name.trim());
+}
+
 function csvParam(v: string | null): string[] {
   return (v ?? "")
     .split(",")
@@ -96,6 +103,7 @@ export default function LeadList({
   const [selectedIds, setSelectedIds] = useState<Map<string, "consumers" | "candidates">>(new Map());
   const [bulkAssigneeId, setBulkAssigneeId] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [hideSaving, setHideSaving] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 860px)");
@@ -451,10 +459,15 @@ export default function LeadList({
 
   const salesStaff = staff.filter((s) => (s.rank ?? "sales") === "sales");
   const managers = staff.filter((s, _, arr) => arr.some((o) => o.parent_id === s.id) || s.parent_id == null);
+  const filterStaff = staff.filter(visibleInStaffFilter);
+  const filterManagers = managers.filter(visibleInStaffFilter);
   const isAdmin = session?.rank === "admin";
   const showAdmin = isAdmin || session?.rank === "manager";
   const canExport = showAdmin;
   const canBulkAssign = needReassign && showAdmin;
+  const canRowSelect =
+    showAdmin && (category === "consumers" || category === "candidates");
+  const showSelectColumn = canRowSelect || canBulkAssign;
   const showHeatmapFor = (_row: LeadRow) => category === "candidates" || category === "consumers" || category === "all";
 
   const heatmapHref = (row: LeadRow) => {
@@ -500,6 +513,38 @@ export default function LeadList({
       }
       return next;
     });
+  };
+
+  const bulkHide = async () => {
+    if (selectedIds.size === 0) return;
+    const n = selectedIds.size;
+    if (!window.confirm(`선택한 ${n}건을 삭제할까요?`)) {
+      return;
+    }
+    setHideSaving(true);
+    try {
+      const payloadItems = Array.from(selectedIds.entries()).map(([id, cat]) => ({
+        id,
+        category: cat,
+      }));
+      const res = await fetch("/api/admin/leads/hide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: payloadItems }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        alert(data.message || "삭제에 실패했습니다.");
+        return;
+      }
+      setSelectedIds(new Map());
+      await load();
+      alert(data.message || `${data.hidden}건을 삭제했습니다.`);
+    } catch {
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setHideSaving(false);
+    }
   };
 
   const bulkAssign = async () => {
@@ -551,7 +596,7 @@ export default function LeadList({
     {
       key: "assigneeIds",
       label: "담당자",
-      options: staff.map((s) => ({ value: s.id, label: s.name })),
+      options: filterStaff.map((s) => ({ value: s.id, label: s.name })),
       selected: assigneeIds,
       searchable: true,
       searchPlaceholder: "이름 검색",
@@ -561,8 +606,10 @@ export default function LeadList({
           {
             key: "teamIds",
             label: "팀",
-            options: managers.map((s) => ({ value: s.id, label: s.name })),
+            options: filterManagers.map((s) => ({ value: s.id, label: s.name })),
             selected: teamIds,
+            searchable: true,
+            searchPlaceholder: "이름 검색",
           },
         ]
       : []),
@@ -797,30 +844,44 @@ export default function LeadList({
           {hasFilters && !loading ? " · 필터 적용됨" : ""}
         </span>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          {canBulkAssign && selectedIds.size > 0 && (
+          {showSelectColumn && selectedIds.size > 0 && (
             <div className="crm-bulk-bar">
               <span>{selectedIds.size}건 선택</span>
-              <select
-                className="crm-select"
-                value={bulkAssigneeId}
-                onChange={(e) => setBulkAssigneeId(e.target.value)}
-                aria-label="일괄 담당자"
-              >
-                <option value="">영업자 선택</option>
-                {salesStaff.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="crm-btn crm-btn-primary"
-                disabled={bulkSaving || !bulkAssigneeId}
-                onClick={() => void bulkAssign()}
-              >
-                {bulkSaving ? "변경 중…" : "담당자 일괄 변경"}
-              </button>
+              {canBulkAssign && (
+                <>
+                  <select
+                    className="crm-select"
+                    value={bulkAssigneeId}
+                    onChange={(e) => setBulkAssigneeId(e.target.value)}
+                    aria-label="일괄 담당자"
+                  >
+                    <option value="">영업자 선택</option>
+                    {salesStaff.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="crm-btn crm-btn-primary"
+                    disabled={bulkSaving || !bulkAssigneeId}
+                    onClick={() => void bulkAssign()}
+                  >
+                    {bulkSaving ? "변경 중…" : "담당자 일괄 변경"}
+                  </button>
+                </>
+              )}
+              {canRowSelect && (
+                <button
+                  type="button"
+                  className="crm-btn"
+                  disabled={hideSaving}
+                  onClick={() => void bulkHide()}
+                >
+                  {hideSaving ? "삭제 중…" : "삭제"}
+                </button>
+              )}
             </div>
           )}
           <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
@@ -878,7 +939,7 @@ export default function LeadList({
             <table className="crm-table">
               <thead>
                 <tr>
-                  {canBulkAssign && (
+                  {showSelectColumn && (
                     <th style={{ width: 40 }}>
                       <input
                         type="checkbox"
@@ -916,7 +977,7 @@ export default function LeadList({
                       style={{ background: rowBackground(row.status, row.admin_status?.key) }}
                       onClick={() => setSelectedId(row.id)}
                     >
-                      {canBulkAssign && (
+                      {showSelectColumn && (
                         <td onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
@@ -1076,7 +1137,7 @@ export default function LeadList({
               <table className="crm-lead-mobile-table">
                 <thead>
                   <tr>
-                    {canBulkAssign && (
+                    {showSelectColumn && (
                       <th className="crm-lead-mobile-check">
                         <input
                           type="checkbox"
@@ -1106,7 +1167,7 @@ export default function LeadList({
                         style={{ background: rowBackground(row.status, row.admin_status?.key) }}
                         onClick={() => setSelectedId(row.id)}
                       >
-                        {canBulkAssign && (
+                        {showSelectColumn && (
                           <td className="crm-lead-mobile-check" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="checkbox"
