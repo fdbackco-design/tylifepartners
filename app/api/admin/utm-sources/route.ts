@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSession } from "@/lib/adminSession";
+import { getSession } from "@/lib/adminSession";
+import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { parseUtmSourceInput, utmSourcesDbErrorMessage } from "@/lib/utmSourceMapping";
 
 export async function GET() {
-  const valid = await verifyAdminSession();
-  if (!valid) {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
 
@@ -46,8 +47,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const valid = await verifyAdminSession();
-  if (!valid) {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
 
@@ -92,8 +93,28 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         );
       }
-      return NextResponse.json({ ok: true, item: { ...retry.data, is_active: true } });
+      const item = { ...retry.data, is_active: true };
+      void writeAdminAudit({
+        actor: actorFromSession(session),
+        action: "utm.create",
+        resourceType: "utm_source",
+        resourceId: retry.data.id,
+        summary: `UTM 소스 등록: ${retry.data.label} (${retry.data.value})`,
+        detail: { value: retry.data.value, label: retry.data.label, sheet_label: retry.data.sheet_label },
+        request,
+      });
+      return NextResponse.json({ ok: true, item });
     }
+
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "utm.create",
+      resourceType: "utm_source",
+      resourceId: data.id,
+      summary: `UTM 소스 등록: ${data.label} (${data.value})`,
+      detail: { value: data.value, label: data.label, sheet_label: data.sheet_label },
+      request,
+    });
 
     return NextResponse.json({ ok: true, item: data });
   } catch (e) {

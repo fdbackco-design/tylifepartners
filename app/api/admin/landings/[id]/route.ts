@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSession } from "@/lib/adminSession";
+import { getSession } from "@/lib/adminSession";
+import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import {
   deleteManagedLanding,
   getManagedLandingById,
@@ -10,8 +11,8 @@ import type { ManagedCtaPosition, ManagedLandingInput } from "@/lib/managedLandi
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_request: NextRequest, ctx: Ctx) {
-  const valid = await verifyAdminSession();
-  if (!valid) {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
   const { id } = await ctx.params;
@@ -28,8 +29,8 @@ export async function GET(_request: NextRequest, ctx: Ctx) {
 }
 
 export async function PATCH(request: NextRequest, ctx: Ctx) {
-  const valid = await verifyAdminSession();
-  if (!valid) {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
   const { id } = await ctx.params;
@@ -48,6 +49,20 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       form_config: body.form_config,
       published: body.published,
     });
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "landing.update",
+      resourceType: "landing",
+      resourceId: id,
+      summary: `랜딩 수정: ${item.title || item.path}`,
+      detail: {
+        path: item.path,
+        title: item.title,
+        published: item.published,
+        changed: Object.keys(body),
+      },
+      request,
+    });
     return NextResponse.json({ ok: true, item });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -60,14 +75,24 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   }
 }
 
-export async function DELETE(_request: NextRequest, ctx: Ctx) {
-  const valid = await verifyAdminSession();
-  if (!valid) {
+export async function DELETE(request: NextRequest, ctx: Ctx) {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
   const { id } = await ctx.params;
   try {
+    const existing = await getManagedLandingById(id);
     await deleteManagedLanding(id);
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "landing.delete",
+      resourceType: "landing",
+      resourceId: id,
+      summary: `랜딩 삭제: ${existing?.title || existing?.path || id}`,
+      detail: { path: existing?.path, title: existing?.title },
+      request,
+    });
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

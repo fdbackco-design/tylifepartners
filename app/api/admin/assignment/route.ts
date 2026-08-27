@@ -192,6 +192,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, message: "권역 추가에 실패했습니다." }, { status: 500 });
     }
 
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "assignment.rule_create",
+      resourceType: "assignment",
+      resourceId: created.id,
+      summary: `자동분배 권역 추가: ${created.region_group}`,
+      detail: { region_group: created.region_group, region_keywords: created.region_keywords },
+      request,
+    });
+
     return NextResponse.json({
       ok: true,
       rule: { ...created, members: [] },
@@ -231,6 +241,16 @@ export async function DELETE(request: NextRequest) {
       console.error("DELETE assignment rule:", error);
       return NextResponse.json({ ok: false, message: "권역 삭제에 실패했습니다." }, { status: 500 });
     }
+
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "assignment.rule_delete",
+      resourceType: "assignment",
+      resourceId: id,
+      summary: `자동분배 권역 삭제: ${rule.region_group}`,
+      detail: { region_group: rule.region_group },
+      request,
+    });
 
     return NextResponse.json({ ok: true, rules: await loadAssignmentRules() });
   } catch (e) {

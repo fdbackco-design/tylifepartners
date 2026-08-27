@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSession } from "@/lib/adminSession";
+import { getSession } from "@/lib/adminSession";
+import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const BUCKET = "landing-assets";
@@ -14,8 +15,8 @@ const MAX_BYTES = 15 * 1024 * 1024;
  * Supabase에 `landing-assets` 버킷을 public으로 생성해 주세요.
  */
 export async function POST(request: NextRequest) {
-  const valid = await verifyAdminSession();
-  if (!valid) {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
 
@@ -58,6 +59,14 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "landing.upload",
+      resourceType: "landing",
+      summary: `랜딩 에셋 업로드: ${filename}`,
+      detail: { filename, path, size },
+      request,
+    });
     return NextResponse.json({
       ok: true,
       signedUrl: data.signedUrl,

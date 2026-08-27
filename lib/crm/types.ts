@@ -78,6 +78,8 @@ export type LeadRow = {
   marketing_consent: number | null;
   status: LeadStatus;
   memo: string;
+  /** 관리자·매니저 코멘트 (영업자 조회 전용) */
+  admin_comment: string;
   assignee_id: string | null;
   assignee_name: string;
   team_name: string;

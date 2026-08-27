@@ -25,6 +25,7 @@ const HEADERS = [
   "관리자상태",
   "상담상태",
   "메모",
+  "코멘트",
   "마케팅동의",
 ];
 
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest) {
       showAdmin ? r.admin_status?.label ?? "" : "",
       r.status,
       r.memo,
+      r.admin_comment,
       r.marketing_consent ?? "",
     ]);
 

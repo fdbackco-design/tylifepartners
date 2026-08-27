@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     });
 
     const config = getCookieConfig(token);
-    const response = NextResponse.json({ ok: true });
+    const response = NextResponse.json({ ok: true, rank: actor.rank });
     response.cookies.set(config.name, config.value, {
       httpOnly: config.httpOnly,
       secure: config.secure,

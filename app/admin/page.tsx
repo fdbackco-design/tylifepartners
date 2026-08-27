@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { loadSavedAdminLogin, saveAdminLogin } from "@/lib/adminLoginStorage";
+import { defaultAdminHome } from "@/lib/crm/scope";
+import type { StaffRank } from "@/lib/crm/types";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -12,11 +15,22 @@ export default function AdminLoginPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    const saved = loadSavedAdminLogin();
+    if (saved) {
+      setId(saved.id);
+      setPassword(saved.password);
+    }
+  }, []);
+
+  useEffect(() => {
     fetch("/api/admin/me")
       .then((r) => r.json())
       .then((d) => {
-        if (d.ok) router.replace("/admin/dashboard");
-        else setChecking(false);
+        if (d.ok && d.user?.rank) {
+          router.replace(defaultAdminHome(d.user.rank as StaffRank));
+        } else {
+          setChecking(false);
+        }
       })
       .catch(() => setChecking(false));
   }, [router]);
@@ -32,8 +46,12 @@ export default function AdminLoginPage() {
         body: JSON.stringify({ id, password }),
       });
       const data = await res.json();
-      if (data.ok) router.replace("/admin/dashboard");
-      else setError(data.message || "로그인에 실패했습니다.");
+      if (data.ok) {
+        saveAdminLogin(id, password);
+        router.replace(defaultAdminHome((data.rank as StaffRank) ?? "admin"));
+      } else {
+        setError(data.message || "로그인에 실패했습니다.");
+      }
     } catch {
       setError("네트워크 오류가 발생했습니다.");
     } finally {
@@ -60,6 +78,7 @@ export default function AdminLoginPage() {
           </label>
           <input
             id="login-id"
+            name="username"
             className="crm-admin-login-input"
             value={id}
             onChange={(e) => setId(e.target.value)}
@@ -75,6 +94,7 @@ export default function AdminLoginPage() {
           </label>
           <input
             id="login-pw"
+            name="password"
             className="crm-admin-login-input"
             type="password"
             value={password}

@@ -15,6 +15,7 @@ import FilterPopover, { type FilterGroup } from "@/app/admin/_components/crm/Fil
 import StatusBadgeMenu from "@/app/admin/_components/crm/StatusBadgeMenu";
 import { CrmAlert, CrmButton, CrmDialog } from "@/app/admin/_components/crm/ui";
 import { formatAssigneeWithTeam } from "@/lib/crm/assigneeHistoryFormat";
+import { buildAdminCommentValue, formatAdminCommentPrefix } from "@/lib/crm/adminComment";
 
 type StaffOpt = { id: string; name: string; parent_id: string | null; rank?: string };
 
@@ -99,6 +100,14 @@ export default function LeadList({
   const [memoSaveStatus, setMemoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const memoSavedRef = useRef<string>("");
   const memoRowRef = useRef<LeadRow | null>(null);
+  const [commentRow, setCommentRow] = useState<LeadRow | null>(null);
+  const [commentHistory, setCommentHistory] = useState("");
+  const [commentDraft, setCommentDraft] = useState("");
+  const [commentSaveStatus, setCommentSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const commentSavedRef = useRef<string>("");
+  const commentOpenedHistoryRef = useRef<string>("");
+  const commentNotifyOnCloseRef = useRef(false);
+  const commentRowRef = useRef<LeadRow | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Map<string, "consumers" | "candidates">>(new Map());
@@ -294,6 +303,11 @@ export default function LeadList({
           setMemoRow(data.item);
         }
       }
+      if (commentRowRef.current?.id === row.id && body.admin_comment != null) {
+        setCommentRow(data.item);
+      } else if (commentRowRef.current?.id === row.id) {
+        setCommentRow(data.item);
+      }
       return data.item as LeadRow;
     }
     alert(data.message || "저장 실패");
@@ -457,6 +471,83 @@ export default function LeadList({
     setMemoSaveStatus("idle");
   };
 
+  const openComment = async (row: LeadRow) => {
+    const openId = row.id;
+    setCommentRow(row);
+    setCommentDraft("");
+    setCommentSaveStatus("idle");
+    commentNotifyOnCloseRef.current = false;
+    const cat = row.type === "후보자" ? "candidates" : "consumers";
+    try {
+      const res = await fetch(`/api/admin/leads/${row.id}?category=${cat}`);
+      const data = await res.json();
+      if (!data.ok || !data.item) return;
+      const history = String(data.item.admin_comment ?? "");
+      commentOpenedHistoryRef.current = history;
+      commentSavedRef.current = history;
+      setCommentHistory(history);
+      if (commentRowRef.current?.id === openId) {
+        setCommentRow(data.item);
+      }
+    } catch {
+      const history = row.admin_comment ?? "";
+      commentOpenedHistoryRef.current = history;
+      commentSavedRef.current = history;
+      setCommentHistory(history);
+    }
+  };
+
+  useEffect(() => {
+    commentRowRef.current = commentRow;
+  }, [commentRow]);
+
+  const closeComment = async () => {
+    const row = commentRowRef.current;
+    const canEdit =
+      session?.rank === "admin" || session?.rank === "manager";
+    if (row && canEdit) {
+      const combined = buildAdminCommentValue(
+        commentHistory,
+        commentDraft,
+        session!.rank
+      );
+      if (combined !== commentSavedRef.current) {
+        setCommentSaveStatus("saving");
+        const cat = row.type === "후보자" ? "candidates" : "consumers";
+        try {
+          const res = await fetch(`/api/admin/leads/${row.id}?category=${cat}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ admin_comment: combined }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            commentSavedRef.current = combined;
+            if (commentDraft.trim()) commentNotifyOnCloseRef.current = true;
+            if (data.item) {
+              setItems((prev) => prev.map((x) => (x.id === row.id ? data.item : x)));
+            }
+          }
+        } catch {
+          // 알림만 시도
+        }
+      }
+      if (commentNotifyOnCloseRef.current && row.assignee_id) {
+        const cat = row.type === "후보자" ? "candidates" : "consumers";
+        try {
+          await fetch(`/api/admin/leads/${row.id}/notify-comment?category=${cat}`, { method: "POST" });
+        } catch {
+          // 알림 실패는 무시
+        }
+      }
+    }
+    setCommentRow(null);
+    setCommentHistory("");
+    setCommentDraft("");
+    setCommentSaveStatus("idle");
+    commentNotifyOnCloseRef.current = false;
+  };
+
   const downloadExcel = () => {
     const sp = new URLSearchParams(query);
     sp.set("format", "xls");
@@ -471,11 +562,57 @@ export default function LeadList({
   const filterManagers = managers.filter(visibleInStaffFilter);
   const isAdmin = session?.rank === "admin";
   const showAdmin = isAdmin || session?.rank === "manager";
+  const canEditComment = showAdmin;
   const canExport = showAdmin;
   const canBulkAssign = needReassign && showAdmin;
   const canDeleteLeads = isAdmin && (category === "consumers" || category === "candidates");
   const showSelectColumn = canDeleteLeads || canBulkAssign;
   const showHeatmapFor = (_row: LeadRow) => category === "candidates" || category === "consumers" || category === "all";
+
+  useEffect(() => {
+    if (!commentRow || !canEditComment || !session) return;
+    const combined = buildAdminCommentValue(commentHistory, commentDraft, session.rank);
+    if (combined === commentSavedRef.current) {
+      setCommentSaveStatus((s) => (s === "saving" ? "idle" : s));
+      return;
+    }
+
+    const row = commentRow;
+    setCommentSaveStatus("saving");
+    const t = window.setTimeout(() => {
+      void (async () => {
+        const latest = buildAdminCommentValue(commentHistory, commentDraft, session.rank);
+        if (commentRowRef.current?.id !== row.id) return;
+        const cat = row.type === "후보자" ? "candidates" : "consumers";
+        try {
+          const res = await fetch(`/api/admin/leads/${row.id}?category=${cat}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ admin_comment: latest }),
+          });
+          const data = await res.json();
+          if (!data.ok) {
+            if (commentRowRef.current?.id === row.id) setCommentSaveStatus("error");
+            return;
+          }
+          if (commentRowRef.current?.id === row.id) {
+            commentSavedRef.current = latest;
+            setCommentSaveStatus("saved");
+            if (commentDraft.trim()) {
+              commentNotifyOnCloseRef.current = true;
+            }
+          }
+          if (data.item) {
+            setItems((prev) => prev.map((x) => (x.id === row.id ? data.item : x)));
+            setCommentRow((prev) => (prev?.id === row.id ? data.item : prev));
+          }
+        } catch {
+          if (commentRowRef.current?.id === row.id) setCommentSaveStatus("error");
+        }
+      })();
+    }, 700);
+    return () => window.clearTimeout(t);
+  }, [commentRow?.id, commentHistory, commentDraft, canEditComment, session]);
 
   const heatmapHref = (row: LeadRow) => {
     const cat =
@@ -998,6 +1135,7 @@ export default function LeadList({
                   {showAdmin && <th>관리자상태</th>}
                   <th>상담상태</th>
                   <th>메모</th>
+                  <th>코멘트</th>
                 </tr>
               </thead>
               <tbody>
@@ -1158,6 +1296,20 @@ export default function LeadList({
                           </div>
                         </div>
                       </td>
+                      <td onClick={(e) => e.stopPropagation()} style={{ minWidth: 200, width: "20%" }}>
+                        <div
+                          className="crm-memo-preview"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => void openComment(row)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") void openComment(row);
+                          }}
+                          title={canEditComment ? "클릭하여 코멘트 작성" : "클릭하여 코멘트 보기"}
+                        >
+                          {row.admin_comment?.trim() || "코멘트 없음"}
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -1188,6 +1340,7 @@ export default function LeadList({
                     {showAdmin && <th>관리자상태</th>}
                     <th>상담상태</th>
                     <th>메모</th>
+                    <th>코멘트</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1264,6 +1417,9 @@ export default function LeadList({
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                             <button type="button" className="crm-btn crm-lead-mobile-memo" onClick={() => void openMemo(row)}>
                               메모
+                            </button>
+                            <button type="button" className="crm-btn crm-lead-mobile-memo" onClick={() => void openComment(row)}>
+                              코멘트
                             </button>
                             {showHeatmapFor(row) && (
                               <Link
@@ -1346,6 +1502,81 @@ export default function LeadList({
                   </div>
                 ))}
               </div>
+            )}
+          </aside>
+        </>
+      )}
+
+      {commentRow && session && (
+        <>
+          <button type="button" className="crm-drawer-backdrop" aria-label="닫기" onClick={() => void closeComment()} />
+          <aside className="crm-drawer" role="dialog" aria-label="코멘트">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div>
+                <strong style={{ fontSize: 16 }}>{commentRow.name}</strong>
+                <div style={{ fontSize: 12, color: "var(--crm-muted)" }}>{formatPhoneKorean(commentRow.phone)}</div>
+              </div>
+              <button type="button" className="crm-btn" onClick={() => void closeComment()}>
+                닫기
+              </button>
+            </div>
+            {canEditComment ? (
+              <>
+                {commentHistory.trim() ? (
+                  <div
+                    style={{
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                      whiteSpace: "pre-wrap",
+                      maxHeight: 200,
+                      overflow: "auto",
+                      padding: "10px 12px",
+                      marginBottom: 12,
+                      background: "var(--crm-surface-muted, #f8f9fb)",
+                      borderRadius: 8,
+                      border: "1px solid var(--crm-border)",
+                    }}
+                  >
+                    {commentHistory}
+                  </div>
+                ) : null}
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--crm-muted)", marginBottom: 6 }}>
+                  {formatAdminCommentPrefix(session.rank)}
+                </div>
+                <textarea
+                  value={commentDraft}
+                  onChange={(e) => setCommentDraft(e.target.value)}
+                  placeholder="코멘트를 입력하세요"
+                  aria-label="코멘트 작성"
+                />
+                <div style={{ marginTop: 8, fontSize: 12, color: "var(--crm-muted)", minHeight: 18 }}>
+                  {commentSaveStatus === "saving"
+                    ? "저장 중…"
+                    : commentSaveStatus === "saved"
+                      ? "자동 저장됨 · 닫으면 담당자에게 알림이 전송됩니다"
+                      : commentSaveStatus === "error"
+                        ? "저장 실패 · 다시 입력하면 재시도됩니다"
+                        : "입력하면 자동 저장됩니다 · 닫을 때 담당자에게 알림이 전송됩니다"}
+                </div>
+              </>
+            ) : (
+              <>
+                <div
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    whiteSpace: "pre-wrap",
+                    minHeight: 120,
+                    padding: "10px 12px",
+                    background: "var(--crm-surface-muted, #f8f9fb)",
+                    borderRadius: 8,
+                    border: "1px solid var(--crm-border)",
+                  }}
+                >
+                  {(commentRow.admin_comment || commentHistory)?.trim() || "코멘트 없음"}
+                </div>
+                <div style={{ marginTop: 8, fontSize: 12, color: "var(--crm-muted)" }}>조회 전용</div>
+              </>
             )}
           </aside>
         </>

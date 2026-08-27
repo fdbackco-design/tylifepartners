@@ -163,3 +163,30 @@ export async function notifyAssigneeAssigned(opts: {
     tag: `assign-${opts.leadId}`,
   });
 }
+
+/** 관리자/매니저 코멘트 작성 후 담당자에게 1회 알림 */
+export async function notifyAssigneeAdminComment(opts: {
+  assigneeId: string;
+  kind: "consumers" | "candidates";
+  name: string;
+  phone: string;
+  leadId: string;
+  authorName: string;
+}): Promise<void> {
+  if (!isWebPushConfigured()) return;
+  const subs = await loadSubsByStaffIds([opts.assigneeId]);
+  if (!subs.length) return;
+
+  const kindLabel = opts.kind === "candidates" ? "후보자" : "소비자";
+  const url =
+    opts.kind === "candidates"
+      ? `/admin/candidates?search=${encodeURIComponent(opts.phone.replace(/\D/g, ""))}`
+      : `/admin/consumers?search=${encodeURIComponent(opts.phone.replace(/\D/g, ""))}`;
+
+  await sendToSubscriptions(subs, {
+    title: "담당 고객에 코멘트가 등록되었습니다",
+    body: `${kindLabel} · ${opts.name} · ${opts.authorName}`,
+    url,
+    tag: `admin-comment-${opts.leadId}`,
+  });
+}

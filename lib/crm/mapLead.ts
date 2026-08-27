@@ -50,6 +50,7 @@ export function mapLeadRow(
     marketing_consent: row.marketing_consent == null ? null : Number(row.marketing_consent),
     status,
     memo: String(row.memo ?? ""),
+    admin_comment: String(row.admin_comment ?? ""),
     assignee_id: assigneeId,
     assignee_name: staff?.name ?? "",
     team_name: teamName,
@@ -62,10 +63,10 @@ export function mapLeadRow(
 }
 
 export const CONSUMER_SELECT =
-  "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, meta_adset_id, meta_campaign_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, location, desired_time, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, merged_into_id, merged_at, normalized_phone";
+  "id, name, phone, created_at, status, memo, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, meta_adset_id, meta_campaign_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, location, desired_time, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, merged_into_id, merged_at, normalized_phone";
 
 export const CANDIDATE_SELECT =
-  "id, name, phone, created_at, status, memo, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, meta_adset_id, meta_campaign_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, merged_into_id, merged_at, normalized_phone";
+  "id, name, phone, created_at, status, memo, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, meta_adset_id, meta_campaign_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, merged_into_id, merged_at, normalized_phone";
 
 export async function loadStaffMaps() {
   const supabase = getSupabaseAdmin();

@@ -93,6 +93,7 @@ export function summarizeLeadPatch(body: Record<string, unknown>): string {
   }
   if (body.status != null) parts.push(`상태→${String(body.status)}`);
   if (body.memo != null) parts.push("메모 수정");
+  if (body.admin_comment != null) parts.push("코멘트 수정");
   if (body.meeting_at !== undefined) parts.push("대면일정 변경");
   return parts.length ? parts.join(", ") : "리드 수정";
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSession } from "@/lib/adminSession";
+import { getSession } from "@/lib/adminSession";
+import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import {
   createManagedLanding,
   listManagedLandings,
@@ -7,8 +8,8 @@ import {
 import type { ManagedCtaPosition, ManagedLandingInput } from "@/lib/managedLandings/types";
 
 export async function GET() {
-  const valid = await verifyAdminSession();
-  if (!valid) {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
   try {
@@ -37,8 +38,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const valid = await verifyAdminSession();
-  if (!valid) {
+  const session = await getSession();
+  if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
   try {
@@ -55,6 +56,15 @@ export async function POST(request: NextRequest) {
       sections: body.sections,
       form_config: body.form_config,
       published: body.published,
+    });
+    void writeAdminAudit({
+      actor: actorFromSession(session),
+      action: "landing.create",
+      resourceType: "landing",
+      resourceId: item.id,
+      summary: `랜딩 생성: ${item.title || item.path}`,
+      detail: { path: item.path, title: item.title, published: item.published },
+      request,
     });
     return NextResponse.json({ ok: true, item });
   } catch (e) {
