@@ -1298,6 +1298,13 @@ main.crm-admin-login {
   font-weight: 600;
 }
 
+.crm-lead-toast {
+  position: sticky;
+  top: 8px;
+  z-index: 40;
+  margin-bottom: 12px;
+}
+
 .crm-menu-item {
   display: block;
   width: 100%;

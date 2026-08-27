@@ -52,8 +52,8 @@ export type HideLeadsResult =
   | { ok: false; message: string; status: number };
 
 export async function hideLeadsFromList(session: SessionUser, items: HideLeadItem[]): Promise<HideLeadsResult> {
-  if (session.rank !== "admin" && session.rank !== "manager") {
-    return { ok: false, message: "권한이 없습니다.", status: 403 };
+  if (session.rank !== "admin") {
+    return { ok: false, message: "관리자만 삭제할 수 있습니다.", status: 403 };
   }
   if (!items.length) {
     return { ok: false, message: "선택된 항목이 없습니다.", status: 400 };
