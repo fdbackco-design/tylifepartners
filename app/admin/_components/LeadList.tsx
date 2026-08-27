@@ -1212,8 +1212,8 @@ export default function LeadList({
                   <th>배정일</th>
                   {showAdmin && <th>관리자상태</th>}
                   <th>상담상태</th>
-                  <th>메모</th>
-                  <th>코멘트</th>
+                  <th className="crm-col-memo">메모</th>
+                  <th className="crm-col-comment">코멘트</th>
                 </tr>
               </thead>
               <tbody>
@@ -1356,25 +1356,28 @@ export default function LeadList({
                           />
                         )}
                       </td>
-                      <td onClick={(e) => e.stopPropagation()} style={{ minWidth: 280, width: "28%" }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                          <div
-                            className="crm-memo-preview"
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => void openMemo(row)}
-                            onDoubleClick={() => void openMemo(row)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") void openMemo(row);
-                            }}
-                            title={isMemoEditable(row.status) ? "클릭하여 메모 편집" : "배정전·대기 상태에서는 메모를 편집할 수 없습니다"}
-                            style={{ flex: 1 }}
-                          >
-                            {row.memo?.trim() || "메모 없음"}
-                          </div>
+                      <td
+                        className="crm-col-memo"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div
+                          className="crm-memo-preview"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => void openMemo(row)}
+                          onDoubleClick={() => void openMemo(row)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") void openMemo(row);
+                          }}
+                          title={isMemoEditable(row.status) ? "클릭하여 메모 편집" : "배정전·대기 상태에서는 메모를 편집할 수 없습니다"}
+                        >
+                          {row.memo?.trim() || "메모 없음"}
                         </div>
                       </td>
-                      <td onClick={(e) => e.stopPropagation()} style={{ minWidth: 200, width: "20%" }}>
+                      <td
+                        className="crm-col-comment"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div
                           className="crm-memo-preview"
                           role="button"

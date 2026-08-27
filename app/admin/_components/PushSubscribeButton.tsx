@@ -79,6 +79,7 @@ export default function PushSubscribeButton() {
 
       await navigator.serviceWorker.register("/sw.js");
       const reg = await navigator.serviceWorker.ready;
+      void reg.update();
       const sub = await reg.pushManager.getSubscription();
 
       if (Notification.permission === "denied") {
@@ -121,6 +122,7 @@ export default function PushSubscribeButton() {
 
       await navigator.serviceWorker.register("/sw.js");
       const reg = await navigator.serviceWorker.ready;
+      void reg.update();
       let sub = await reg.pushManager.getSubscription();
       if (!sub) {
         sub = await reg.pushManager.subscribe({

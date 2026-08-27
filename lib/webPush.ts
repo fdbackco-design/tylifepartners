@@ -37,6 +37,27 @@ type SubRow = {
   auth: string;
 };
 
+function pushAppOrigin(): string {
+  const raw = String(
+    process.env.WEB_PUSH_APP_ORIGIN ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+      "https://www.feed-life.com"
+  )
+    .trim()
+    .replace(/\/$/, "");
+  if (!raw) return "https://www.feed-life.com";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `https://${raw}`;
+}
+
+function toAbsoluteAppUrl(pathOrUrl: string): string {
+  const raw = String(pathOrUrl || "/admin/consumers").trim() || "/admin/consumers";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const path = raw.startsWith("/") ? raw : `/${raw}`;
+  return `${pushAppOrigin()}${path}`;
+}
+
 async function sendToSubscriptions(subs: SubRow[], payload: PushPayload): Promise<void> {
   if (!subs.length) return;
   if (!configureVapid()) {
@@ -44,11 +65,27 @@ async function sendToSubscriptions(subs: SubRow[], payload: PushPayload): Promis
     return;
   }
 
+  const navigate = toAbsoluteAppUrl(payload.url || "/admin/consumers");
+  const tag = payload.tag || "tylife-crm";
+
+  // Declarative Web Push (iOS 홈화면 웹앱): 알림 탭 시 JS 없이도 navigate URL로 이동
+  // 구형 SW/브라우저는 동일 JSON을 push 이벤트로 받아 showNotification 처리
   const body = JSON.stringify({
+    web_push: 8030,
+    notification: {
+      title: payload.title,
+      body: payload.body,
+      navigate,
+      tag,
+      lang: "ko",
+      dir: "ltr",
+      silent: false,
+    },
+    // 레거시 SW 호환 필드
     title: payload.title,
     body: payload.body,
-    url: payload.url || "/admin/consumers",
-    tag: payload.tag || "tylife-crm",
+    url: navigate,
+    tag,
   });
 
   const supabase = getSupabaseAdmin();
