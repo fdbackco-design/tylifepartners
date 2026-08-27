@@ -33,7 +33,7 @@ const ACTION_OPTIONS = [
   { value: "logout", label: "로그아웃" },
   { value: "lead.update", label: "리드 수정" },
   { value: "lead.bulk_assignee", label: "담당자 일괄 변경" },
-  { value: "lead.hide_from_list", label: "삭제" },
+  { value: "lead.hide_from_list", label: "db 삭제" },
   { value: "user.create", label: "계정 생성" },
   { value: "user.update", label: "계정 수정" },
   { value: "user.reset_password", label: "비밀번호 초기화" },
@@ -50,6 +50,44 @@ function rankLabel(rank: string) {
   if (rank === "manager") return "매니저";
   if (rank === "sales") return "영업자";
   return rank || "-";
+}
+
+function formatAction(row: AuditRow): string {
+  if (row.action === "lead.hide_from_list") {
+    const count =
+      typeof row.detail?.hidden_count === "number"
+        ? row.detail.hidden_count
+        : Array.isArray(row.detail?.names)
+          ? row.detail.names.length
+          : Array.isArray(row.detail?.items)
+            ? row.detail.items.length
+            : null;
+    return count != null ? `db ${count}건 삭제` : "db 삭제";
+  }
+  return row.action;
+}
+
+function formatSummary(row: AuditRow): string {
+  if (row.action === "lead.hide_from_list") {
+    const fromDetailNames = Array.isArray(row.detail?.names)
+      ? (row.detail.names as unknown[]).map((n) => String(n)).filter(Boolean)
+      : [];
+    const fromPreview = Array.isArray(row.detail?.names_preview)
+      ? (row.detail.names_preview as unknown[]).map((n) => String(n)).filter(Boolean)
+      : [];
+    const fromItems = Array.isArray(row.detail?.items)
+      ? (row.detail.items as Array<{ name?: string }>)
+          .map((i) => String(i?.name ?? "").trim())
+          .filter(Boolean)
+      : [];
+    const names = fromDetailNames.length
+      ? fromDetailNames
+      : fromPreview.length
+        ? fromPreview
+        : fromItems;
+    if (names.length) return names.join(", ");
+  }
+  return row.summary || "-";
 }
 
 function formatTime(iso: string) {
@@ -206,16 +244,11 @@ export default function AuditLogsPage() {
                   </td>
                   <td className="crm-cell-nowrap">{rankLabel(row.actor_rank)}</td>
                   <td className="crm-cell-nowrap" style={{ fontSize: 12 }}>
-                    {row.action}
+                    {formatAction(row)}
                     {!row.success ? " · 실패" : ""}
                   </td>
                   <td>
-                    <div>{row.summary}</div>
-                    {row.resource_id ? (
-                      <div style={{ fontSize: 11, color: "var(--crm-muted)" }}>
-                        {row.resource_type}:{row.resource_id.slice(0, 8)}…
-                      </div>
-                    ) : null}
+                    <div style={{ whiteSpace: "pre-wrap" }}>{formatSummary(row)}</div>
                   </td>
                   <td className="crm-cell-nowrap" style={{ fontSize: 12, color: "var(--crm-muted)" }}>
                     {row.ip || "-"}

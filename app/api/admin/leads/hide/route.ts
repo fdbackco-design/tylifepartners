@@ -13,6 +13,9 @@ export async function POST(request: NextRequest) {
   if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
   }
+  if (session.rank !== "admin") {
+    return NextResponse.json({ ok: false, message: "관리자만 삭제할 수 있습니다." }, { status: 403 });
+  }
 
   try {
     const body = await request.json();
@@ -32,16 +35,19 @@ export async function POST(request: NextRequest) {
     }
 
     const names = result.hiddenDetails.map((d) => d.name).filter(Boolean);
+    const nameList = names.length
+      ? names.join(", ")
+      : result.hiddenDetails.map((d) => d.id).join(", ");
     void writeAdminAudit({
       actor: actorFromSession(session),
       action: "lead.hide_from_list",
       resourceType: "lead",
-      summary: `${result.hidden}건 삭제${result.skipped ? ` (${result.skipped}건 제외)` : ""}`,
+      summary: nameList || `${result.hidden}건`,
       detail: {
         hidden_count: result.hidden,
         skipped_count: result.skipped,
         items: result.hiddenDetails,
-        names_preview: names.slice(0, 20),
+        names: names,
       },
       request,
     });

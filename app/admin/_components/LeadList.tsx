@@ -13,6 +13,7 @@ import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
 import DateRangePicker from "@/app/admin/_components/crm/DateRangePicker";
 import FilterPopover, { type FilterGroup } from "@/app/admin/_components/crm/FilterPopover";
 import StatusBadgeMenu from "@/app/admin/_components/crm/StatusBadgeMenu";
+import { CrmAlert, CrmButton, CrmDialog } from "@/app/admin/_components/crm/ui";
 import { formatAssigneeWithTeam } from "@/lib/crm/assigneeHistoryFormat";
 
 type StaffOpt = { id: string; name: string; parent_id: string | null; rank?: string };
@@ -104,6 +105,8 @@ export default function LeadList({
   const [bulkAssigneeId, setBulkAssigneeId] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
   const [hideSaving, setHideSaving] = useState(false);
+  const [hideConfirmOpen, setHideConfirmOpen] = useState(false);
+  const [toast, setToast] = useState<{ tone: "success" | "danger" | "info"; message: string } | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 860px)");
@@ -465,9 +468,8 @@ export default function LeadList({
   const showAdmin = isAdmin || session?.rank === "manager";
   const canExport = showAdmin;
   const canBulkAssign = needReassign && showAdmin;
-  const canRowSelect =
-    showAdmin && (category === "consumers" || category === "candidates");
-  const showSelectColumn = canRowSelect || canBulkAssign;
+  const canDeleteLeads = isAdmin && (category === "consumers" || category === "candidates");
+  const showSelectColumn = canDeleteLeads || canBulkAssign;
   const showHeatmapFor = (_row: LeadRow) => category === "candidates" || category === "consumers" || category === "all";
 
   const heatmapHref = (row: LeadRow) => {
@@ -515,10 +517,24 @@ export default function LeadList({
     });
   };
 
-  const bulkHide = async () => {
-    if (selectedIds.size === 0) return;
-    const n = selectedIds.size;
-    if (!window.confirm(`선택한 ${n}건을 삭제할까요?`)) {
+  const showToast = (tone: "success" | "danger" | "info", message: string) => {
+    setToast({ tone, message });
+  };
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  const requestBulkHide = () => {
+    if (!canDeleteLeads || selectedIds.size === 0) return;
+    setHideConfirmOpen(true);
+  };
+
+  const confirmBulkHide = async () => {
+    if (!canDeleteLeads || selectedIds.size === 0) {
+      setHideConfirmOpen(false);
       return;
     }
     setHideSaving(true);
@@ -534,14 +550,15 @@ export default function LeadList({
       });
       const data = await res.json();
       if (!data.ok) {
-        alert(data.message || "삭제에 실패했습니다.");
+        showToast("danger", data.message || "삭제에 실패했습니다.");
         return;
       }
+      setHideConfirmOpen(false);
       setSelectedIds(new Map());
       await load();
-      alert(data.message || `${data.hidden}건을 삭제했습니다.`);
+      showToast("success", data.message || `${data.hidden}건을 삭제했습니다.`);
     } catch {
-      alert("네트워크 오류가 발생했습니다.");
+      showToast("danger", "네트워크 오류가 발생했습니다.");
     } finally {
       setHideSaving(false);
     }
@@ -775,6 +792,12 @@ export default function LeadList({
 
   return (
     <div>
+      {toast ? (
+        <div className="crm-lead-toast" role="status">
+          <CrmAlert tone={toast.tone}>{toast.message}</CrmAlert>
+        </div>
+      ) : null}
+
       {(title || description) && (
         <div>
           {title && <h1 className="crm-page-title">{title}</h1>}
@@ -872,12 +895,12 @@ export default function LeadList({
                   </button>
                 </>
               )}
-              {canRowSelect && (
+              {canDeleteLeads && (
                 <button
                   type="button"
                   className="crm-btn"
                   disabled={hideSaving}
-                  onClick={() => void bulkHide()}
+                  onClick={requestBulkHide}
                 >
                   {hideSaving ? "삭제 중…" : "삭제"}
                 </button>
@@ -1337,6 +1360,32 @@ export default function LeadList({
           </div>
         </>
       )}
+
+      <CrmDialog
+        open={hideConfirmOpen}
+        onClose={() => {
+          if (!hideSaving) setHideConfirmOpen(false);
+        }}
+        title="삭제 확인"
+        footer={
+          <>
+            <CrmButton
+              variant="secondary"
+              disabled={hideSaving}
+              onClick={() => setHideConfirmOpen(false)}
+            >
+              취소
+            </CrmButton>
+            <CrmButton variant="danger" disabled={hideSaving} onClick={() => void confirmBulkHide()}>
+              {hideSaving ? "삭제 중…" : "삭제"}
+            </CrmButton>
+          </>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
+          선택한 <strong>{selectedIds.size}</strong>건을 삭제할까요?
+        </p>
+      </CrmDialog>
     </div>
   );
 }
