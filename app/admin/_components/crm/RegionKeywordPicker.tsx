@@ -6,7 +6,6 @@ import {
   formatRegionValue,
   getDistrictsForRegion,
   isBaseRegion,
-  REGION_GROUPS,
   type BaseRegion,
 } from "@/lib/regions";
 import { CrmButton, CrmChip, CrmInput, CrmSelect } from "@/app/admin/_components/crm/ui";
@@ -23,11 +22,9 @@ function mergeKeywords(current: string[], add: string[]): string[] {
 type Props = {
   value: string[];
   onChange: (next: string[]) => void;
-  /** 상세 지역을 새 권역으로 만들 때 (자동 분배 권역 추가 시트) */
-  onCreateSubZone?: (zoneName: string, keywords: string[]) => void;
 };
 
-export default function RegionKeywordPicker({ value, onChange, onCreateSubZone }: Props) {
+export default function RegionKeywordPicker({ value, onChange }: Props) {
   const [draft, setDraft] = useState("");
   const [baseRegion, setBaseRegion] = useState<BaseRegion | "">("");
   const [district, setDistrict] = useState("");
@@ -47,28 +44,16 @@ export default function RegionKeywordPicker({ value, onChange, onCreateSubZone }
     setDraft("");
   };
 
-  const addBaseOnly = () => {
+  const addSelected = () => {
     if (!baseRegion) return;
+    if (district) {
+      onChange(mergeKeywords(value, [formatRegionValue(baseRegion, district)]));
+      return;
+    }
     onChange(mergeKeywords(value, [baseRegion]));
   };
 
-  const addDetail = () => {
-    if (!baseRegion || !district) return;
-    onChange(mergeKeywords(value, [formatRegionValue(baseRegion, district)]));
-  };
-
-  const addAllDistricts = () => {
-    if (!baseRegion) return;
-    const kws = districts.map((d) => formatRegionValue(baseRegion, d));
-    onChange(mergeKeywords(value, kws));
-  };
-
-  const createSubZoneFromDetail = () => {
-    if (!baseRegion || !district || !onCreateSubZone) return;
-    const label = formatRegionValue(baseRegion, district);
-    onCreateSubZone(label, [label, district]);
-    setDistrict("");
-  };
+  const addLabel = district ? "상세 지역 추가" : "시·도 추가";
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
@@ -94,19 +79,6 @@ export default function RegionKeywordPicker({ value, onChange, onCreateSubZone }
           gap: 10,
         }}
       >
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--crm-muted)" }}>
-          랜딩페이지와 동일한 지역·상세 선택
-        </div>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {REGION_GROUPS.map((g) => (
-            <span key={g.zone} className="crm-ui-hint" style={{ fontSize: 11 }}>
-              <strong style={{ color: "var(--crm-text)" }}>{g.zone}</strong>{" "}
-              {g.regions.join(" · ")}
-            </span>
-          ))}
-        </div>
-
         <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
           <CrmSelect
             value={baseRegion}
@@ -146,45 +118,11 @@ export default function RegionKeywordPicker({ value, onChange, onCreateSubZone }
           </CrmSelect>
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          <CrmButton type="button" size="sm" variant="secondary" disabled={!baseRegion} onClick={addBaseOnly}>
-            시·도 추가
+        <div>
+          <CrmButton type="button" size="sm" variant="secondary" disabled={!baseRegion} onClick={addSelected}>
+            {addLabel}
           </CrmButton>
-          <CrmButton
-            type="button"
-            size="sm"
-            variant="secondary"
-            disabled={!baseRegion || !district}
-            onClick={addDetail}
-          >
-            상세 지역 추가
-          </CrmButton>
-          <CrmButton
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={!baseRegion || districts.length === 0}
-            onClick={addAllDistricts}
-          >
-            시·도 내 전체 상세 추가
-          </CrmButton>
-          {onCreateSubZone ? (
-            <CrmButton
-              type="button"
-              size="sm"
-              variant="primary"
-              disabled={!baseRegion || !district}
-              onClick={createSubZoneFromDetail}
-            >
-              상세 지역을 새 권역으로
-            </CrmButton>
-          ) : null}
         </div>
-
-        <p className="crm-ui-hint" style={{ margin: 0 }}>
-          상세 지역(예: 경기 수원시) 키워드가 더 길면 시·도 전체(경기)보다 우선 매칭됩니다. 수원·화성 등
-          담당자를 나누려면 각각「상세 지역을 새 권역으로」를 사용하세요.
-        </p>
       </div>
 
       <div style={{ display: "flex", gap: 8 }}>

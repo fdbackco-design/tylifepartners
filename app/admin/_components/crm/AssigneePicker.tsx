@@ -13,14 +13,30 @@ type Props = {
   onChange: (id: string | null) => void;
   disabled?: boolean;
   busy?: boolean;
+  /** 미선택 시 버튼 라벨 (기본: 미배정) */
+  placeholder?: string;
+  /** 미배정/선택 해제 항목 표시 (기본: true) */
+  allowClear?: boolean;
 };
 
-export default function AssigneePicker({ value, staff, teamName, history, onChange, disabled, busy }: Props) {
+export default function AssigneePicker({
+  value,
+  staff,
+  teamName,
+  history,
+  onChange,
+  disabled,
+  busy,
+  placeholder = "미배정",
+  allowClear = true,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const root = useRef<HTMLDivElement>(null);
   const current = staff.find((s) => s.id === value);
-  const label = formatAssigneeWithTeam(current?.name || "", teamName);
+  const label = value
+    ? formatAssigneeWithTeam(current?.name || "", teamName)
+    : placeholder;
   const historyText =
     history && history.length >= 2 ? history.join(" -> ") : "";
   const locked = Boolean(disabled || busy);
@@ -40,6 +56,10 @@ export default function AssigneePicker({ value, staff, teamName, history, onChan
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) setQ("");
+  }, [open]);
+
   return (
     <div ref={root} className={`crm-assignee-picker${busy ? " is-busy" : ""}`}>
       <button
@@ -52,7 +72,7 @@ export default function AssigneePicker({ value, staff, teamName, history, onChan
         aria-busy={busy || undefined}
       >
         {busy ? <span className="crm-assignee-picker-spinner" aria-hidden /> : null}
-        <span className="crm-assignee-picker-label">{value ? label : "미배정"}</span>
+        <span className="crm-assignee-picker-label">{label}</span>
         {busy ? <span className="crm-assignee-picker-busy-text">저장 중</span> : null}
       </button>
       {historyText ? (
@@ -70,16 +90,18 @@ export default function AssigneePicker({ value, staff, teamName, history, onChan
             style={{ width: "100%", marginBottom: 8 }}
             autoFocus
           />
-          <button
-            type="button"
-            className={`crm-menu-item${!value ? " is-active" : ""}`}
-            onClick={() => {
-              onChange(null);
-              setOpen(false);
-            }}
-          >
-            미배정
-          </button>
+          {allowClear ? (
+            <button
+              type="button"
+              className={`crm-menu-item${!value ? " is-active" : ""}`}
+              onClick={() => {
+                onChange(null);
+                setOpen(false);
+              }}
+            >
+              {placeholder}
+            </button>
+          ) : null}
           {filtered.map((s) => (
             <button
               key={s.id}
@@ -93,6 +115,11 @@ export default function AssigneePicker({ value, staff, teamName, history, onChan
               {s.name}
             </button>
           ))}
+          {filtered.length === 0 ? (
+            <div className="crm-ui-hint" style={{ padding: "8px 10px" }}>
+              검색 결과가 없습니다
+            </div>
+          ) : null}
         </div>
       )}
     </div>

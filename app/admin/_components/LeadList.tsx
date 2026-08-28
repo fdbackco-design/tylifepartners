@@ -724,7 +724,6 @@ export default function LeadList({
     window.location.href = `/api/admin/leads/export?${sp.toString()}`;
   };
 
-  const salesStaff = staff.filter((s) => (s.rank ?? "sales") === "sales");
   const managers = staff.filter((s, _, arr) => arr.some((o) => o.parent_id === s.id) || s.parent_id == null);
   const filterStaff = staff.filter(visibleInStaffFilter);
   const filterManagers = managers.filter(visibleInStaffFilter);
@@ -732,9 +731,13 @@ export default function LeadList({
   const showAdmin = isAdmin || session?.rank === "manager";
   const canEditComment = showAdmin;
   const canExport = session ? canExportLeads(session) : false;
-  const canBulkAssign = needReassign && showAdmin;
+  const canBulkAssign = showAdmin;
   const canDeleteLeads = isAdmin && (category === "consumers" || category === "candidates");
   const showSelectColumn = canDeleteLeads || canBulkAssign;
+  const bulkAssignableStaff = useMemo(
+    () => staff.filter((s) => (s.rank ?? "sales") === "sales" || (s.rank ?? "") === "manager"),
+    [staff]
+  );
   const showHeatmapFor = (_row: LeadRow) => category === "candidates" || category === "consumers" || category === "all";
 
   const visibleDesktopCols = useMemo(
@@ -973,7 +976,7 @@ export default function LeadList({
 
   const bulkAssign = async () => {
     if (!bulkAssigneeId || selectedIds.size === 0) {
-      alert("영업자와 대상을 선택해 주세요.");
+      alert("담당자와 대상을 선택해 주세요.");
       return;
     }
     setBulkSaving(true);
@@ -1282,19 +1285,14 @@ export default function LeadList({
               <span>{selectedIds.size}건 선택</span>
               {canBulkAssign && (
                 <>
-                  <select
-                    className="crm-select"
-                    value={bulkAssigneeId}
-                    onChange={(e) => setBulkAssigneeId(e.target.value)}
-                    aria-label="일괄 담당자"
-                  >
-                    <option value="">영업자 선택</option>
-                    {salesStaff.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                  <AssigneePicker
+                    value={bulkAssigneeId || null}
+                    staff={bulkAssignableStaff}
+                    placeholder="담당자 선택"
+                    allowClear={false}
+                    disabled={bulkSaving}
+                    onChange={(id) => setBulkAssigneeId(id ?? "")}
+                  />
                   <button
                     type="button"
                     className="crm-btn crm-btn-primary"
