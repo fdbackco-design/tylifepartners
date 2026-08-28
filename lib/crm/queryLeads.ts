@@ -3,15 +3,19 @@ import { attachAssigneeHistories } from "@/lib/crm/assigneeHistory";
 import { applyHiddenLeadFilter, loadHiddenLeadIdMaps } from "@/lib/crm/leadListHide";
 import { buildLeadSearchOrFilter } from "@/lib/crm/leadSearch";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
-import { visibleAssigneeIds } from "@/lib/crm/scope";
+import { visibleAssigneeIdsFromStaff } from "@/lib/crm/scope";
 import { getAdminStatus, matchesAdminStatusFilter } from "@/lib/crm/status";
 import type { LeadCategory, LeadRow, SessionUser } from "@/lib/crm/types";
 import { attachMetaCreatives } from "@/lib/meta/ads";
 import { loadActiveBlacklistPhones } from "@/lib/phoneBlacklist";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-async function enrichLeads(items: LeadRow[], session: SessionUser): Promise<LeadRow[]> {
-  // 목록에서는 Meta Graph 동기 호출을 하지 않고 DB 캐시만 사용 (미스분은 백그라운드 채움)
+async function enrichLeads(
+  items: LeadRow[],
+  session: SessionUser,
+  staffNameById: Map<string, string>
+): Promise<LeadRow[]> {
+  // 목록에서는 Meta Graph 동기 호출을 하지 않고 DB 캐시만 사용
   let withMeta = items;
   try {
     withMeta = await attachMetaCreatives(items, { cacheOnly: true });
@@ -22,7 +26,7 @@ async function enrichLeads(items: LeadRow[], session: SessionUser): Promise<Lead
   // 담당자 이력 체인은 관리자 목록에서만 표시 → 영업자/매니저는 스킵
   if (session.rank !== "admin") return withMeta;
   try {
-    return await attachAssigneeHistories(withMeta);
+    return await attachAssigneeHistories(withMeta, staffNameById);
   } catch (e) {
     console.warn("[queryLeads] assignee history skipped:", e instanceof Error ? e.message : e);
     return withMeta;
@@ -49,11 +53,13 @@ export type LeadQueryInput = {
   unassigned?: boolean;
   limit?: number;
   offset?: number;
+  /** silent poll 등 — estimated count 생략 */
+  skipCount?: boolean;
 };
 
 export type LeadQueryResult = {
   items: LeadRow[];
-  total: number;
+  total: number | null;
   staff: Array<{ id: string; name: string; parent_id: string | null; rank?: string; is_active?: boolean }>;
   scoped: string[] | "all";
 };
@@ -88,6 +94,7 @@ export function parseLeadQuery(sp: URLSearchParams): LeadQueryInput {
     unassigned: sp.get("unassigned") === "1",
     limit: Math.min(Math.max(Number(sp.get("limit") || 50), 1), 5000),
     offset: Math.max(Number(sp.get("offset") || 0), 0),
+    skipCount: sp.get("skip_count") === "1",
   };
 }
 
@@ -170,13 +177,13 @@ function applyBlacklistFilter(query: any, blockedPhones: string[]) {
 
 export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promise<LeadQueryResult> {
   const supabase = getSupabaseAdmin();
-  const [scoped, staffMaps, blockedPhones, hiddenLeads] = await Promise.all([
-    visibleAssigneeIds(session),
+  const [staffMaps, blockedPhones, hiddenLeads] = await Promise.all([
     loadStaffMaps(),
     loadActiveBlacklistPhones(),
     loadHiddenLeadIdMaps(),
   ]);
   const { staffById, parentNameById, staff } = staffMaps;
+  const scoped = visibleAssigneeIdsFromStaff(session, Array.from(staffById.values()));
 
   let teamAssigneeIds: string[] | null = null;
   if (q.teamIds?.length) {
@@ -196,10 +203,13 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
       .replace(", admin_comment", "")
       .replace("admin_comment, ", "");
 
+    // 관리자상태는 DB 컬럼이 아니라 계산값 → 필터 시 넉넉히 가져온 뒤 메모리에서 걸러 페이징
+    const needsMemoryPaging = q.category === "all" || Boolean(q.adminStatuses?.length);
+    const wantCount = !needsMemoryPaging && !q.skipCount;
+
     const run = async (select: string) => {
-      // exact count는 대량 데이터에서 느림 → estimated로 페이지 네비게이션에 충분
       let query = (supabase.from(table) as any)
-        .select(select, { count: "estimated" })
+        .select(select, wantCount ? { count: "estimated" } : undefined)
         .or("merge_status.eq.active,merge_status.is.null")
         .order("created_at", { ascending: false });
       query = applyCommonFilters(query, q, scoped, session.rank);
@@ -214,8 +224,6 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
       if (q.needReassign) {
         query = query.in("status", ["대기", "1차컨택", "부재(메신저완료)"]);
       }
-      // 관리자상태는 DB 컬럼이 아니라 계산값이므로, 필터 시 넉넉히 가져온 뒤 메모리에서 걸러 페이징
-      const needsMemoryPaging = q.category === "all" || Boolean(q.adminStatuses?.length);
       if (!needsMemoryPaging) {
         query = query.range(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50) - 1);
       } else {
@@ -233,7 +241,7 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
     const items = (data ?? []).map((row: Record<string, unknown>) =>
       mapLeadRow(row, kind, staffById, parentNameById)
     );
-    return { items, total: count ?? items.length };
+    return { items, total: wantCount ? count ?? items.length : null };
   };
 
   const isNeedReassign = (i: LeadRow) =>
@@ -243,8 +251,8 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
   const applyAdminStatusFilter = (items: LeadRow[]) =>
     items.filter((i) => matchesAdminStatusFilter(i.admin_status, q.adminStatuses));
 
-  const wrap = async (items: LeadRow[], total: number): Promise<LeadQueryResult> => ({
-    items: await enrichLeads(items, session),
+  const wrap = async (items: LeadRow[], total: number | null): Promise<LeadQueryResult> => ({
+    items: await enrichLeads(items, session, parentNameById),
     total,
     staff,
     scoped,
@@ -255,7 +263,7 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
     let items = [...a.items, ...b.items].sort((x, y) => (x.created_at_iso < y.created_at_iso ? 1 : -1));
     if (q.needReassign) items = items.filter(isNeedReassign);
     items = applyAdminStatusFilter(items);
-    const total = items.length;
+    const total = q.skipCount ? null : items.length;
     const page = items.slice(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50));
     return wrap(page, total);
   }
@@ -265,12 +273,12 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
   if (q.needReassign) items = items.filter(isNeedReassign);
   if (q.adminStatuses?.length) {
     items = applyAdminStatusFilter(items);
-    const total = items.length;
+    const total = q.skipCount ? null : items.length;
     const page = items.slice(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50));
     return wrap(page, total);
   }
   if (q.needReassign) {
-    return wrap(items, items.length);
+    return wrap(items, q.skipCount ? null : items.length);
   }
   return wrap(items, result.total);
 }

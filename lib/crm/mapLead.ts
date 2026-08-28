@@ -1,6 +1,7 @@
 import { landingPreviewSrc } from "@/lib/crm/landingPreview";
 import { formatKstDateTime } from "@/lib/crm/kst";
 import { getAdminStatus, normalizeStatus } from "@/lib/crm/status";
+import { getOrLoadTtlCache } from "@/lib/crm/ttlCache";
 import type { LeadRow } from "@/lib/crm/types";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -68,7 +69,10 @@ export const CONSUMER_SELECT =
 export const CANDIDATE_SELECT =
   "id, name, phone, created_at, status, memo, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, normalized_phone";
 
-export async function loadStaffMaps() {
+const STAFF_MAPS_CACHE_KEY = "crm:staff-maps";
+const STAFF_MAPS_TTL_MS = 30_000;
+
+async function loadStaffMapsUncached() {
   const supabase = getSupabaseAdmin();
   // active + inactive를 한 번에 읽어 부모 이름 매핑과 목록용 staff를 함께 구성
   const { data: all } = await supabase
@@ -86,4 +90,8 @@ export async function loadStaffMaps() {
     }
   }
   return { staffById, parentNameById, staff: active };
+}
+
+export async function loadStaffMaps() {
+  return getOrLoadTtlCache(STAFF_MAPS_CACHE_KEY, STAFF_MAPS_TTL_MS, loadStaffMapsUncached);
 }

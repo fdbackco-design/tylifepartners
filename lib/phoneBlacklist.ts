@@ -1,3 +1,4 @@
+import { getOrLoadTtlCache } from "@/lib/crm/ttlCache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 /** 숫자만 남긴 연락처 (01012345678) */
@@ -79,26 +80,31 @@ export async function isLeadSubmissionBlockedAsync(phone: string): Promise<boole
 }
 
 /** 활성 블랙리스트 정규화 전화번호 목록 (목록/내보내기 숨김용) */
+const BLACKLIST_PHONES_CACHE_KEY = "crm:blacklist-phones";
+const BLACKLIST_PHONES_TTL_MS = 60_000;
+
 export async function loadActiveBlacklistPhones(): Promise<string[]> {
-  const fromEnv = Array.from(getBlockedLeadPhones());
-  try {
-    const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
-      .from("lead_blacklist")
-      .select("normalized_phone")
-      .eq("is_active", true);
-    if (error) {
-      console.error("loadActiveBlacklistPhones:", error.message);
+  return getOrLoadTtlCache(BLACKLIST_PHONES_CACHE_KEY, BLACKLIST_PHONES_TTL_MS, async () => {
+    const fromEnv = Array.from(getBlockedLeadPhones());
+    try {
+      const supabase = getSupabaseAdmin();
+      const { data, error } = await supabase
+        .from("lead_blacklist")
+        .select("normalized_phone")
+        .eq("is_active", true);
+      if (error) {
+        console.error("loadActiveBlacklistPhones:", error.message);
+        return fromEnv;
+      }
+      const fromDb = (data ?? [])
+        .map((r) => normalizePhoneDigits(String(r.normalized_phone ?? "")))
+        .filter((p) => p.length >= 10);
+      return Array.from(new Set([...fromEnv, ...fromDb]));
+    } catch (e) {
+      console.error("loadActiveBlacklistPhones:", e);
       return fromEnv;
     }
-    const fromDb = (data ?? [])
-      .map((r) => normalizePhoneDigits(String(r.normalized_phone ?? "")))
-      .filter((p) => p.length >= 10);
-    return Array.from(new Set([...fromEnv, ...fromDb]));
-  } catch (e) {
-    console.error("loadActiveBlacklistPhones:", e);
-    return fromEnv;
-  }
+  });
 }
 
 /** 로그용 마스킹 (01012345678 → 010****5678). 로그에 전체 번호를 남기지 않기 위함 */

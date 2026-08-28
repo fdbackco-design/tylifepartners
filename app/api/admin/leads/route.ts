@@ -4,7 +4,7 @@ import { parseLeadQuery, queryLeads } from "@/lib/crm/queryLeads";
 import { canSeeAdminStatus, canSeeMetaAdSpend } from "@/lib/crm/scope";
 import { allowedStatusesFor } from "@/lib/crm/status";
 import { LEAD_STATUSES } from "@/lib/crm/types";
-import { getTodayDbCost } from "@/lib/meta/insights";
+import { getTodayDbCostForList } from "@/lib/meta/insights";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -17,7 +17,14 @@ export async function GET(request: NextRequest) {
     if (q.needReassign && session.rank === "sales") {
       return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
     }
-    const { items, total, staff, scoped } = await queryLeads(session, q);
+
+    const wantDailyCost = canSeeMetaAdSpend(session) && !q.skipCount;
+    const [leadResult, dailyDbCost] = await Promise.all([
+      queryLeads(session, q),
+      wantDailyCost ? getTodayDbCostForList() : Promise.resolve(undefined),
+    ]);
+
+    const { items, total, staff, scoped } = leadResult;
     const visibleStaff =
       scoped === "all" ? staff : staff.filter((s) => scoped.includes(s.id));
     const showAdmin = canSeeAdminStatus(session);
@@ -25,12 +32,10 @@ export async function GET(request: NextRequest) {
     const uniq = (key: "region" | "age_group" | "job" | "job_rank" | "entry_page" | "utm_source") =>
       Array.from(new Set(mapped.map((i) => String(i[key] ?? "")).filter(Boolean))).sort();
 
-    const dailyDbCost = canSeeMetaAdSpend(session) ? await getTodayDbCost() : undefined;
-
     return NextResponse.json({
       ok: true,
       items: mapped,
-      total,
+      ...(typeof total === "number" ? { total } : {}),
       session: { rank: session.rank, userId: session.userId, name: session.name },
       staff: visibleStaff.map((s) => ({
         id: s.id,

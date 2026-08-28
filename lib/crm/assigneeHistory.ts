@@ -12,7 +12,10 @@ type LogRow = {
 export { buildAssigneeNameChain, formatAssigneeWithTeam } from "@/lib/crm/assigneeHistoryFormat";
 
 /** 목록 리드들에 담당자 변경 체인 붙이기 */
-export async function attachAssigneeHistories(items: LeadRow[]): Promise<LeadRow[]> {
+export async function attachAssigneeHistories(
+  items: LeadRow[],
+  staffNameById?: Map<string, string>
+): Promise<LeadRow[]> {
   if (!items.length) return items;
   const supabase = getSupabaseAdmin();
   const consumerIds = items.filter((i) => i.type === "소비자").map((i) => i.id);
@@ -38,19 +41,34 @@ export async function attachAssigneeHistories(items: LeadRow[]): Promise<LeadRow
     fetchLogs("tylife_b2b", candidateIds),
   ]);
 
-  const staffIds = new Set<string>();
-  for (const log of [...consumerLogs, ...candidateLogs]) {
-    if (log.from_assignee_id) staffIds.add(log.from_assignee_id);
-    if (log.to_assignee_id) staffIds.add(log.to_assignee_id);
-  }
-
-  const nameById = new Map<string, string>();
-  if (staffIds.size) {
-    const { data: staff } = await supabase
-      .from("staff_users")
-      .select("id, name")
-      .in("id", Array.from(staffIds));
-    for (const s of staff ?? []) nameById.set(s.id, s.name);
+  const nameById = new Map<string, string>(staffNameById ?? []);
+  if (!staffNameById?.size) {
+    const staffIds = new Set<string>();
+    for (const log of [...consumerLogs, ...candidateLogs]) {
+      if (log.from_assignee_id) staffIds.add(log.from_assignee_id);
+      if (log.to_assignee_id) staffIds.add(log.to_assignee_id);
+    }
+    if (staffIds.size) {
+      const { data: staff } = await supabase
+        .from("staff_users")
+        .select("id, name")
+        .in("id", Array.from(staffIds));
+      for (const s of staff ?? []) nameById.set(s.id, s.name);
+    }
+  } else {
+    // 전달된 맵에 없는 id만 보강
+    const missing = new Set<string>();
+    for (const log of [...consumerLogs, ...candidateLogs]) {
+      if (log.from_assignee_id && !nameById.has(log.from_assignee_id)) missing.add(log.from_assignee_id);
+      if (log.to_assignee_id && !nameById.has(log.to_assignee_id)) missing.add(log.to_assignee_id);
+    }
+    if (missing.size) {
+      const { data: staff } = await supabase
+        .from("staff_users")
+        .select("id, name")
+        .in("id", Array.from(missing));
+      for (const s of staff ?? []) nameById.set(s.id, s.name);
+    }
   }
   const nameOf = (id: string | null | undefined) => (id ? nameById.get(id) ?? "" : "");
 
