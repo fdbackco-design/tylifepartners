@@ -1,6 +1,7 @@
 import type { LeadCategory, SessionUser } from "@/lib/crm/types";
 import { visibleAssigneeIds } from "@/lib/crm/scope";
 import { tableForCategory } from "@/lib/crm/status";
+import { getOrLoadTtlCache, invalidateTtlCache } from "@/lib/crm/ttlCache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export type HiddenLeadMaps = {
@@ -8,7 +9,10 @@ export type HiddenLeadMaps = {
   tylife_b2b: Set<string>;
 };
 
-export async function loadHiddenLeadIdMaps(): Promise<HiddenLeadMaps> {
+const HIDDEN_LEADS_CACHE_KEY = "crm:hidden-lead-ids";
+const HIDDEN_LEADS_TTL_MS = 30_000;
+
+async function loadHiddenLeadIdMapsUncached(): Promise<HiddenLeadMaps> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase.from("lead_list_hides").select("lead_table, lead_id");
   if (error) {
@@ -27,6 +31,14 @@ export async function loadHiddenLeadIdMaps(): Promise<HiddenLeadMaps> {
     else leads.add(id);
   }
   return { leads, tylife_b2b };
+}
+
+export async function loadHiddenLeadIdMaps(): Promise<HiddenLeadMaps> {
+  return getOrLoadTtlCache(HIDDEN_LEADS_CACHE_KEY, HIDDEN_LEADS_TTL_MS, loadHiddenLeadIdMapsUncached);
+}
+
+export function invalidateHiddenLeadIdMapsCache(): void {
+  invalidateTtlCache(HIDDEN_LEADS_CACHE_KEY);
 }
 
 export function applyHiddenLeadFilter(
@@ -130,5 +142,6 @@ export async function hideLeadsFromList(session: SessionUser, items: HideLeadIte
     return { ok: false, message: "삭제할 수 있는 항목이 없습니다.", status: 400 };
   }
 
+  if (hidden) invalidateHiddenLeadIdMapsCache();
   return { ok: true, hidden, skipped, hiddenDetails };
 }

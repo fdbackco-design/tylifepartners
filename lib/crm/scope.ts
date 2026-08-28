@@ -39,6 +39,16 @@ export async function visibleAssigneeIds(session: SessionUser): Promise<string[]
   return descendantAssigneeIds(session.userId, data ?? []);
 }
 
+/** loadStaffMaps 결과로 스코프 계산 — staff_users 재조회 방지 */
+export function visibleAssigneeIdsFromStaff(
+  session: SessionUser,
+  staff: Array<{ id: string; parent_id: string | null }>
+): string[] | "all" {
+  if (session.rank === "admin") return "all";
+  if (!session.userId) return [];
+  return descendantAssigneeIds(session.userId, staff);
+}
+
 export function canManageAccounts(session: SessionUser): boolean {
   return session.rank === "admin" || session.rank === "manager";
 }

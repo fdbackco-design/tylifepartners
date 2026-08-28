@@ -1,4 +1,5 @@
 import { addDaysYmd, kstYmd, startOfKstDayIso, startOfNextKstDayIso } from "@/lib/crm/kst";
+import { getTtlCache, setTtlCache } from "@/lib/crm/ttlCache";
 import { getMetaAccessToken, isMetaAdsConfigured, normalizeMetaAdAccountId } from "@/lib/meta/ads";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -597,4 +598,64 @@ export async function getTodayDbCost(): Promise<TodayDbCost> {
     syncStatus: spendInfo.hasError && spendInfo.spend <= 0 ? "error" : "ok",
     hasInsightRows: true,
   });
+}
+
+const LIST_DB_COST_CACHE_KEY = "meta:today-db-cost-list";
+const LIST_DB_COST_TTL_MS = 60_000;
+const LIST_DB_COST_STORE_FRESH_MS = 10 * 60 * 1000;
+
+/**
+ * 목록 API용 — meta_daily_db_cost 스냅샷 + 짧은 메모리 캐시.
+ * 무거운 exact count / 재집계는 백그라운드로만 돌림.
+ */
+export async function getTodayDbCostForList(): Promise<TodayDbCost> {
+  const cached = getTtlCache<TodayDbCost>(LIST_DB_COST_CACHE_KEY);
+  if (cached) return cached;
+
+  const metricsDate = yesterdayMetricsDateKst();
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("meta_daily_db_cost")
+    .select("spend, db_inflow_count, cost_per_db, sync_status, synced_at, updated_at")
+    .eq("metrics_date", metricsDate)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("[meta/insights] list db cost read:", error.message);
+  }
+
+  const updatedAt = data?.updated_at ? new Date(String(data.updated_at)).getTime() : 0;
+  const storeFresh = updatedAt > 0 && Date.now() - updatedAt < LIST_DB_COST_STORE_FRESH_MS;
+
+  if (data) {
+    const value = buildTodayDbCost({
+      metricsDate,
+      spend: Number(data.spend) || 0,
+      dbInflowCount: Number(data.db_inflow_count) || 0,
+      syncedAt: data.synced_at ? String(data.synced_at) : null,
+      syncStatus: (data.sync_status as MetaInsightSyncStatus) || "ok",
+      hasInsightRows: true,
+    });
+    setTtlCache(LIST_DB_COST_CACHE_KEY, value, LIST_DB_COST_TTL_MS);
+    if (!storeFresh) {
+      void getTodayDbCost()
+        .then((fresh) => setTtlCache(LIST_DB_COST_CACHE_KEY, fresh, LIST_DB_COST_TTL_MS))
+        .catch((e) => console.warn("[meta/insights] list bg refresh:", e instanceof Error ? e.message : e));
+    }
+    return value;
+  }
+
+  const pending = buildTodayDbCost({
+    metricsDate,
+    spend: null,
+    dbInflowCount: null,
+    syncedAt: null,
+    syncStatus: "pending",
+    hasInsightRows: false,
+  });
+  setTtlCache(LIST_DB_COST_CACHE_KEY, pending, Math.min(15_000, LIST_DB_COST_TTL_MS));
+  void getTodayDbCost()
+    .then((fresh) => setTtlCache(LIST_DB_COST_CACHE_KEY, fresh, LIST_DB_COST_TTL_MS))
+    .catch((e) => console.warn("[meta/insights] list bg seed:", e instanceof Error ? e.message : e));
+  return pending;
 }

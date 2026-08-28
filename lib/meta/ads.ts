@@ -49,8 +49,9 @@ export function pickMetaAdId(opts: {
   return null;
 }
 
+/** 목록·확대 모두 image_url 우선 — Meta thumbnail_url은 서명 만료가 더 빨라 깨지는 경우가 많음 */
 function previewUrl(row: MetaCreativeCache): string | null {
-  return row.thumbnail_url || row.image_url || null;
+  return row.image_url || row.thumbnail_url || null;
 }
 
 /** 확대 보기용 — 원본 image_url 우선 */
@@ -228,16 +229,9 @@ export async function attachMetaCreatives<T extends {
       const rows = await Promise.all(chunk.map((id) => resolveMetaAdCreative(id)));
       for (const row of rows) map.set(row.ad_id, row);
     }
-  } else if (missing.length && opts?.cacheOnly) {
-    // 목록은 캐시만 쓰고, 미스분은 백그라운드로 채워 다음 새로고침에 반영
-    void Promise.all(
-      missing.slice(0, 12).map((id) =>
-        fetchAndCacheMetaAdCreative(id).catch((e) => {
-          console.warn("[meta/ads] background fill:", e instanceof Error ? e.message : e);
-        })
-      )
-    );
   }
+  // cacheOnly: 목록 응답을 막지 않도록 Graph 백그라운드 fill은 하지 않음
+  // (캐시 미스는 null 미리보기 → 다음 동기화/상세 갱신에서 채워짐)
 
   return items.map((item, idx) => {
     const adId = idByIndex[idx];

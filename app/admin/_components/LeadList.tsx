@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatPhoneKorean } from "@/lib/phone";
@@ -27,6 +27,18 @@ type StaffOpt = { id: string; name: string; parent_id: string | null; rank?: str
 
 /** 담당자 필터 — 미배정 (URL assignee_ids 센티널, queryLeads와 동일) */
 const UNASSIGNED_ASSIGNEE_FILTER = "__unassigned__";
+
+/** Meta CDN URL 만료 시 목록 썸네일 → 원본 URL 폴백 */
+function onMetaCreativeImgError(
+  e: SyntheticEvent<HTMLImageElement>,
+  fallback: string | null | undefined
+) {
+  const el = e.currentTarget;
+  const next = String(fallback ?? "").trim();
+  if (!next || el.src === next || el.dataset.fallbackTried === "1") return;
+  el.dataset.fallbackTried = "1";
+  el.src = next;
+}
 
 /** 소비자·후보자 DB 필터 담당자/팀 목록에서 제외 */
 const FILTER_HIDDEN_STAFF_NAMES = new Set(["형지수", "중형지수", "이명진", "송해민", "정성현"]);
@@ -345,7 +357,9 @@ export default function LeadList({
       setError("");
     }
     try {
-      const res = await fetch(`/api/admin/leads?${query}`);
+      const sp = new URLSearchParams(query);
+      if (silent) sp.set("skip_count", "1");
+      const res = await fetch(`/api/admin/leads?${sp.toString()}`);
       const data = await res.json();
       if (gen !== loadGenRef.current) return;
       if (res.status === 401) {
@@ -361,7 +375,7 @@ export default function LeadList({
         return;
       }
       setItems(data.items ?? []);
-      setTotal(data.total ?? 0);
+      if (typeof data.total === "number") setTotal(data.total);
       setStaff(data.staff ?? []);
       if (!silent) setSelectedIds(new Map());
       if (data.session) setSession(data.session);
@@ -385,7 +399,7 @@ export default function LeadList({
 
   // 열려 있는 DB 탭에서 새 상담신청이 목록에 자동 반영되도록 조용히 갱신
   useEffect(() => {
-    const POLL_MS = 30_000;
+    const POLL_MS = 60_000;
     let timer: ReturnType<typeof setInterval> | null = null;
 
     const clear = () => {
@@ -1468,6 +1482,9 @@ export default function LeadList({
                                       className="crm-thumb crm-thumb-meta"
                                       src={row.meta_creative_preview}
                                       alt={row.meta_ad_name || "광고 소재"}
+                                      onError={(e) =>
+                                        onMetaCreativeImgError(e, row.meta_creative_full)
+                                      }
                                     />
                                     {row.meta_creative_type === "video" && (
                                       <span className="crm-meta-creative-badge">영상</span>
@@ -1824,6 +1841,9 @@ export default function LeadList({
                                   className="crm-thumb crm-thumb-meta"
                                   src={row.meta_creative_preview}
                                   alt={row.meta_ad_name || "광고 소재"}
+                                  onError={(e) =>
+                                    onMetaCreativeImgError(e, row.meta_creative_full)
+                                  }
                                 />
                                 {row.meta_creative_type === "video" && (
                                   <span className="crm-meta-creative-badge">영상</span>
