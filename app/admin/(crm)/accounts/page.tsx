@@ -61,9 +61,9 @@ export default function AccountsPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [confirmUser, setConfirmUser] = useState<User | null>(null);
-  const [confirmBulk, setConfirmBulk] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [confirmBulkAction, setConfirmBulkAction] = useState<"activate" | "deactivate" | null>(null);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -145,8 +145,7 @@ export default function AccountsPage() {
     sales: items.filter((u) => u.rank === "sales").length,
   };
 
-  const canDeactivateUser = (u: User) => {
-    if (!u.is_active) return false;
+  const canSelectUser = (u: User) => {
     if (me?.userId && me.userId === u.id) return false;
     if (me?.rank === "admin") return true;
     if (me?.rank === "manager" && me.userId) {
@@ -156,15 +155,22 @@ export default function AccountsPage() {
   };
 
   const selectableFiltered = useMemo(
-    () => filtered.filter((u) => canDeactivateUser(u)),
+    () => filtered.filter((u) => canSelectUser(u)),
     [filtered, me?.rank, me?.userId]
   );
+
+  const selectedUsers = useMemo(
+    () => items.filter((u) => selectedIds.has(u.id)),
+    [items, selectedIds]
+  );
+  const selectedActiveCount = selectedUsers.filter((u) => u.is_active).length;
+  const selectedInactiveCount = selectedUsers.filter((u) => !u.is_active).length;
 
   const allFilteredSelected =
     selectableFiltered.length > 0 && selectableFiltered.every((u) => selectedIds.has(u.id));
 
   const toggleSelect = (u: User) => {
-    if (!canDeactivateUser(u)) return;
+    if (!canSelectUser(u)) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(u.id)) next.delete(u.id);
@@ -189,23 +195,24 @@ export default function AccountsPage() {
     });
   };
 
-  const bulkDeactivate = async () => {
-    if (selectedIds.size === 0) return;
+  const bulkSetActive = async (nextActive: boolean) => {
+    const targetIds = selectedUsers.filter((u) => u.is_active !== nextActive).map((u) => u.id);
+    if (targetIds.length === 0) return;
     setBulkSaving(true);
     try {
-      const res = await fetch("/api/admin/users/bulk-deactivate", {
+      const res = await fetch("/api/admin/users/bulk-status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_ids: Array.from(selectedIds) }),
+        body: JSON.stringify({ user_ids: targetIds, is_active: nextActive }),
       });
       const data = await res.json();
       if (!data.ok) {
-        setToast(data.message || "일괄 비활성화에 실패했습니다.");
+        setToast(data.message || `일괄 ${nextActive ? "활성" : "비활성"}화에 실패했습니다.`);
         return;
       }
-      setToast(`${data.deactivated}명 계정을 비활성화했습니다.`);
+      setToast(`${data.updated}명 계정을 ${nextActive ? "활성" : "비활성"}화했습니다.`);
       setSelectedIds(new Set());
-      setConfirmBulk(false);
+      setConfirmBulkAction(null);
       await load();
     } catch {
       setToast("네트워크 오류가 발생했습니다.");
@@ -407,12 +414,29 @@ export default function AccountsPage() {
       {selectedIds.size > 0 ? (
         <div
           className="crm-ui-toolbar"
-          style={{ marginTop: 0, marginBottom: 12, justifyContent: "space-between" }}
+          style={{ marginTop: 0, marginBottom: 12, justifyContent: "space-between", gap: 8 }}
         >
           <span style={{ fontSize: 13, fontWeight: 600 }}>{selectedIds.size}명 선택</span>
-          <CrmButton variant="danger" disabled={bulkSaving} onClick={() => setConfirmBulk(true)}>
-            {bulkSaving ? "처리 중…" : "선택 비활성화"}
-          </CrmButton>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {selectedInactiveCount > 0 ? (
+              <CrmButton
+                variant="primary"
+                disabled={bulkSaving}
+                onClick={() => setConfirmBulkAction("activate")}
+              >
+                {bulkSaving ? "처리 중…" : `선택 활성화 (${selectedInactiveCount})`}
+              </CrmButton>
+            ) : null}
+            {selectedActiveCount > 0 ? (
+              <CrmButton
+                variant="danger"
+                disabled={bulkSaving}
+                onClick={() => setConfirmBulkAction("deactivate")}
+              >
+                {bulkSaving ? "처리 중…" : `선택 비활성화 (${selectedActiveCount})`}
+              </CrmButton>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -462,7 +486,7 @@ export default function AccountsPage() {
                   <input
                     type="checkbox"
                     checked={selectedIds.has(u.id)}
-                    disabled={!canDeactivateUser(u)}
+                    disabled={!canSelectUser(u)}
                     onChange={() => toggleSelect(u)}
                     aria-label={`${u.name} 선택`}
                   />
@@ -610,23 +634,40 @@ export default function AccountsPage() {
       </CrmSheet>
 
       <CrmDialog
-        open={confirmBulk}
-        onClose={() => setConfirmBulk(false)}
-        title="선택 계정 비활성화"
+        open={confirmBulkAction != null}
+        onClose={() => setConfirmBulkAction(null)}
+        title={confirmBulkAction === "activate" ? "선택 계정 활성화" : "선택 계정 비활성화"}
         footer={
           <>
-            <CrmButton variant="secondary" onClick={() => setConfirmBulk(false)}>
+            <CrmButton variant="secondary" onClick={() => setConfirmBulkAction(null)}>
               취소
             </CrmButton>
-            <CrmButton variant="danger" disabled={bulkSaving} onClick={() => void bulkDeactivate()}>
-              {bulkSaving ? "처리 중…" : "비활성화"}
+            <CrmButton
+              variant={confirmBulkAction === "activate" ? "primary" : "danger"}
+              disabled={bulkSaving}
+              onClick={() => void bulkSetActive(confirmBulkAction === "activate")}
+            >
+              {bulkSaving
+                ? "처리 중…"
+                : confirmBulkAction === "activate"
+                  ? "활성화"
+                  : "비활성화"}
             </CrmButton>
           </>
         }
       >
         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
-          선택한 <strong>{selectedIds.size}</strong>명 계정을 비활성화할까요? 로그인할 수 없게 되며, 배정된
-          고객 데이터는 유지됩니다.
+          {confirmBulkAction === "activate" ? (
+            <>
+              선택한 비활성 계정 <strong>{selectedInactiveCount}</strong>명을 활성화할까요? 다시
+              로그인할 수 있게 됩니다.
+            </>
+          ) : (
+            <>
+              선택한 활성 계정 <strong>{selectedActiveCount}</strong>명을 비활성화할까요? 로그인할 수
+              없게 되며, 배정된 고객 데이터는 유지됩니다.
+            </>
+          )}
         </p>
       </CrmDialog>
 

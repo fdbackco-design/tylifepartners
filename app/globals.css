@@ -1481,6 +1481,13 @@ main.crm-admin-login {
   color: var(--crm-primary);
   font-size: 13px;
   font-weight: 600;
+  position: relative;
+  z-index: 5;
+}
+
+.crm-bulk-bar .crm-assignee-picker {
+  font-weight: 500;
+  color: var(--crm-text);
 }
 
 .crm-lead-toast {

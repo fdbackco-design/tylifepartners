@@ -173,9 +173,9 @@ export default function AssignmentPage() {
     }
   };
 
-  const addZone = async (opts?: { region_group?: string; region_keywords?: string[]; openSettings?: boolean }) => {
-    const name = (opts?.region_group ?? newZoneName).trim();
-    const keywords = opts?.region_keywords ?? newZoneKeywords;
+  const addZone = async () => {
+    const name = newZoneName.trim();
+    const keywords = newZoneKeywords;
     if (!name) {
       setMessage({ tone: "danger", text: "권역 이름을 입력해 주세요." });
       return;
@@ -209,23 +209,11 @@ export default function AssignmentPage() {
       setNewZoneKeywords([]);
       await load();
       setMessage({ tone: "success", text: `"${name}" 권역이 추가되었습니다.` });
-      if (opts?.openSettings) {
-        const newRule =
-          ((data.rules as Rule[] | undefined)?.find((r) => r.region_group === name) as Rule | undefined) ??
-          (data.rule as Rule | undefined);
-        if (newRule) openSettings(newRule);
-      }
     } catch {
       setMessage({ tone: "danger", text: "네트워크 오류가 발생했습니다." });
     } finally {
       setAddingZone(false);
     }
-  };
-
-  const createSubZoneFromPicker = (zoneName: string, keywords: string[]) => {
-    setSheetRuleId(null);
-    setAddOpen(false);
-    void addZone({ region_group: zoneName, region_keywords: keywords, openSettings: true });
   };
 
   const deleteZone = async (rule: Rule) => {
@@ -426,11 +414,7 @@ export default function AssignmentPage() {
               label="포함 지역"
               hint="랜딩 신청 지역과 동일한 형식(예: 경기 수원시)으로 추가하면 상세 단위 배정이 가능합니다."
             >
-              <RegionKeywordPicker
-                value={draftKeywords}
-                onChange={setDraftKeywords}
-                onCreateSubZone={createSubZoneFromPicker}
-              />
+              <RegionKeywordPicker value={draftKeywords} onChange={setDraftKeywords} />
             </CrmField>
 
             <CrmField
@@ -519,14 +503,7 @@ export default function AssignmentPage() {
           />
         </CrmField>
         <CrmField label="포함 지역" hint="고객 지역 문자열에 포함되면 해당 권역으로 매칭됩니다.">
-          <RegionKeywordPicker
-            value={newZoneKeywords}
-            onChange={setNewZoneKeywords}
-            onCreateSubZone={(zoneName, keywords) => {
-              setNewZoneName(zoneName);
-              setNewZoneKeywords(keywords);
-            }}
-          />
+          <RegionKeywordPicker value={newZoneKeywords} onChange={setNewZoneKeywords} />
         </CrmField>
       </CrmSheet>
     </div>

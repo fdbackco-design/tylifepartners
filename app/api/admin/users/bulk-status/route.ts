@@ -13,8 +13,7 @@ type StaffRow = {
   is_active: boolean;
 };
 
-function canDeactivateTarget(session: SessionUser, target: StaffRow): boolean {
-  if (!target.is_active) return false;
+function canManageTarget(session: SessionUser, target: StaffRow): boolean {
   if (session.userId && session.userId === target.id) return false;
   if (session.rank === "admin") return true;
   if (session.rank === "manager" && session.userId) {
@@ -31,6 +30,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
+    const nextActive = Boolean(body.is_active);
     const userIds: string[] = Array.isArray(body.user_ids)
       ? Array.from(
           new Set(
@@ -45,7 +45,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, message: "선택된 계정이 없습니다." }, { status: 400 });
     }
     if (userIds.length > 100) {
-      return NextResponse.json({ ok: false, message: "한 번에 100명까지 비활성화할 수 있습니다." }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, message: `한 번에 100명까지 ${nextActive ? "활성" : "비활성"}화할 수 있습니다.` },
+        { status: 400 }
+      );
     }
 
     const supabase = getSupabaseAdmin();
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
       .in("id", userIds);
 
     if (error) {
-      console.error("bulk-deactivate load:", error);
+      console.error("bulk-status load:", error);
       return NextResponse.json({ ok: false, message: "계정을 불러오지 못했습니다." }, { status: 500 });
     }
 
@@ -73,7 +76,11 @@ export async function POST(request: NextRequest) {
         skipped.push(id);
         continue;
       }
-      if (!canDeactivateTarget(session, target)) {
+      if (!canManageTarget(session, target)) {
+        skipped.push(id);
+        continue;
+      }
+      if (target.is_active === nextActive) {
         skipped.push(id);
         continue;
       }
@@ -81,32 +88,42 @@ export async function POST(request: NextRequest) {
     }
 
     if (!allowed.length) {
-      return NextResponse.json({
-        ok: false,
-        message: "비활성화할 수 있는 계정이 없습니다. 본인·관리자·권한 밖 계정은 제외됩니다.",
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          ok: false,
+          message: nextActive
+            ? "활성화할 수 있는 계정이 없습니다. 이미 활성이거나 권한 밖·본인 계정은 제외됩니다."
+            : "비활성화할 수 있는 계정이 없습니다. 이미 비활성이거나 권한 밖·본인 계정은 제외됩니다.",
+        },
+        { status: 400 }
+      );
     }
 
     const { error: updateError } = await supabase
       .from("staff_users")
-      .update({ is_active: false })
+      .update({ is_active: nextActive })
       .in(
         "id",
         allowed.map((u) => u.id)
       );
 
     if (updateError) {
-      console.error("bulk-deactivate update:", updateError);
-      return NextResponse.json({ ok: false, message: "비활성화에 실패했습니다." }, { status: 500 });
+      console.error("bulk-status update:", updateError);
+      return NextResponse.json(
+        { ok: false, message: `${nextActive ? "활성" : "비활성"}화에 실패했습니다.` },
+        { status: 500 }
+      );
     }
 
+    const verb = nextActive ? "활성화" : "비활성화";
     void writeAdminAudit({
       actor: actorFromSession(session),
-      action: "user.bulk_deactivate",
+      action: nextActive ? "user.bulk_activate" : "user.bulk_deactivate",
       resourceType: "user",
-      summary: `계정 일괄 비활성화 ${allowed.length}명`,
+      summary: `계정 일괄 ${verb} ${allowed.length}명`,
       detail: {
-        deactivated: allowed.map((u) => ({ id: u.id, name: u.name, rank: u.rank })),
+        is_active: nextActive,
+        updated: allowed.map((u) => ({ id: u.id, name: u.name, rank: u.rank })),
         skipped: skipped.length,
       },
       request,
@@ -114,12 +131,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      deactivated: allowed.length,
+      updated: allowed.length,
       skipped: skipped.length,
+      is_active: nextActive,
       names: allowed.map((u) => u.name),
     });
   } catch (e) {
-    console.error("POST /api/admin/users/bulk-deactivate:", e);
+    console.error("POST /api/admin/users/bulk-status:", e);
     return NextResponse.json({ ok: false, message: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }
