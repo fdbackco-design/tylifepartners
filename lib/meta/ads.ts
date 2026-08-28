@@ -18,9 +18,22 @@ export type MetaCreativeCache = {
   fetched_at: string;
 };
 
-function accessToken(): string | null {
+export function getMetaAccessToken(): string | null {
   const t = String(process.env.META_ACCESS_TOKEN ?? "").trim();
   return t || null;
+}
+
+/** act_123 또는 123 → act_123 */
+export function normalizeMetaAdAccountId(raw?: string | null): string | null {
+  const v = String(raw ?? process.env.META_AD_ACCOUNT_ID ?? "")
+    .trim()
+    .replace(/^act_/i, "");
+  if (!v || !/^\d+$/.test(v)) return null;
+  return `act_${v}`;
+}
+
+function accessToken(): string | null {
+  return getMetaAccessToken();
 }
 
 export function isMetaAdsConfigured(): boolean {

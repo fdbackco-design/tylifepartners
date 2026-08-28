@@ -55,6 +55,11 @@ export function canEditAdminComment(session: SessionUser): boolean {
   return session.rank === "admin" || session.rank === "manager";
 }
 
+/** Meta 개별 DB 추정 비용(CPL) — 관리자만 */
+export function canSeeMetaAdSpend(session: SessionUser): boolean {
+  return session.rank === "admin";
+}
+
 /** CRM 탭·보조 메뉴 접근 가능 여부 */
 export function canAccessAdminPath(rank: SessionUser["rank"], pathname: string): boolean {
   const path = pathname.split("?")[0] || pathname;

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { parseLeadQuery, queryLeads } from "@/lib/crm/queryLeads";
-import { canSeeAdminStatus } from "@/lib/crm/scope";
+import { canSeeAdminStatus, canSeeMetaAdSpend } from "@/lib/crm/scope";
 import { allowedStatusesFor } from "@/lib/crm/status";
 import { LEAD_STATUSES } from "@/lib/crm/types";
+import { getTodayDbCost } from "@/lib/meta/insights";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -23,6 +24,8 @@ export async function GET(request: NextRequest) {
     const mapped = showAdmin ? items : items.map((row) => ({ ...row, admin_status: null }));
     const uniq = (key: "region" | "age_group" | "job" | "job_rank" | "entry_page" | "utm_source") =>
       Array.from(new Set(mapped.map((i) => String(i[key] ?? "")).filter(Boolean))).sort();
+
+    const dailyDbCost = canSeeMetaAdSpend(session) ? await getTodayDbCost() : undefined;
 
     return NextResponse.json({
       ok: true,
@@ -46,6 +49,7 @@ export async function GET(request: NextRequest) {
         entry_pages: uniq("entry_page"),
         utm_sources: uniq("utm_source"),
       },
+      ...(dailyDbCost ? { daily_db_cost: dailyDbCost } : {}),
     });
   } catch (e) {
     console.error("GET /api/admin/leads:", e);
