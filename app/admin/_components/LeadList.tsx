@@ -182,7 +182,10 @@ export default function LeadList({
   const [dateTo, setDateTo] = useState(searchParams.get("date_to") ?? "");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dailyDbCost, setDailyDbCost] = useState<TodayDbCost | null>(null);
-  const desktopTableShellRef = useRef<HTMLDivElement>(null);
+  const [desktopTableShellEl, setDesktopTableShellEl] = useState<HTMLDivElement | null>(null);
+  const setDesktopTableShellRef = useCallback((node: HTMLDivElement | null) => {
+    setDesktopTableShellEl(node);
+  }, []);
   const [memoRow, setMemoRow] = useState<LeadRow | null>(null);
   const [memoLogs, setMemoLogs] = useState<{ id: string; assignee_name: string; memo: string; created_at: string }[]>([]);
   const [memoSaveStatus, setMemoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -744,7 +747,7 @@ export default function LeadList({
 
   // PC: 표 영역을 마우스로 끌어 가로 스크롤
   useEffect(() => {
-    const el = desktopTableShellRef.current;
+    const el = desktopTableShellEl;
     if (!el) return;
 
     let dragging = false;
@@ -752,62 +755,79 @@ export default function LeadList({
     let startX = 0;
     let startScrollLeft = 0;
 
-    const isInteractive = (target: EventTarget | null) => {
-      if (!(target instanceof Element)) return false;
-      return Boolean(target.closest("a, button, input, select, textarea, label, [role='button'], [role='menuitem']"));
+    const syncScrollableClass = () => {
+      el.classList.toggle("is-scrollable-x", el.scrollWidth > el.clientWidth + 1);
     };
 
-    const onPointerDown = (e: PointerEvent) => {
+    const isInteractive = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      return Boolean(
+        target.closest("a, button, input, select, textarea, label, .crm-popover, [contenteditable='true']")
+      );
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
       if (e.button !== 0) return;
       if (isInteractive(e.target)) return;
+      if (el.scrollWidth <= el.clientWidth + 1) return;
+
       dragging = true;
       moved = false;
       startX = e.clientX;
       startScrollLeft = el.scrollLeft;
       el.classList.add("is-grab-scrolling");
-      el.setPointerCapture?.(e.pointerId);
+      e.preventDefault();
     };
 
-    const onPointerMove = (e: PointerEvent) => {
+    const onMouseMove = (e: MouseEvent) => {
       if (!dragging) return;
       const dx = e.clientX - startX;
-      if (Math.abs(dx) > 4) moved = true;
+      if (Math.abs(dx) > 3) moved = true;
       el.scrollLeft = startScrollLeft - dx;
-      if (moved) e.preventDefault();
+      e.preventDefault();
     };
 
-    const endDrag = (e: PointerEvent) => {
+    const endDrag = () => {
       if (!dragging) return;
       dragging = false;
       el.classList.remove("is-grab-scrolling");
-      try {
-        el.releasePointerCapture?.(e.pointerId);
-      } catch {
-        // ignore
-      }
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", endDrag);
     };
 
     const onClickCapture = (e: MouseEvent) => {
       if (!moved) return;
-      // 드래그 직후 클릭(링크/버튼) 방지
       e.preventDefault();
       e.stopPropagation();
       moved = false;
     };
 
-    el.addEventListener("pointerdown", onPointerDown);
-    el.addEventListener("pointermove", onPointerMove);
-    el.addEventListener("pointerup", endDrag);
-    el.addEventListener("pointercancel", endDrag);
-    el.addEventListener("click", onClickCapture, true);
-    return () => {
-      el.removeEventListener("pointerdown", onPointerDown);
-      el.removeEventListener("pointermove", onPointerMove);
-      el.removeEventListener("pointerup", endDrag);
-      el.removeEventListener("pointercancel", endDrag);
-      el.removeEventListener("click", onClickCapture, true);
+    const onMouseDownCapture = (e: MouseEvent) => {
+      onMouseDown(e);
+      if (!dragging) return;
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", endDrag);
     };
-  }, [items.length, loading]);
+
+    syncScrollableClass();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncScrollableClass) : null;
+    ro?.observe(el);
+    const table = el.querySelector("table");
+    if (table) ro?.observe(table);
+
+    el.addEventListener("mousedown", onMouseDownCapture);
+    el.addEventListener("click", onClickCapture, true);
+    window.addEventListener("resize", syncScrollableClass);
+    return () => {
+      ro?.disconnect();
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", endDrag);
+      el.removeEventListener("mousedown", onMouseDownCapture);
+      el.removeEventListener("click", onClickCapture, true);
+      window.removeEventListener("resize", syncScrollableClass);
+      el.classList.remove("is-grab-scrolling", "is-scrollable-x");
+    };
+  }, [desktopTableShellEl, items.length, loading, visibleDesktopCols.length]);
   useEffect(() => {
     if (!commentRow || !canEditComment || !session) return;
     const combined = buildAdminCommentValue(commentHistory, commentDraft, session.rank);
@@ -1347,7 +1367,7 @@ export default function LeadList({
         </div>
       ) : (
         <>
-          <div className="crm-table-shell crm-table-desktop" ref={desktopTableShellRef}>
+          <div className="crm-table-shell crm-table-desktop" ref={setDesktopTableShellRef}>
             <table className="crm-table">
               <thead>
                 <tr>

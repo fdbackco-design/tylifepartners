@@ -1099,7 +1099,7 @@ main.crm-admin-login {
   width: 100%;
 }
 
-.crm-table-shell.crm-table-desktop {
+.crm-table-shell.crm-table-desktop.is-scrollable-x {
   cursor: grab;
   overscroll-behavior-x: contain;
 }
