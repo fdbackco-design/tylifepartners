@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { addDaysLocal, endOfMonthYmd, formatYmdDot, startOfMonthYmd, todayYmdLocal } from "@/lib/crm/ui";
 
 type Props = {
@@ -16,10 +16,14 @@ const PRESETS = [
   { label: "이번 달", get: () => { const t = todayYmdLocal(); return [startOfMonthYmd(t), endOfMonthYmd(t)] as const; } },
 ];
 
+const POPOVER_WIDTH = 320;
+const VIEWPORT_PAD = 12;
+
 export default function DateRangePicker({ from, to, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
+  const [alignEnd, setAlignEnd] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,6 +32,20 @@ export default function DateRangePicker({ from, to, onChange }: Props) {
       setDraftTo(to);
     }
   }, [open, from, to]);
+
+  useLayoutEffect(() => {
+    if (!open || !root.current) return;
+    const place = () => {
+      const rect = root.current!.getBoundingClientRect();
+      const spaceRight = window.innerWidth - rect.left - VIEWPORT_PAD;
+      const spaceLeft = rect.right - VIEWPORT_PAD;
+      // 오른쪽 공간이 부족하면 트리거 우측에 맞춰 왼쪽으로 펼침
+      setAlignEnd(spaceRight < POPOVER_WIDTH && spaceLeft >= spaceRight);
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -56,7 +74,11 @@ export default function DateRangePicker({ from, to, onChange }: Props) {
         {label}
       </button>
       {open && (
-        <div className="crm-popover crm-date-range-popover" role="dialog" aria-label="기간 선택">
+        <div
+          className={`crm-popover crm-date-range-popover${alignEnd ? " crm-popover-right" : ""}`}
+          role="dialog"
+          aria-label="기간 선택"
+        >
           <div className="crm-date-range-presets">
             {PRESETS.map((p) => (
               <button
