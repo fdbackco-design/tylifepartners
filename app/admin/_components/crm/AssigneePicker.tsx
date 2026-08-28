@@ -17,6 +17,8 @@ type Props = {
   placeholder?: string;
   /** 미배정/선택 해제 항목 표시 (기본: true) */
   allowClear?: boolean;
+  /** value가 staff 목록에 없을 때 표시 (비활성·삭제된 담당자) */
+  unresolvedLabel?: string | null;
 };
 
 export default function AssigneePicker({
@@ -29,14 +31,26 @@ export default function AssigneePicker({
   busy,
   placeholder = "미배정",
   allowClear = true,
+  unresolvedLabel,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const root = useRef<HTMLDivElement>(null);
   const current = staff.find((s) => s.id === value);
-  const label = value
-    ? formatAssigneeWithTeam(current?.name || "", teamName)
-    : placeholder;
+  const fallbackName = String(unresolvedLabel ?? "").trim();
+  const missingFromList = Boolean(value && !current);
+
+  let label = placeholder;
+  if (value) {
+    if (current?.name) {
+      label = formatAssigneeWithTeam(current.name, teamName);
+    } else if (fallbackName) {
+      label = `${fallbackName} (비활성)`;
+    } else {
+      label = "담당자 없음(비활성/삭제)";
+    }
+  }
+
   const historyText =
     history && history.length >= 2 ? history.join(" -> ") : "";
   const locked = Boolean(disabled || busy);
@@ -102,6 +116,11 @@ export default function AssigneePicker({
               {placeholder}
             </button>
           ) : null}
+          {missingFromList ? (
+            <button type="button" className="crm-menu-item is-active" disabled>
+              {fallbackName ? `${fallbackName} (비활성)` : "담당자 없음(비활성/삭제)"}
+            </button>
+          ) : null}
           {filtered.map((s) => (
             <button
               key={s.id}
@@ -115,7 +134,7 @@ export default function AssigneePicker({
               {s.name}
             </button>
           ))}
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && !missingFromList ? (
             <div className="crm-ui-hint" style={{ padding: "8px 10px" }}>
               검색 결과가 없습니다
             </div>
