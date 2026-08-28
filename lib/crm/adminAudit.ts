@@ -86,6 +86,38 @@ export async function writeAdminAudit(opts: {
   }
 }
 
+/** 계정 관리 — 직원별 최근 성공 로그인 시각 (감사 로그 기준, 컬럼 미백필 시 보조) */
+export async function loadLastLoginAtByStaffIds(userIds: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const ids = Array.from(new Set(userIds.filter(Boolean)));
+  if (!ids.length) return map;
+
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("admin_audit_logs")
+      .select("actor_user_id, created_at")
+      .eq("action", "login")
+      .eq("success", true)
+      .in("actor_user_id", ids)
+      .order("created_at", { ascending: false })
+      .limit(Math.min(ids.length * 200, 5000));
+
+    if (error || !data) return map;
+
+    for (const row of data) {
+      const id = String(row.actor_user_id ?? "");
+      if (!id || map.has(id)) continue;
+      map.set(id, String(row.created_at));
+      if (map.size >= ids.length) break;
+    }
+  } catch (e) {
+    console.warn("[adminAudit] loadLastLoginAtByStaffIds:", e instanceof Error ? e.message : e);
+  }
+
+  return map;
+}
+
 export function summarizeLeadPatch(body: Record<string, unknown>): string {
   const parts: string[] = [];
   if (body.assignee_id !== undefined) {

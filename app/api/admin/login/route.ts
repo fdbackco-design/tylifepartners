@@ -82,6 +82,16 @@ export async function POST(request: NextRequest) {
         name: user.name,
         rank,
       };
+
+      void supabase
+        .from("staff_users")
+        .update({ last_login_at: new Date().toISOString() })
+        .eq("id", user.id)
+        .then(({ error: loginAtError }) => {
+          if (loginAtError && !/last_login_at|schema cache|column/i.test(loginAtError.message)) {
+            console.warn("staff login last_login_at:", loginAtError.message);
+          }
+        });
     }
 
     void writeAdminAudit({
