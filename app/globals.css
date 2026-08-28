@@ -1940,6 +1940,11 @@ main.crm-admin-login {
   z-index: 50;
 }
 
+.crm-date-range-popover.crm-popover-right {
+  left: auto;
+  right: 0;
+}
+
 .crm-date-range-presets {
   display: flex;
   flex-wrap: wrap;
