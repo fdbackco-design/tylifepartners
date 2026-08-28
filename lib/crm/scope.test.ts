@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { canSeeMetaAdSpend, descendantAssigneeIds } from "@/lib/crm/scope";
+import { canExportLeads, canSeeMetaAdSpend, descendantAssigneeIds } from "@/lib/crm/scope";
 import type { SessionUser } from "@/lib/crm/types";
 
 describe("descendantAssigneeIds", () => {
@@ -50,5 +50,22 @@ describe("canSeeMetaAdSpend", () => {
     assert.equal(canSeeMetaAdSpend({ ...base, rank: "admin" }), true);
     assert.equal(canSeeMetaAdSpend({ ...base, rank: "manager" }), false);
     assert.equal(canSeeMetaAdSpend({ ...base, rank: "sales" }), false);
+  });
+});
+
+describe("canExportLeads", () => {
+  const base: SessionUser = {
+    rank: "sales",
+    userId: "u1",
+    name: "테스트",
+    loginId: "t",
+    region: null,
+    parentId: null,
+  };
+
+  it("allows admin only", () => {
+    assert.equal(canExportLeads({ ...base, rank: "admin" }), true);
+    assert.equal(canExportLeads({ ...base, rank: "manager" }), false);
+    assert.equal(canExportLeads({ ...base, rank: "sales" }), false);
   });
 });

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { toCsv, toExcelXml } from "@/lib/crm/excel";
 import { parseLeadQuery, queryLeads } from "@/lib/crm/queryLeads";
-import { canSeeAdminStatus } from "@/lib/crm/scope";
+import { canExportLeads, canSeeAdminStatus } from "@/lib/crm/scope";
 
 const HEADERS = [
   "유형",
@@ -37,12 +37,12 @@ function asciiFilename(label: string, stamp: string, ext: string): string {
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
+  if (!canExportLeads(session)) {
+    return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
+  }
 
   try {
     const q = parseLeadQuery(request.nextUrl.searchParams);
-    if (q.needReassign && session.rank === "sales") {
-      return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
-    }
     q.limit = 5000;
     q.offset = 0;
     const { items } = await queryLeads(session, q);
