@@ -168,3 +168,17 @@ export function parseBaseRegion(regionValue: string): BaseRegion | null {
   const first = t.split(/\s+/)[0] ?? "";
   return isBaseRegion(first) ? first : null;
 }
+
+/** 랜딩·자동분배 UI 공통 권역 그룹 */
+export const REGION_GROUPS: { zone: string; regions: BaseRegion[] }[] = [
+  { zone: "수도권", regions: ["서울", "인천", "경기"] },
+  { zone: "충청권", regions: ["대전", "세종", "충북", "충남"] },
+  { zone: "경상권", regions: ["부산", "대구", "울산", "경북", "경남"] },
+  { zone: "전라권", regions: ["전북", "전남광주"] },
+  { zone: "강원권", regions: ["강원"] },
+  { zone: "제주권", regions: ["제주"] },
+];
+
+export function regionKeywordLabel(base: string, district?: string | null): string {
+  return formatRegionValue(base, district);
+}
