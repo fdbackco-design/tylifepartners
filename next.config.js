@@ -1,7 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async redirects() {
-    return [{ source: "/life-care", destination: "/no-clawback", permanent: true }];
+    return [
+      { source: "/", destination: "/admin", permanent: false },
+      { source: "/life-care", destination: "/no-clawback", permanent: true },
+    ];
   },
 };
 
