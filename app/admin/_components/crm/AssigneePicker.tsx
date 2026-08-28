@@ -17,6 +17,13 @@ type Props = {
   placeholder?: string;
   /** 미배정/선택 해제 항목 표시 (기본: true) */
   allowClear?: boolean;
+  /** allowClear 메뉴 항목 라벨 (기본: placeholder) */
+  clearLabel?: string;
+  /**
+   * clear 항목 활성 표시. 미지정 시 value == null 이면 활성.
+   * 일괄 변경처럼 “아직 선택 안 함”과 “미배정 선택”을 구분할 때 false로 둠.
+   */
+  clearIsSelected?: boolean;
   /** value가 staff 목록에 없을 때 표시 (비활성·삭제된 담당자) */
   unresolvedLabel?: string | null;
 };
@@ -31,6 +38,8 @@ export default function AssigneePicker({
   busy,
   placeholder = "미배정",
   allowClear = true,
+  clearLabel,
+  clearIsSelected,
   unresolvedLabel,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -108,13 +117,13 @@ export default function AssigneePicker({
             {allowClear ? (
               <button
                 type="button"
-                className={`crm-menu-item${!value ? " is-active" : ""}`}
+                className={`crm-menu-item${(clearIsSelected ?? value == null) ? " is-active" : ""}`}
                 onClick={() => {
                   onChange(null);
                   setOpen(false);
                 }}
               >
-                {placeholder}
+                {clearLabel ?? placeholder}
               </button>
             ) : null}
             {missingFromList ? (

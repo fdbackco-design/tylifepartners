@@ -206,7 +206,8 @@ export default function LeadList({
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Map<string, "consumers" | "candidates">>(new Map());
-  const [bulkAssigneeId, setBulkAssigneeId] = useState("");
+  const [bulkAssigneeId, setBulkAssigneeId] = useState<string | null>(null);
+  const [bulkAssigneePicked, setBulkAssigneePicked] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [hideSaving, setHideSaving] = useState(false);
   const [hideConfirmOpen, setHideConfirmOpen] = useState(false);
@@ -997,8 +998,8 @@ export default function LeadList({
   };
 
   const bulkAssign = async () => {
-    if (!bulkAssigneeId || selectedIds.size === 0) {
-      alert("담당자와 대상을 선택해 주세요.");
+    if (!bulkAssigneePicked || selectedIds.size === 0) {
+      alert("담당자(또는 미배정)와 대상을 선택해 주세요.");
       return;
     }
     setBulkSaving(true);
@@ -1018,7 +1019,8 @@ export default function LeadList({
         return;
       }
       setSelectedIds(new Map());
-      setBulkAssigneeId("");
+      setBulkAssigneeId(null);
+      setBulkAssigneePicked(false);
       await load();
     } catch {
       alert("네트워크 오류가 발생했습니다.");
@@ -1314,17 +1316,22 @@ export default function LeadList({
               {canBulkAssign && (
                 <>
                   <AssigneePicker
-                    value={bulkAssigneeId || null}
+                    value={bulkAssigneePicked ? bulkAssigneeId : null}
                     staff={bulkAssignableStaff}
-                    placeholder="담당자 선택"
-                    allowClear={false}
+                    placeholder={bulkAssigneePicked && bulkAssigneeId == null ? "미배정" : "담당자 선택"}
+                    clearLabel="미배정"
+                    clearIsSelected={bulkAssigneePicked && bulkAssigneeId == null}
+                    allowClear
                     disabled={bulkSaving}
-                    onChange={(id) => setBulkAssigneeId(id ?? "")}
+                    onChange={(id) => {
+                      setBulkAssigneePicked(true);
+                      setBulkAssigneeId(id);
+                    }}
                   />
                   <button
                     type="button"
                     className="crm-btn crm-btn-primary"
-                    disabled={bulkSaving || !bulkAssigneeId}
+                    disabled={bulkSaving || !bulkAssigneePicked}
                     onClick={() => void bulkAssign()}
                   >
                     {bulkSaving ? "변경 중…" : "담당자 일괄 변경"}
