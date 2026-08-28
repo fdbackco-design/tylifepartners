@@ -17,6 +17,7 @@ import {
   IconPlus,
 } from "@/app/admin/_components/crm/ui";
 import { REGION_ZONE_NAMES } from "@/lib/crm/regionZones";
+import RegionKeywordPicker from "@/app/admin/_components/crm/RegionKeywordPicker";
 
 type Member = { id?: string; staff_user_id: string; weight: number; assigned_count?: number };
 type Rule = {
@@ -46,60 +47,6 @@ function staffLabel(s: Staff): string {
   const rank = s.rank === "manager" ? "매니저" : "영업자";
   const region = s.region ? ` · ${s.region}` : "";
   return `${s.name} (${rank}${region})`;
-}
-
-function KeywordEditor({
-  value,
-  onChange,
-}: {
-  value: string[];
-  onChange: (next: string[]) => void;
-}) {
-  const [draft, setDraft] = useState("");
-
-  const add = () => {
-    const parts = draft
-      .split(/[,，\n]/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (!parts.length) return;
-    const set = new Set(value);
-    for (const p of parts) set.add(p);
-    onChange(Array.from(set));
-    setDraft("");
-  };
-
-  return (
-    <div style={{ display: "grid", gap: 8 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-        {value.length ? (
-          value.map((kw) => (
-            <CrmChip key={kw} onRemove={() => onChange(value.filter((x) => x !== kw))}>
-              {kw}
-            </CrmChip>
-          ))
-        ) : (
-          <span className="crm-ui-hint">포함 지역이 없습니다.</span>
-        )}
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <CrmInput
-          value={draft}
-          placeholder="예: 서울, 인천 (쉼표로 여러 개)"
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              add();
-            }
-          }}
-        />
-        <CrmButton type="button" size="sm" variant="secondary" onClick={add}>
-          추가
-        </CrmButton>
-      </div>
-    </div>
-  );
 }
 
 export default function AssignmentPage() {
@@ -226,8 +173,9 @@ export default function AssignmentPage() {
     }
   };
 
-  const addZone = async () => {
-    const name = newZoneName.trim();
+  const addZone = async (opts?: { region_group?: string; region_keywords?: string[]; openSettings?: boolean }) => {
+    const name = (opts?.region_group ?? newZoneName).trim();
+    const keywords = opts?.region_keywords ?? newZoneKeywords;
     if (!name) {
       setMessage({ tone: "danger", text: "권역 이름을 입력해 주세요." });
       return;
@@ -236,7 +184,7 @@ export default function AssignmentPage() {
       setMessage({ tone: "danger", text: `"${name}" 권역이 이미 있습니다.` });
       return;
     }
-    if (!newZoneKeywords.length) {
+    if (!keywords.length) {
       setMessage({ tone: "danger", text: "포함 지역을 하나 이상 입력해 주세요." });
       return;
     }
@@ -247,7 +195,7 @@ export default function AssignmentPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           region_group: name,
-          region_keywords: newZoneKeywords,
+          region_keywords: keywords,
           enabled: true,
         }),
       });
@@ -261,11 +209,23 @@ export default function AssignmentPage() {
       setNewZoneKeywords([]);
       await load();
       setMessage({ tone: "success", text: `"${name}" 권역이 추가되었습니다.` });
+      if (opts?.openSettings) {
+        const newRule =
+          ((data.rules as Rule[] | undefined)?.find((r) => r.region_group === name) as Rule | undefined) ??
+          (data.rule as Rule | undefined);
+        if (newRule) openSettings(newRule);
+      }
     } catch {
       setMessage({ tone: "danger", text: "네트워크 오류가 발생했습니다." });
     } finally {
       setAddingZone(false);
     }
+  };
+
+  const createSubZoneFromPicker = (zoneName: string, keywords: string[]) => {
+    setSheetRuleId(null);
+    setAddOpen(false);
+    void addZone({ region_group: zoneName, region_keywords: keywords, openSettings: true });
   };
 
   const deleteZone = async (rule: Rule) => {
@@ -464,9 +424,13 @@ export default function AssignmentPage() {
           <>
             <CrmField
               label="포함 지역"
-              hint="고객 지역 문자열에 포함되면 이 권역으로 매칭됩니다. 여러 개는 쉼표로 추가하세요."
+              hint="랜딩 신청 지역과 동일한 형식(예: 경기 수원시)으로 추가하면 상세 단위 배정이 가능합니다."
             >
-              <KeywordEditor value={draftKeywords} onChange={setDraftKeywords} />
+              <RegionKeywordPicker
+                value={draftKeywords}
+                onChange={setDraftKeywords}
+                onCreateSubZone={createSubZoneFromPicker}
+              />
             </CrmField>
 
             <CrmField
@@ -554,8 +518,15 @@ export default function AssignmentPage() {
             placeholder="예: 해외권"
           />
         </CrmField>
-        <CrmField label="포함 지역" hint="이 키워드가 고객 지역에 포함되면 해당 권역으로 배정합니다.">
-          <KeywordEditor value={newZoneKeywords} onChange={setNewZoneKeywords} />
+        <CrmField label="포함 지역" hint="고객 지역 문자열에 포함되면 해당 권역으로 매칭됩니다.">
+          <RegionKeywordPicker
+            value={newZoneKeywords}
+            onChange={setNewZoneKeywords}
+            onCreateSubZone={(zoneName, keywords) => {
+              setNewZoneName(zoneName);
+              setNewZoneKeywords(keywords);
+            }}
+          />
         </CrmField>
       </CrmSheet>
     </div>

@@ -72,6 +72,35 @@ describe("auto-assign helpers", () => {
     assert.equal(matchRule("경기도 성남시", rules)?.region_group, "수도권");
   });
 
+  it("matchRule prefers city-level keywords across rules", () => {
+    const rules: AssignmentRule[] = [
+      {
+        id: "1",
+        region_group: "경기 수원",
+        region_keywords: ["경기 수원시", "수원시"],
+        enabled: true,
+        members: [],
+      },
+      {
+        id: "2",
+        region_group: "경기 화성",
+        region_keywords: ["경기 화성시", "화성시"],
+        enabled: true,
+        members: [],
+      },
+      {
+        id: "3",
+        region_group: "수도권",
+        region_keywords: ["경기", "서울", "인천"],
+        enabled: true,
+        members: [],
+      },
+    ];
+    assert.equal(matchRule("경기 수원시", rules)?.region_group, "경기 수원");
+    assert.equal(matchRule("경기 화성시", rules)?.region_group, "경기 화성");
+    assert.equal(matchRule("경기 안양시", rules)?.region_group, "수도권");
+  });
+
   it("pickWeightedMember prefers lower assigned_count/weight", () => {
     const picked = pickWeightedMember([
       { id: "a", staff_user_id: "s1", weight: 1, assigned_count: 2 },
