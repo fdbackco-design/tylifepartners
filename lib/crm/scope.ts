@@ -60,6 +60,11 @@ export function canSeeMetaAdSpend(session: SessionUser): boolean {
   return session.rank === "admin";
 }
 
+/** 소비자·후보자·담당자 변경 필요 DB 내보내기 — 관리자만 */
+export function canExportLeads(session: Pick<SessionUser, "rank">): boolean {
+  return session.rank === "admin";
+}
+
 /** CRM 탭·보조 메뉴 접근 가능 여부 */
 export function canAccessAdminPath(rank: SessionUser["rank"], pathname: string): boolean {
   const path = pathname.split("?")[0] || pathname;

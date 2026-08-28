@@ -17,6 +17,7 @@ import StatusBadgeMenu from "@/app/admin/_components/crm/StatusBadgeMenu";
 import { CrmAlert, CrmButton, CrmDialog } from "@/app/admin/_components/crm/ui";
 import { formatAssigneeWithTeam } from "@/lib/crm/assigneeHistoryFormat";
 import { buildAdminCommentValue, formatAdminCommentPrefix } from "@/lib/crm/adminComment";
+import { canExportLeads } from "@/lib/crm/scope";
 import {
   peekPendingOpenComment,
   takePendingOpenComment,
@@ -730,7 +731,7 @@ export default function LeadList({
   const isAdmin = session?.rank === "admin";
   const showAdmin = isAdmin || session?.rank === "manager";
   const canEditComment = showAdmin;
-  const canExport = showAdmin;
+  const canExport = session ? canExportLeads(session) : false;
   const canBulkAssign = needReassign && showAdmin;
   const canDeleteLeads = isAdmin && (category === "consumers" || category === "candidates");
   const showSelectColumn = canDeleteLeads || canBulkAssign;
