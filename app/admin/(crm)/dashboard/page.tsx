@@ -33,11 +33,13 @@ export default function DashboardPage() {
   const [sortMode, setSortMode] = useState<SortMode>("rate_desc");
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError("");
     fetch(`/api/admin/dashboard?date_from=${from}&date_to=${to}`)
       .then((r) => r.json())
       .then((d) => {
+        if (cancelled) return;
         if (d.ok) {
           setRows(d.by_person ?? []);
           setSummary({
@@ -47,9 +49,17 @@ export default function DashboardPage() {
           });
         } else setError(d.message || "조회 실패");
       })
-      .catch(() => setError("네트워크 오류"))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!cancelled) setError("네트워크 오류");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [from, to]);
+
 
   const chartRows = useMemo(() => {
     const list = rows.filter((r) => r.assigned > 0);
@@ -88,10 +98,15 @@ export default function DashboardPage() {
           <strong>오류</strong>
           {error}
         </div>
-      ) : loading ? (
+      ) : loading && rows.length === 0 ? (
         <div className="crm-skeleton" style={{ height: 280, marginTop: 16 }} />
       ) : (
         <>
+          {loading ? (
+            <div className="crm-dash-loading" aria-live="polite" style={{ marginTop: 8, fontSize: 12, color: "var(--crm-muted)" }}>
+              갱신 중…
+            </div>
+          ) : null}
           <div className="crm-dash-stats" style={{ marginTop: 16 }}>
             <CrmStatRow
               items={[
