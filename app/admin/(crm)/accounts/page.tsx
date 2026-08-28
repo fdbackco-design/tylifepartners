@@ -37,6 +37,7 @@ type User = {
   account_status?: "active" | "invite_pending" | "inactive";
   last_login_at?: string | null;
   created_at?: string;
+  assigned_lead_count?: number;
 };
 
 function isValidMobile(digits: string): boolean {
@@ -52,7 +53,7 @@ function statusBadge(status: User["account_status"], isActive: boolean) {
 
 export default function AccountsPage() {
   const [items, setItems] = useState<User[]>([]);
-  const [me, setMe] = useState<{ rank: string } | null>(null);
+  const [me, setMe] = useState<{ rank: string; userId?: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
@@ -60,6 +61,9 @@ export default function AccountsPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [confirmUser, setConfirmUser] = useState<User | null>(null);
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -139,6 +143,75 @@ export default function AccountsPage() {
     admins: items.filter((u) => u.rank === "admin").length,
     managers: items.filter((u) => u.rank === "manager").length,
     sales: items.filter((u) => u.rank === "sales").length,
+  };
+
+  const canDeactivateUser = (u: User) => {
+    if (!u.is_active) return false;
+    if (me?.userId && me.userId === u.id) return false;
+    if (me?.rank === "admin") return true;
+    if (me?.rank === "manager" && me.userId) {
+      return u.rank === "sales" && u.parent_id === me.userId;
+    }
+    return false;
+  };
+
+  const selectableFiltered = useMemo(
+    () => filtered.filter((u) => canDeactivateUser(u)),
+    [filtered, me?.rank, me?.userId]
+  );
+
+  const allFilteredSelected =
+    selectableFiltered.length > 0 && selectableFiltered.every((u) => selectedIds.has(u.id));
+
+  const toggleSelect = (u: User) => {
+    if (!canDeactivateUser(u)) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(u.id)) next.delete(u.id);
+      else next.add(u.id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllFiltered = () => {
+    if (allFilteredSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const u of selectableFiltered) next.delete(u.id);
+        return next;
+      });
+      return;
+    }
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const u of selectableFiltered) next.add(u.id);
+      return next;
+    });
+  };
+
+  const bulkDeactivate = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkSaving(true);
+    try {
+      const res = await fetch("/api/admin/users/bulk-deactivate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_ids: Array.from(selectedIds) }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setToast(data.message || "일괄 비활성화에 실패했습니다.");
+        return;
+      }
+      setToast(`${data.deactivated}명 계정을 비활성화했습니다.`);
+      setSelectedIds(new Set());
+      setConfirmBulk(false);
+      await load();
+    } catch {
+      setToast("네트워크 오류가 발생했습니다.");
+    } finally {
+      setBulkSaving(false);
+    }
   };
 
   const openCreate = () => {
@@ -331,6 +404,18 @@ export default function AccountsPage() {
         </CrmSelect>
       </div>
 
+      {selectedIds.size > 0 ? (
+        <div
+          className="crm-ui-toolbar"
+          style={{ marginTop: 0, marginBottom: 12, justifyContent: "space-between" }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{selectedIds.size}명 선택</span>
+          <CrmButton variant="danger" disabled={bulkSaving} onClick={() => setConfirmBulk(true)}>
+            {bulkSaving ? "처리 중…" : "선택 비활성화"}
+          </CrmButton>
+        </div>
+      ) : null}
+
       {loading ? (
         <div className="crm-skeleton" style={{ height: 220 }} />
       ) : items.length === 0 ? (
@@ -349,10 +434,20 @@ export default function AccountsPage() {
         <CrmTable>
           <thead>
             <tr>
+              <th style={{ width: 40 }}>
+                <input
+                  type="checkbox"
+                  checked={allFilteredSelected}
+                  onChange={toggleSelectAllFiltered}
+                  disabled={selectableFiltered.length === 0}
+                  aria-label="현재 목록 전체 선택"
+                />
+              </th>
               <th>이름</th>
               <th>직급</th>
               <th>아이디</th>
               <th>연락처</th>
+              <th>담당 DB</th>
               <th>담당 권역</th>
               <th>소속</th>
               <th>계정상태</th>
@@ -363,12 +458,24 @@ export default function AccountsPage() {
           <tbody>
             {filtered.map((u) => (
               <tr key={u.id}>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(u.id)}
+                    disabled={!canDeactivateUser(u)}
+                    onChange={() => toggleSelect(u)}
+                    aria-label={`${u.name} 선택`}
+                  />
+                </td>
                 <td style={{ fontWeight: 600 }} className="crm-cell-nowrap">{u.name}</td>
                 <td className="crm-cell-nowrap">
                   {u.rank === "admin" ? "관리자" : u.rank === "manager" ? "매니저" : "영업자"}
                 </td>
                 <td className="crm-cell-nowrap">{u.login_id}</td>
                 <td className="crm-cell-nowrap">{formatPhoneKorean(u.phone)}</td>
+                <td className="crm-cell-nowrap" style={{ fontVariantNumeric: "tabular-nums" }}>
+                  {(u.assigned_lead_count ?? 0).toLocaleString("ko-KR")}
+                </td>
                 <td>
                   {u.region && isRegionZoneName(u.region) ? (
                     <CrmBadge tone="primary">{u.region}</CrmBadge>
@@ -501,6 +608,27 @@ export default function AccountsPage() {
         )}
         {formError ? <CrmAlert tone="danger">{formError}</CrmAlert> : null}
       </CrmSheet>
+
+      <CrmDialog
+        open={confirmBulk}
+        onClose={() => setConfirmBulk(false)}
+        title="선택 계정 비활성화"
+        footer={
+          <>
+            <CrmButton variant="secondary" onClick={() => setConfirmBulk(false)}>
+              취소
+            </CrmButton>
+            <CrmButton variant="danger" disabled={bulkSaving} onClick={() => void bulkDeactivate()}>
+              {bulkSaving ? "처리 중…" : "비활성화"}
+            </CrmButton>
+          </>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
+          선택한 <strong>{selectedIds.size}</strong>명 계정을 비활성화할까요? 로그인할 수 없게 되며, 배정된
+          고객 데이터는 유지됩니다.
+        </p>
+      </CrmDialog>
 
       <CrmDialog
         open={!!confirmUser}

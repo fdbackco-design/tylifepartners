@@ -3,6 +3,7 @@ import { getSession } from "@/lib/adminSession";
 import { actorFromSession, loadLastLoginAtByStaffIds, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { credentialsFromPhone, hashPassword } from "@/lib/crm/password";
 import { isRegionZoneName } from "@/lib/crm/regionZones";
+import { loadAssignedLeadCountsByStaff } from "@/lib/crm/staffLeadCounts";
 import { canManageAccounts } from "@/lib/crm/scope";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -75,6 +76,8 @@ export async function GET() {
     data.filter((u) => !u.last_login_at).map((u) => u.id)
   );
 
+  const leadCounts = await loadAssignedLeadCountsByStaff();
+
   const items = data.map((u) => {
     let account_status: "active" | "invite_pending" | "inactive" = "active";
     if (!u.is_active) account_status = "inactive";
@@ -93,6 +96,7 @@ export async function GET() {
       parent_name: u.parent_id ? byId.get(u.parent_id) ?? null : null,
       account_status,
       last_login_at: lastLoginAt,
+      assigned_lead_count: leadCounts.get(u.id) ?? 0,
     };
   });
   return NextResponse.json({ ok: true, items });
