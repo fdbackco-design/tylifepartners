@@ -737,10 +737,29 @@ export default function LeadList({
   const canBulkAssign = showAdmin;
   const canDeleteLeads = isAdmin && (category === "consumers" || category === "candidates");
   const showSelectColumn = canDeleteLeads || canBulkAssign;
-  const bulkAssignableStaff = useMemo(
-    () => staff.filter((s) => (s.rank ?? "sales") === "sales" || (s.rank ?? "") === "manager"),
-    [staff]
-  );
+  const bulkAssignableStaff = useMemo(() => {
+    const allowAdminNames = new Set(["안성준대표"]);
+    return staff.filter((s) => {
+      const rank = s.rank ?? "sales";
+      if (rank === "sales" || rank === "manager") return true;
+      if (rank === "admin" && category === "candidates") {
+        return allowAdminNames.has(s.name.trim());
+      }
+      return false;
+    });
+  }, [staff, category]);
+  /** 담당자 지정 목록: 후보자는 관리자 중 안성준대표만 노출 */
+  const assigneePickerStaff = useMemo(() => {
+    const allowAdminNames = new Set(["안성준대표"]);
+    return staff.filter((s) => {
+      const rank = s.rank ?? "sales";
+      if (rank === "admin") {
+        if (category !== "candidates") return true;
+        return allowAdminNames.has(s.name.trim());
+      }
+      return true;
+    });
+  }, [staff, category]);
   const showHeatmapFor = (_row: LeadRow) => category === "candidates" || category === "consumers" || category === "all";
 
   const visibleDesktopCols = useMemo(
@@ -1552,7 +1571,7 @@ export default function LeadList({
                                 {showAdmin ? (
                                   <AssigneePicker
                                     value={row.assignee_id}
-                                    staff={staff}
+                                    staff={assigneePickerStaff}
                                     teamName={row.team_name}
                                     history={isAdmin ? row.assignee_history : undefined}
                                     busy={patchingAssigneeIds.has(row.id)}
@@ -1719,7 +1738,7 @@ export default function LeadList({
                           {showAdmin ? (
                             <AssigneePicker
                               value={row.assignee_id}
-                              staff={staff}
+                              staff={assigneePickerStaff}
                               teamName={row.team_name}
                               history={isAdmin ? row.assignee_history : undefined}
                               busy={patchingAssigneeIds.has(row.id)}
