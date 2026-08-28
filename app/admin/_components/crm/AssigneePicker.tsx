@@ -95,50 +95,52 @@ export default function AssigneePicker({
         </div>
       ) : null}
       {open && !busy && (
-        <div className="crm-popover" role="listbox" style={{ minWidth: 220 }}>
+        <div className="crm-popover crm-assignee-popover" role="listbox">
           <input
             className="crm-input"
             placeholder="담당자 검색"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            style={{ width: "100%", marginBottom: 8 }}
+            style={{ width: "100%", marginBottom: 8, flexShrink: 0 }}
             autoFocus
           />
-          {allowClear ? (
-            <button
-              type="button"
-              className={`crm-menu-item${!value ? " is-active" : ""}`}
-              onClick={() => {
-                onChange(null);
-                setOpen(false);
-              }}
-            >
-              {placeholder}
-            </button>
-          ) : null}
-          {missingFromList ? (
-            <button type="button" className="crm-menu-item is-active" disabled>
-              {fallbackName ? `${fallbackName} (비활성)` : "담당자 없음(비활성/삭제)"}
-            </button>
-          ) : null}
-          {filtered.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              className={`crm-menu-item${s.id === value ? " is-active" : ""}`}
-              onClick={() => {
-                onChange(s.id);
-                setOpen(false);
-              }}
-            >
-              {s.name}
-            </button>
-          ))}
-          {filtered.length === 0 && !missingFromList ? (
-            <div className="crm-ui-hint" style={{ padding: "8px 10px" }}>
-              검색 결과가 없습니다
-            </div>
-          ) : null}
+          <div className="crm-assignee-popover-list">
+            {allowClear ? (
+              <button
+                type="button"
+                className={`crm-menu-item${!value ? " is-active" : ""}`}
+                onClick={() => {
+                  onChange(null);
+                  setOpen(false);
+                }}
+              >
+                {placeholder}
+              </button>
+            ) : null}
+            {missingFromList ? (
+              <button type="button" className="crm-menu-item is-active" disabled>
+                {fallbackName ? `${fallbackName} (비활성)` : "담당자 없음(비활성/삭제)"}
+              </button>
+            ) : null}
+            {filtered.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className={`crm-menu-item${s.id === value ? " is-active" : ""}`}
+                onClick={() => {
+                  onChange(s.id);
+                  setOpen(false);
+                }}
+              >
+                {s.name}
+              </button>
+            ))}
+            {filtered.length === 0 && !missingFromList ? (
+              <div className="crm-ui-hint" style={{ padding: "8px 10px" }}>
+                검색 결과가 없습니다
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
     </div>
