@@ -1,6 +1,7 @@
 import { startOfKstDayIso, startOfNextKstDayIso } from "@/lib/crm/kst";
 import { attachAssigneeHistories } from "@/lib/crm/assigneeHistory";
 import { applyHiddenLeadFilter, loadHiddenLeadIdMaps } from "@/lib/crm/leadListHide";
+import { buildLeadSearchOrFilter } from "@/lib/crm/leadSearch";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
 import { visibleAssigneeIds } from "@/lib/crm/scope";
 import { getAdminStatus, matchesAdminStatusFilter } from "@/lib/crm/status";
@@ -102,8 +103,7 @@ function applyCommonFilters(
   rank: SessionUser["rank"]
 ) {
   if (q.search) {
-    const term = `%${q.search.replace(/,/g, "")}%`;
-    query = query.or(`name.ilike.${term},phone.ilike.${term}`);
+    query = query.or(buildLeadSearchOrFilter(q.search));
   }
   let assigneeFilter = [...(q.assigneeIds ?? [])];
   const wantsUnassigned =
