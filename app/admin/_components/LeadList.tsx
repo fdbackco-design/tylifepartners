@@ -25,6 +25,9 @@ import {
 
 type StaffOpt = { id: string; name: string; parent_id: string | null; rank?: string };
 
+/** 담당자 필터 — 미배정 (URL assignee_ids 센티널, queryLeads와 동일) */
+const UNASSIGNED_ASSIGNEE_FILTER = "__unassigned__";
+
 /** 소비자·후보자 DB 필터 담당자/팀 목록에서 제외 */
 const FILTER_HIDDEN_STAFF_NAMES = new Set(["형지수", "중형지수", "이명진", "송해민", "정성현"]);
 
@@ -1023,7 +1026,10 @@ export default function LeadList({
     {
       key: "assigneeIds",
       label: "담당자",
-      options: filterStaff.map((s) => ({ value: s.id, label: s.name })),
+      options: [
+        ...(isAdmin ? [{ value: UNASSIGNED_ASSIGNEE_FILTER, label: "미배정" }] : []),
+        ...filterStaff.map((s) => ({ value: s.id, label: s.name })),
+      ],
       selected: assigneeIds,
       searchable: true,
       searchPlaceholder: "이름 검색",
@@ -1086,7 +1092,10 @@ export default function LeadList({
   for (const id of assigneeIds) {
     chips.push({
       key: `a-${id}`,
-      label: `담당자: ${staff.find((s) => s.id === id)?.name ?? id}`,
+      label:
+        id === UNASSIGNED_ASSIGNEE_FILTER
+          ? "담당자: 미배정"
+          : `담당자: ${staff.find((s) => s.id === id)?.name ?? id}`,
       onRemove: () => {
         setAssigneeIds((prev) => prev.filter((x) => x !== id));
         setPage(0);

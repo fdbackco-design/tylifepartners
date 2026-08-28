@@ -92,6 +92,9 @@ export function parseLeadQuery(sp: URLSearchParams): LeadQueryInput {
 
 const NO_MATCH_ID = "00000000-0000-0000-0000-000000000000";
 
+/** 담당자 필터 — 미배정 (assignee_ids CSV 센티널) */
+export const UNASSIGNED_ASSIGNEE_FILTER = "__unassigned__";
+
 function applyCommonFilters(
   query: any,
   q: LeadQueryInput,
@@ -103,23 +106,33 @@ function applyCommonFilters(
     query = query.or(`name.ilike.${term},phone.ilike.${term}`);
   }
   let assigneeFilter = [...(q.assigneeIds ?? [])];
+  const wantsUnassigned =
+    Boolean(q.unassigned) || assigneeFilter.includes(UNASSIGNED_ASSIGNEE_FILTER);
+  assigneeFilter = assigneeFilter.filter((id) => id !== UNASSIGNED_ASSIGNEE_FILTER);
+
+  if (wantsUnassigned && rank !== "admin") {
+    return query.eq("id", NO_MATCH_ID);
+  }
+
   if (scopedIds !== "all") {
     if (!scopedIds.length) {
       return query.eq("id", NO_MATCH_ID);
     }
     assigneeFilter = assigneeFilter.length
       ? assigneeFilter.filter((id) => scopedIds.includes(id))
-      : [...scopedIds];
+      : wantsUnassigned
+        ? []
+        : [...scopedIds];
     // 스코프 밖만 고르면 빈 배열이 되어 필터가 빠지던 문제 → 결과 없음으로 닫음
-    if (!assigneeFilter.length) {
+    if (!assigneeFilter.length && !wantsUnassigned) {
       return query.eq("id", NO_MATCH_ID);
     }
   }
-  if (q.unassigned) {
-    // 미배정은 전체 관리자만
-    if (rank !== "admin") {
-      return query.eq("id", NO_MATCH_ID);
-    }
+
+  if (wantsUnassigned && assigneeFilter.length) {
+    const inList = assigneeFilter.join(",");
+    query = query.or(`assignee_id.is.null,assignee_id.in.(${inList})`);
+  } else if (wantsUnassigned) {
     query = query.is("assignee_id", null);
   } else if (assigneeFilter.length) {
     query = query.in("assignee_id", assigneeFilter);
