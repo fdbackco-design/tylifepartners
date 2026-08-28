@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
-import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
+import { actorFromSession, loadLastLoginAtByStaffIds, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { credentialsFromPhone, hashPassword } from "@/lib/crm/password";
 import { isRegionZoneName } from "@/lib/crm/regionZones";
 import { canManageAccounts } from "@/lib/crm/scope";
@@ -17,6 +17,7 @@ type StaffListRow = {
   is_active: boolean;
   created_at: string;
   must_change_password?: boolean;
+  last_login_at?: string | null;
 };
 
 export async function GET() {
@@ -28,6 +29,8 @@ export async function GET() {
   }
 
   const supabase = getSupabaseAdmin();
+  const selectWithLogin =
+    "id, name, phone, region, rank, login_id, parent_id, is_active, created_at, must_change_password, last_login_at";
   const selectWithFlag =
     "id, name, phone, region, rank, login_id, parent_id, is_active, created_at, must_change_password";
   const selectLegacy =
@@ -42,7 +45,12 @@ export async function GET() {
   };
 
   let data: StaffListRow[] = [];
-  let { data: raw, error } = await runList(selectWithFlag);
+  let { data: raw, error } = await runList(selectWithLogin);
+  if (error && /last_login_at|schema cache|column/i.test(error.message)) {
+    const fallback = await runList(selectWithFlag);
+    raw = fallback.data;
+    error = fallback.error;
+  }
   if (error && /must_change_password|schema cache|column/i.test(error.message)) {
     const fallback = await runList(selectLegacy);
     raw = fallback.data;
@@ -63,10 +71,15 @@ export async function GET() {
     if (u.rank === "manager") byId.set(u.id, u.name);
   }
 
+  const auditLastLogins = await loadLastLoginAtByStaffIds(
+    data.filter((u) => !u.last_login_at).map((u) => u.id)
+  );
+
   const items = data.map((u) => {
     let account_status: "active" | "invite_pending" | "inactive" = "active";
     if (!u.is_active) account_status = "inactive";
     else if (u.must_change_password) account_status = "invite_pending";
+    const lastLoginAt = u.last_login_at ?? auditLastLogins.get(u.id) ?? null;
     return {
       id: u.id,
       name: u.name,
@@ -79,7 +92,7 @@ export async function GET() {
       created_at: u.created_at,
       parent_name: u.parent_id ? byId.get(u.parent_id) ?? null : null,
       account_status,
-      last_login_at: null as string | null,
+      last_login_at: lastLoginAt,
     };
   });
   return NextResponse.json({ ok: true, items });

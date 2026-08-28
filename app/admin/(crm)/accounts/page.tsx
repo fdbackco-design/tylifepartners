@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatPhoneKorean } from "@/lib/phone";
+import { formatKstDateTime } from "@/lib/crm/kst";
 import { REGION_ZONE_NAMES, isRegionZoneName } from "@/lib/crm/regionZones";
 import {
   CrmAlert,
@@ -379,7 +380,11 @@ export default function AccountsPage() {
                 </td>
                 <td>{u.parent_name || "—"}</td>
                 <td>{statusBadge(u.account_status, u.is_active)}</td>
-                <td style={{ color: "var(--crm-muted)" }}>{u.last_login_at ? new Date(u.last_login_at).toLocaleString("ko-KR") : "—"}</td>
+                <td style={{ color: "var(--crm-muted)", whiteSpace: "nowrap" }}>
+                  {u.last_login_at
+                    ? formatKstDateTime(new Date(u.last_login_at))
+                    : "—"}
+                </td>
                 <td>
                   <CrmMenu trigger={<IconDots />} align="right">
                     <CrmMenuItem onClick={() => openEdit(u)}>수정</CrmMenuItem>
