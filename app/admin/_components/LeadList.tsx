@@ -1556,6 +1556,7 @@ export default function LeadList({
                                     teamName={row.team_name}
                                     history={isAdmin ? row.assignee_history : undefined}
                                     busy={patchingAssigneeIds.has(row.id)}
+                                    unresolvedLabel={row.assignee_name}
                                     onChange={(id) => void patchAssignee(row, id)}
                                   />
                                 ) : (
@@ -1722,6 +1723,7 @@ export default function LeadList({
                               teamName={row.team_name}
                               history={isAdmin ? row.assignee_history : undefined}
                               busy={patchingAssigneeIds.has(row.id)}
+                              unresolvedLabel={row.assignee_name}
                               onChange={(id) => void patchAssignee(row, id)}
                             />
                           ) : (
