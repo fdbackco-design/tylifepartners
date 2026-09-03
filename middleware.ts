@@ -9,6 +9,7 @@ const RESERVED_EXACT = new Set([
   "/me",
   "/sidejob",
   "/no-clawback",
+  "/privacy",
   "/v1",
   "/v2",
   "/v3",
