@@ -22,10 +22,78 @@ export type MetaGraphLead = {
 
 export type ParsedMetaLeadFields = {
   name: string;
+  rawName: string;
+  nameIsTestDummy: boolean;
   phone: string;
+  rawPhone: string;
+  phoneIsTestDummy: boolean;
   email: string | null;
   region: string | null;
 };
+
+const PHONE_FIELD_KEYS = [
+  "phone_number",
+  "phone",
+  "전화번호",
+  "휴대폰",
+  "휴대전화",
+  "mobile_phone",
+  "mobile",
+  "연락처",
+  "핸드폰",
+] as const;
+
+const NAME_FIELD_KEYS = [
+  "full_name",
+  "fullname",
+  "name",
+  "이름",
+  "성함",
+  "고객명",
+  "성명",
+  "fname",
+] as const;
+
+/** Meta Lead Ads Testing Tool 더미값 (`<test lead: dummy data for …>`) */
+export function isMetaTestDummyValue(raw: string): boolean {
+  const s = String(raw ?? "").trim();
+  if (!s) return false;
+  return /^<\s*test\s+lead\s*:/i.test(s) || /dummy\s+data\s+for/i.test(s);
+}
+
+/** 더미 전화용 합성 번호(leadgen_id 기반, 11자리) — 실번호와 충돌 최소화 */
+export function syntheticTestPhoneFromLeadId(leadgenId: string): string {
+  const digits = String(leadgenId).replace(/\D/g, "");
+  const tail = `${digits.slice(-8)}00000000`.slice(0, 8);
+  return `010${tail}`.slice(0, 11);
+}
+
+/** 숫자가 거의 없는 원본도 로그에 안전하게 남김 */
+export function maskRawPhoneForLog(raw: string): string {
+  const s = String(raw ?? "").trim();
+  if (!s) return "(empty)";
+  if (isMetaTestDummyValue(s)) return "(meta-test-dummy)";
+  const digits = normalizePhoneDigits(s);
+  if (digits.length >= 7) return maskPhoneForLog(digits);
+  return `(non-phone len=${s.length} digits=${digits.length})`;
+}
+
+function extractFieldRawValue(f: MetaLeadFieldData): string {
+  const values = f.values as unknown;
+  if (Array.isArray(values)) {
+    const first = values[0];
+    if (first == null) return "";
+    return String(first).trim();
+  }
+  if (typeof values === "string" || typeof values === "number") {
+    return String(values).trim();
+  }
+  const single = (f as { value?: unknown }).value;
+  if (typeof single === "string" || typeof single === "number") {
+    return String(single).trim();
+  }
+  return "";
+}
 
 export type MetaLeadgenWebhookValue = {
   leadgen_id?: string;
@@ -42,15 +110,19 @@ export type IngestMetaLeadResult =
   | { ok: true; created: boolean; leadId: string; skipped?: "blocked" }
   | { ok: false; message: string; status?: number; stage?: "graph" | "supabase" | "validate" };
 
+function normalizeFieldKey(name: string): string {
+  return String(name ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+}
+
 function fieldMap(fieldData: MetaLeadFieldData[] | undefined): Map<string, string> {
   const map = new Map<string, string>();
   for (const f of fieldData ?? []) {
-    const key = String(f.name ?? "")
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "_");
-    const val = Array.isArray(f.values) ? String(f.values[0] ?? "").trim() : "";
-    if (key && val) map.set(key, val);
+    const key = normalizeFieldKey(String(f.name ?? ""));
+    const val = extractFieldRawValue(f);
+    if (key && val && !map.has(key)) map.set(key, val);
   }
   return map;
 }
@@ -75,50 +147,46 @@ export function normalizeMetaPhone(raw: string): string {
 /** Instant Form field_data → CRM 필드 */
 export function parseMetaLeadFields(fieldData: MetaLeadFieldData[] | undefined): ParsedMetaLeadFields {
   const map = fieldMap(fieldData);
-  const first = pickField(map, ["first_name", "이름", "성명_이름"]);
+  const first = pickField(map, ["first_name", "성명_이름"]);
   const last = pickField(map, ["last_name", "성", "성명_성"]);
-  const full = pickField(map, [
-    "full_name",
-    "fullname",
-    "이름",
-    "성함",
-    "고객명",
-    "성명",
+  const full = pickField(map, [...NAME_FIELD_KEYS]);
+  let rawName =
+    full || [last, first].filter(Boolean).join(" ").trim() || [first, last].filter(Boolean).join(" ").trim();
+  rawName = rawName.replace(/\s+/g, " ").trim();
+  const nameIsTestDummy = isMetaTestDummyValue(rawName);
+  const name = nameIsTestDummy ? "" : rawName;
+
+  const rawPhone = pickField(map, [...PHONE_FIELD_KEYS]);
+  const phoneIsTestDummy = isMetaTestDummyValue(rawPhone);
+  const phone = phoneIsTestDummy ? "" : normalizeMetaPhone(rawPhone);
+
+  const emailRaw = pickField(map, ["email", "e-mail", "이메일", "메일"]);
+  const email = emailRaw && !isMetaTestDummyValue(emailRaw) ? emailRaw : null;
+
+  const regionRaw = pickField(map, [
+    "city",
+    "state",
+    "province",
+    "region",
+    "location",
+    "사는_곳",
+    "사는곳",
+    "거주지역",
+    "지역",
+    "주소",
   ]);
-  let name = full || [last, first].filter(Boolean).join(" ").trim() || [first, last].filter(Boolean).join(" ").trim();
-  name = name.replace(/\s+/g, " ").trim();
+  const region = regionRaw && !isMetaTestDummyValue(regionRaw) ? regionRaw : null;
 
-  const phone = normalizeMetaPhone(
-    pickField(map, [
-      "phone_number",
-      "phone",
-      "mobile",
-      "mobile_phone",
-      "연락처",
-      "휴대폰",
-      "핸드폰",
-      "전화번호",
-    ])
-  );
-
-  const email =
-    pickField(map, ["email", "e-mail", "이메일", "메일"]) || null;
-
-  const region =
-    pickField(map, [
-      "city",
-      "state",
-      "province",
-      "region",
-      "location",
-      "사는_곳",
-      "사는곳",
-      "거주지역",
-      "지역",
-      "주소",
-    ]) || null;
-
-  return { name, phone, email: email || null, region };
+  return {
+    name,
+    rawName,
+    nameIsTestDummy,
+    phone,
+    rawPhone,
+    phoneIsTestDummy,
+    email: email || null,
+    region,
+  };
 }
 
 export function getMetaWebhookVerifyToken(): string | null {
@@ -309,14 +377,35 @@ export async function ingestMetaLeadFromWebhook(
   const graph = fetched.lead;
   const parsed = parseMetaLeadFields(graph.field_data);
   let name = parsed.name;
-  if (!name || name.length < 2) name = "Meta리드";
+  if (parsed.nameIsTestDummy || !name || name.length < 2) {
+    name = parsed.nameIsTestDummy ? "Meta테스트리드" : "Meta리드";
+  }
   if (name.length > 40) name = name.slice(0, 40);
 
-  const phone = parsed.phone;
-  if (phone.length < 10 || phone.length > 11) {
+  let phone = parsed.phone;
+  const phoneRawMasked = maskRawPhoneForLog(parsed.rawPhone);
+  const phoneNormMasked = phone ? maskPhoneForLog(phone) : "(empty)";
+  console.info("[meta-leads][validate] phone mapping:", {
+    leadgenId,
+    fieldNames: graph.field_data?.map((f) => f.name),
+    phoneFieldFound: Boolean(parsed.rawPhone),
+    phoneRawMasked,
+    phoneNormMasked,
+    phoneIsTestDummy: parsed.phoneIsTestDummy,
+  });
+
+  if (parsed.phoneIsTestDummy) {
+    // Testing Tool 더미는 실번호가 아니므로 합성 번호로 UPSERT 허용 (운영 실리드는 기존 검증 유지)
+    phone = syntheticTestPhoneFromLeadId(leadgenId);
+    console.warn("[meta-leads][validate] meta test dummy phone — using synthetic:", {
+      leadgenId,
+      phoneMasked: maskPhoneForLog(phone),
+    });
+  } else if (phone.length < 10 || phone.length > 11) {
     console.error("[meta-leads][validate] invalid phone:", {
       leadgenId,
-      phoneMasked: phone ? maskPhoneForLog(phone) : "(empty)",
+      phoneRawMasked,
+      phoneNormMasked,
       fieldNames: graph.field_data?.map((f) => f.name),
     });
     return { ok: false, message: "유효한 전화번호가 없습니다.", status: 400, stage: "validate" };
