@@ -31,6 +31,7 @@ const SECONDARY_TABS = [
   { href: "/admin/audit-logs", label: "활동 로그", ranks: ["admin"] as const },
   { href: "/admin/assignment", label: "자동 분배 설정", ranks: ["admin"] as const },
   { href: "/admin/blacklist", label: "블랙리스트", ranks: ["admin"] as const },
+  { href: "/admin/meta-lead-import", label: "Meta Lead CSV", ranks: ["admin"] as const },
   { href: "/admin/utm", label: "UTM", ranks: ["admin"] as const },
   { href: "/admin/landings", label: "랜딩", ranks: ["admin"] as const },
   { href: "/admin/landing-analytics", label: "스크롤 히트맵", ranks: ["admin"] as const },
