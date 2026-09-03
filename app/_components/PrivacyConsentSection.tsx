@@ -151,14 +151,14 @@ export default function PrivacyConsentSection({
           >
             <div style={{ fontSize: compact ? 12 : 14, lineHeight: 1.65, color: "var(--text-secondary)" }}>
               <div style={{ fontWeight: 800, color: "var(--text-secondary)", marginBottom: 8 }}>
-                &lt;개인정보제공 동의서&gt;
+                &lt;개인정보제공 동의 및 취급방침&gt;
               </div>
 
-              <div>* 본 동의서는 티와이 라이프 파트너스가 개인정보처리자로서 수집 · 이용합니다.</div>
+              <div>* 본 동의서는 피드백(브랜드명 FEED LIFE)가 개인정보처리자로서 수집 · 이용합니다.</div>
               <div style={{ marginTop: 10, fontWeight: 700 }}>1. 수집 · 이용에 관한 사항</div>
               <div style={{ marginTop: 6, fontWeight: 700 }}>수집 · 이용목적</div>
-              <div style={{ marginTop: 4 }}>- 티와이 라이프 파트너스 채용 상담 진행 및 관련 안내 제공</div>
-              <div style={{ marginTop: 2 }}>- 티와이 라이프 파트너스에 대한 채용 정보 및 지원 방법 등 안내 제공</div>
+              <div style={{ marginTop: 4 }}>- FEED LIFE 채용 상담 진행 및 관련 안내 제공</div>
+              <div style={{ marginTop: 2 }}>- FEED LIFE에 대한 채용 정보 및 지원 방법 등 안내 제공</div>
               <div style={{ marginTop: 2 }}>- 상담 후 추가적인 지원 안내 및 관련 서비스에 대한 안내 제공</div>
 
               <div style={{ marginTop: 10, fontWeight: 700 }}>보유 및 이용기간</div>
@@ -167,7 +167,7 @@ export default function PrivacyConsentSection({
               <div style={{ marginTop: 10, fontWeight: 700 }}>거부 권리 및 불이익</div>
               <div style={{ marginTop: 4 }}>- 귀하는 아래 개인(신용)정보 수집, 이용에 관한 동의를 거부하실 수 있습니다.</div>
               <div style={{ marginTop: 2 }}>
-                - 동의 거부 시 불이익은 없으나 티와이 라이프 파트너스의 채용상담 서비스는 제공되지 않습니다.
+                - 동의 거부 시 불이익은 없으나 FEED LIFE의 상담 서비스는 제공되지 않습니다.
               </div>
 
               <div style={{ marginTop: 10, fontWeight: 700 }}>2. 수집 · 이용항목</div>
@@ -187,15 +187,15 @@ export default function PrivacyConsentSection({
                 &lt;마케팅 활용을 위한 개인정보 제공 동의&gt;
               </div>
 
-              <div>*본 동의서는 티와이 라이프 파트너스가 개인정보처리자로서 수집·이용합니다.</div>
+              <div>* 본 동의서는 FEED LIFE가 개인정보처리자로서 수집 · 이용합니다.</div>
 
               <div style={{ marginTop: 10, fontWeight: 700 }}>1. 수집 · 이용에 관한 사항</div>
-              <div style={{ marginTop: 6, fontWeight: 700 }}>- 개인정보의 수집 및 이용 목적</div>
-              <div style={{ marginTop: 4 }}>- ‘티와이 라이프 파트너스’ 채용 서비스 관련 정보 제공 및 안내</div>
+              <div style={{ marginTop: 6, fontWeight: 700 }}>개인정보의 수집 및 이용 목적</div>
+              <div style={{ marginTop: 4 }}>- ‘FEED LIFE’ 상담 서비스 관련 정보 제공 및 안내</div>
               <div style={{ marginTop: 2 }}>- 채용 이벤트 및 프로모션 안내</div>
               <div style={{ marginTop: 2 }}>- 채용 시장 조사 및 서비스 품질 향상</div>
 
-              <div style={{ marginTop: 10, fontWeight: 700 }}>2. 수집·이용 항목</div>
+              <div style={{ marginTop: 10, fontWeight: 700 }}>2. 수집 · 이용 항목</div>
               <div style={{ marginTop: 4 }}>성명, 거주지, 연령대, 성별, 전화번호, 직업</div>
 
               <div style={{ marginTop: 10, fontWeight: 700 }}>개인정보의 보유 및 이용 기간</div>
@@ -205,7 +205,7 @@ export default function PrivacyConsentSection({
 
               <div style={{ marginTop: 10, fontWeight: 700 }}>동의 거부 권리 및 불이익</div>
               <div style={{ marginTop: 4 }}>
-                귀하는 본 동의를 거부하실 수 있으며, 거부하신 경우에도 ‘티와이 라이프 파트너스’ 서비스 이용에는 제한이 없습니다.
+                귀하는 본 동의를 거부하실 수 있으며, 거부하신 경우에도 ‘FEED LIFE’ 서비스 이용에는 제한이 없습니다.
               </div>
               <div style={{ marginTop: 2 }}>
                 다만, 마케팅 정보 제공 등 부가 혜택 안내가 제한될 수 있습니다.
@@ -214,6 +214,17 @@ export default function PrivacyConsentSection({
               <div style={{ marginTop: 10 }}>위 개인정보를 수집/이용 하는 것에 동의합니다.</div>
               <div style={{ marginTop: 4 }}>
                 채용 마케팅 광고성 정보(전화/문자/카카오톡/이메일) 수신에 동의합니다.
+              </div>
+
+              <div style={{ marginTop: 14 }}>
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: "var(--text-secondary)", textDecoration: "underline" }}
+                >
+                  전체 개인정보처리방침 보기
+                </a>
               </div>
             </div>
           </div>

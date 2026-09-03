@@ -59,11 +59,18 @@ function fullImageUrl(row: MetaCreativeCache): string | null {
   return row.image_url || row.thumbnail_url || null;
 }
 
-async function graphGet(path: string, fields: string): Promise<{ ok: true; data: any } | { ok: false; status: number; message: string }> {
+async function graphGet(
+  path: string,
+  fields: string,
+  extraParams?: Record<string, string>
+): Promise<{ ok: true; data: any } | { ok: false; status: number; message: string }> {
   const token = accessToken();
   if (!token) return { ok: false, status: 0, message: "META_ACCESS_TOKEN 미설정" };
   const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${path.replace(/^\//, "")}`);
   url.searchParams.set("fields", fields);
+  if (extraParams) {
+    for (const [k, v] of Object.entries(extraParams)) url.searchParams.set(k, v);
+  }
   url.searchParams.set("access_token", token);
   const res = await fetch(url.toString(), { method: "GET", cache: "no-store" });
   const json = await res.json().catch(() => ({}));
@@ -77,11 +84,87 @@ async function graphGet(path: string, fields: string): Promise<{ ok: true; data:
 function mapCreativeType(creative: any): string {
   if (!creative) return "unknown";
   if (creative.video_id) return "video";
-  if (creative.image_url || creative.thumbnail_url) return "image";
+  if (creative.image_url || creative.thumbnail_url || creative.image_hash) return "image";
   const ot = String(creative.object_type ?? "").toLowerCase();
   if (ot.includes("video")) return "video";
-  if (ot.includes("image") || ot.includes("photo")) return "image";
+  if (ot.includes("image") || ot.includes("photo") || ot.includes("share")) return "image";
   return ot || "unknown";
+}
+
+function firstNonEmpty(...vals: unknown[]): string | null {
+  for (const v of vals) {
+    const s = String(v ?? "").trim();
+    if (s) return s;
+  }
+  return null;
+}
+
+/** Lead Ads / Instant Form 포함 — creative 중첩 스펙에서 이미지 URL·hash 추출 */
+export function extractCreativeMedia(creative: any): {
+  image_url: string | null;
+  thumbnail_url: string | null;
+  video_id: string | null;
+  image_hash: string | null;
+  story_id: string | null;
+} {
+  const oss = creative?.object_story_spec ?? {};
+  const link = oss.link_data ?? {};
+  const photo = oss.photo_data ?? {};
+  const video = oss.video_data ?? {};
+  const feed = creative?.asset_feed_spec ?? {};
+  const feedImage = Array.isArray(feed.images) ? feed.images[0] : null;
+  const feedVideo = Array.isArray(feed.videos) ? feed.videos[0] : null;
+
+  const image_hash = firstNonEmpty(
+    creative?.image_hash,
+    link.image_hash,
+    photo.image_hash,
+    feedImage?.hash
+  );
+  const image_url = firstNonEmpty(
+    creative?.image_url,
+    link.picture,
+    link.image_url,
+    photo.url,
+    photo.picture,
+    video.image_url,
+    feedImage?.url
+  );
+  const thumbnail_url = firstNonEmpty(creative?.thumbnail_url, image_url);
+  const video_id = firstNonEmpty(creative?.video_id, video.video_id, feedVideo?.video_id);
+  const story_id = firstNonEmpty(
+    creative?.effective_object_story_id,
+    creative?.object_story_id
+  );
+
+  return { image_url, thumbnail_url, video_id, image_hash, story_id };
+}
+
+async function resolveImageHashUrl(imageHash: string): Promise<string | null> {
+  const accountId = normalizeMetaAdAccountId();
+  if (!accountId) return null;
+  const result = await graphGet(
+    `${accountId}/adimages`,
+    "hash,url,permalink_url",
+    { hashes: `["${imageHash}"]` }
+  );
+  if (!result.ok) {
+    console.warn("[meta/ads] adimages lookup failed:", result.message);
+    return null;
+  }
+  const data = result.data?.data;
+  if (!Array.isArray(data) || !data.length) return null;
+  const row = data.find((d: any) => String(d.hash) === imageHash) ?? data[0];
+  return firstNonEmpty(row?.url, row?.permalink_url);
+}
+
+async function resolveStoryPicture(storyId: string): Promise<string | null> {
+  const result = await graphGet(storyId, "full_picture,picture");
+  if (!result.ok) {
+    console.warn("[meta/ads] story picture failed:", storyId, result.message);
+    return null;
+  }
+  return firstNonEmpty(result.data?.full_picture, result.data?.picture);
 }
 
 async function upsertCreativeCache(row: MetaCreativeCache, extra?: Record<string, unknown>) {
@@ -96,7 +179,7 @@ async function upsertCreativeCache(row: MetaCreativeCache, extra?: Record<string
   }
 }
 
-/** Marketing API로 광고 소재를 조회하고 DB에 캐시 */
+/** Marketing API로 광고 소재를 조회하고 DB에 캐시 (Lead Ads 중첩 이미지 포함) */
 export async function fetchAndCacheMetaAdCreative(adId: string): Promise<MetaCreativeCache> {
   const id = String(adId).trim();
   const now = new Date().toISOString();
@@ -119,9 +202,24 @@ export async function fetchAndCacheMetaAdCreative(adId: string): Promise<MetaCre
     return row;
   }
 
+  // Lead Form 광고는 image_url이 비고 thumbnail_url / object_story_spec / image_hash 에만 있는 경우가 많음
   const result = await graphGet(
     id,
-    "id,name,creative{id,name,thumbnail_url,image_url,video_id,object_type,effective_object_story_id}"
+    [
+      "id",
+      "name",
+      "creative{",
+      "id,name,thumbnail_url,image_url,image_hash,video_id,object_type,",
+      "effective_object_story_id,object_story_id,",
+      "object_story_spec{",
+      "link_data{image_hash,picture,image_url,link,name,message},",
+      "photo_data{image_hash,url,picture},",
+      "video_data{video_id,image_url,image_hash}",
+      "},",
+      "asset_feed_spec{images{hash,url},videos{video_id}}",
+      "}",
+    ].join(""),
+    { thumbnail_width: "600", thumbnail_height: "600" }
   );
 
   if (!result.ok) {
@@ -140,24 +238,46 @@ export async function fetchAndCacheMetaAdCreative(adId: string): Promise<MetaCre
       fetched_at: now,
     };
     await upsertCreativeCache(row, { raw: { error: result.message } });
+    console.error("[meta/ads] ad creative fetch failed:", { adId: id, status: result.status, message: result.message });
     return row;
   }
 
   const creative = result.data?.creative ?? null;
+  const media = extractCreativeMedia(creative);
+  let imageUrl = media.image_url;
+  let thumbUrl = media.thumbnail_url;
+
+  if (!imageUrl && media.image_hash) {
+    imageUrl = await resolveImageHashUrl(media.image_hash);
+    if (imageUrl && !thumbUrl) thumbUrl = imageUrl;
+  }
+  if (!imageUrl && !thumbUrl && media.story_id) {
+    const storyPic = await resolveStoryPicture(media.story_id);
+    imageUrl = storyPic;
+    thumbUrl = storyPic;
+  }
+
   const row: MetaCreativeCache = {
     ad_id: id,
     ad_name: result.data?.name ? String(result.data.name) : null,
     creative_id: creative?.id ? String(creative.id) : null,
     creative_type: mapCreativeType(creative),
-    thumbnail_url: creative?.thumbnail_url ? String(creative.thumbnail_url) : null,
-    image_url: creative?.image_url ? String(creative.image_url) : null,
-    video_id: creative?.video_id ? String(creative.video_id) : null,
+    thumbnail_url: thumbUrl,
+    image_url: imageUrl,
+    video_id: media.video_id,
     permalink_url: null,
     fetch_status: "ok",
-    fetch_error: null,
+    fetch_error: imageUrl || thumbUrl ? null : "creative has no resolvable image",
     fetched_at: now,
   };
   await upsertCreativeCache(row, { raw: result.data });
+  console.info("[meta/ads] creative cached:", {
+    adId: id,
+    hasImage: Boolean(imageUrl || thumbUrl),
+    creativeType: row.creative_type,
+    usedHash: Boolean(media.image_hash && imageUrl),
+    usedStory: Boolean(media.story_id && imageUrl),
+  });
   return row;
 }
 
@@ -173,7 +293,13 @@ function isFresh(row: MetaCreativeCache): boolean {
   if (Number.isNaN(t)) return false;
   if (row.fetch_status === "missing_token") return false;
   if (row.fetch_status === "error") return Date.now() - t < 60 * 60 * 1000; // 오류는 1시간 캐시
+  // Lead Ads 등: ok인데 이미지가 비어 있으면 재조회 (이전 얕은 필드 캐시 무효)
+  if (row.fetch_status === "ok" && !row.image_url && !row.thumbnail_url) return false;
   return Date.now() - t < CACHE_TTL_MS;
+}
+
+function hasPreview(row: MetaCreativeCache): boolean {
+  return Boolean(row.image_url || row.thumbnail_url);
 }
 
 /** 캐시 우선, 만료/없음이면 API 조회 */
@@ -217,7 +343,8 @@ export async function attachMetaCreatives<T extends {
       .in("ad_id", unique);
     for (const row of data ?? []) {
       const c = row as MetaCreativeCache;
-      if (isFresh(c)) map.set(c.ad_id, c);
+      // 이미지 없는 ok 캐시는 fresh로 치지 않음 → 백그라운드 재조회
+      if (isFresh(c) && hasPreview(c)) map.set(c.ad_id, c);
     }
   }
 
@@ -230,9 +357,9 @@ export async function attachMetaCreatives<T extends {
       for (const row of rows) map.set(row.ad_id, row);
     }
   } else if (missing.length && opts?.cacheOnly) {
-    // 목록은 캐시만 쓰고, 미스분은 소수만 백그라운드로 채워 다음 새로고침에 썸네일 표시
+    // 목록은 캐시만 쓰고, 미스·이미지없음 분은 소수만 백그라운드 재조회
     void Promise.all(
-      missing.slice(0, 8).map((id) =>
+      missing.slice(0, 12).map((id) =>
         fetchAndCacheMetaAdCreative(id).catch((e) => {
           console.warn("[meta/ads] background fill:", e instanceof Error ? e.message : e);
         })
