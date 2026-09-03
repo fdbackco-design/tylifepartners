@@ -1,6 +1,6 @@
 import { addDaysYmd, kstYmd, startOfKstDayIso, startOfNextKstDayIso } from "@/lib/crm/kst";
 import { getTtlCache, setTtlCache } from "@/lib/crm/ttlCache";
-import { getMetaAccessToken, isMetaAdsConfigured, normalizeMetaAdAccountId } from "@/lib/meta/ads";
+import { getMetaAdsAccessToken, isMetaAdsConfigured, normalizeMetaAdAccountId } from "@/lib/meta/ads";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const GRAPH_VERSION = "v21.0";
@@ -39,8 +39,8 @@ export type TodayDbCost = {
 type GraphResult = { ok: true; data: any } | { ok: false; status: number; message: string };
 
 async function graphGet(path: string, params: Record<string, string>): Promise<GraphResult> {
-  const token = getMetaAccessToken();
-  if (!token) return { ok: false, status: 0, message: "META_ACCESS_TOKEN 미설정" };
+  const token = getMetaAdsAccessToken();
+  if (!token) return { ok: false, status: 0, message: "META_ADS_ACCESS_TOKEN(또는 META_ACCESS_TOKEN) 미설정" };
   const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${path.replace(/^\//, "")}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   url.searchParams.set("access_token", token);
@@ -525,7 +525,7 @@ export async function syncMetaAdDailyInsights(): Promise<SyncMetaInsightsResult>
       insight_date: "",
       timezone: "Asia/Seoul",
       upserted: 0,
-      message: "META_ACCESS_TOKEN 미설정",
+      message: "META_ADS_ACCESS_TOKEN(또는 META_ACCESS_TOKEN) 미설정",
     };
   }
 

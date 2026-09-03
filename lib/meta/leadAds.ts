@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { tryAutoAssignLead } from "@/lib/crm/assignment";
+import { mapMetaLeadJobRank } from "@/lib/crm/metaLeadCsv";
 import { resolveRegionZone } from "@/lib/crm/regionZones";
 import { getMetaAccessToken } from "@/lib/meta/ads";
 import { isLeadSubmissionBlockedAsync, maskPhoneForLog, normalizePhoneDigits } from "@/lib/phoneBlacklist";
@@ -29,6 +30,10 @@ export type ParsedMetaLeadFields = {
   phoneIsTestDummy: boolean;
   email: string | null;
   region: string | null;
+  available_time: string | null;
+  age_group: string | null;
+  job: string | null;
+  job_rank: string | null;
 };
 
 const PHONE_FIELD_KEYS = [
@@ -177,6 +182,17 @@ export function parseMetaLeadFields(fieldData: MetaLeadFieldData[] | undefined):
   ]);
   const region = regionRaw && !isMetaTestDummyValue(regionRaw) ? regionRaw : null;
 
+  const pickOptional = (keys: string[]) => {
+    const v = pickField(map, keys);
+    return v && !isMetaTestDummyValue(v) ? v : null;
+  };
+
+  const available_time = pickOptional(["상담가능시간", "available_time", "desired_time"]);
+  const age_group = pickOptional(["연령대", "age_group", "age"]);
+  const job = pickOptional(["직업", "job", "occupation"]);
+  const jobRankRaw = pickOptional(["직급", "job_rank"]);
+  const job_rank = jobRankRaw ? mapMetaLeadJobRank(jobRankRaw) ?? jobRankRaw.replace(/_/g, " ") : null;
+
   return {
     name,
     rawName,
@@ -186,6 +202,10 @@ export function parseMetaLeadFields(fieldData: MetaLeadFieldData[] | undefined):
     phoneIsTestDummy,
     email: email || null,
     region,
+    available_time,
+    age_group,
+    job,
+    job_rank,
   };
 }
 
@@ -346,7 +366,7 @@ function logSupabaseError(stage: string, error: { message?: string; details?: st
 }
 
 /**
- * Meta Instant Form 리드를 소비자 DB(leads)에 반영.
+ * Meta Instant Form 리드를 후보자 DB(tylife_b2b)에 반영.
  * meta_lead_id 기준 중복 방지(재전송 UPSERT).
  */
 export async function ingestMetaLeadFromWebhook(
@@ -362,6 +382,7 @@ export async function ingestMetaLeadFromWebhook(
     form_id: value.form_id ?? null,
     page_id: value.page_id ?? null,
     ad_id: value.ad_id ?? null,
+    target: "tylife_b2b",
   });
 
   const fetched = await fetchMetaLeadById(leadgenId);
@@ -429,20 +450,20 @@ export async function ingestMetaLeadFromWebhook(
   const nowIso = new Date().toISOString();
 
   const supabase = getSupabaseAdmin();
+  const TABLE = "tylife_b2b" as const;
 
   const { data: existing, error: findErr } = await supabase
-    .from("leads")
+    .from(TABLE)
     .select("id")
     .eq("meta_lead_id", leadgenId)
     .maybeSingle();
 
   if (findErr) {
-    logSupabaseError("lookup by meta_lead_id", findErr, { leadgenId });
-    // 컬럼 미적용(039 미실행)이면 insert도 실패하므로 여기서 중단해 원인을 명확히 함
+    logSupabaseError("lookup by meta_lead_id", findErr, { leadgenId, table: TABLE });
     if (/meta_lead_id|schema cache|column/i.test(findErr.message)) {
       return {
         ok: false,
-        message: `Supabase 스키마 오류(meta_lead_id): ${findErr.message}. 마이그레이션 039를 적용하세요.`,
+        message: `Supabase 스키마 오류(meta_lead_id): ${findErr.message}. 마이그레이션 040을 적용하세요.`,
         status: 500,
         stage: "supabase",
       };
@@ -450,57 +471,51 @@ export async function ingestMetaLeadFromWebhook(
     return { ok: false, message: findErr.message, status: 500, stage: "supabase" };
   }
 
-  if (existing?.id) {
-    const { error: updErr } = await supabase
-      .from("leads")
-      .update({
-        name,
-        phone,
-        normalized_phone: phone,
-        email: parsed.email,
-        meta_form_id: formId,
-        meta_ad_id: adId,
-        meta_adset_id: adsetId,
-        meta_campaign_id: campaignId,
-        meta_created_time: metaCreated,
-        source: "meta",
-        utm_source: "meta",
-        utm_medium: "lead_ads",
-        utm_content: adId,
-        region: regionRaw,
-        location: regionRaw,
-        region_zone: resolveRegionZone(regionRaw),
-      })
-      .eq("id", existing.id);
-
-    if (updErr) {
-      logSupabaseError("update existing lead", updErr, { leadgenId, leadId: existing.id });
-      return { ok: false, message: updErr.message, status: 500, stage: "supabase" };
-    }
-    console.info("[meta-leads][supabase] upsert update ok:", { leadgenId, leadId: existing.id });
-    return { ok: true, created: false, leadId: String(existing.id) };
-  }
-
-  const insertRow: Record<string, unknown> = {
+  const sharedFields: Record<string, unknown> = {
     name,
     phone,
     normalized_phone: phone,
     email: parsed.email,
-    source: "meta",
-    utm_source: "meta",
-    utm_medium: "lead_ads",
-    utm_campaign: campaignId,
-    utm_content: adId,
-    meta_lead_id: leadgenId,
     meta_form_id: formId,
     meta_ad_id: adId,
     meta_adset_id: adsetId,
     meta_campaign_id: campaignId,
     meta_created_time: metaCreated,
-    entry_page: "/meta-lead-ads",
+    source: "meta",
+    utm_source: "meta",
+    utm_medium: "lead_ads",
+    utm_campaign: campaignId,
+    utm_content: adId,
     region: regionRaw,
-    location: regionRaw,
     region_zone: resolveRegionZone(regionRaw),
+    available_time: parsed.available_time,
+    age_group: parsed.age_group,
+    job: parsed.job,
+    job_rank: parsed.job_rank,
+  };
+
+  if (existing?.id) {
+    const { error: updErr } = await supabase
+      .from(TABLE)
+      .update(sharedFields)
+      .eq("id", existing.id);
+
+    if (updErr) {
+      logSupabaseError("update existing candidate", updErr, { leadgenId, leadId: existing.id });
+      return { ok: false, message: updErr.message, status: 500, stage: "supabase" };
+    }
+    console.info("[meta-leads][supabase] upsert update ok:", {
+      table: TABLE,
+      leadgenId,
+      leadId: existing.id,
+    });
+    return { ok: true, created: false, leadId: String(existing.id) };
+  }
+
+  const insertRow: Record<string, unknown> = {
+    ...sharedFields,
+    meta_lead_id: leadgenId,
+    entry_page: "/meta-lead-ads",
     status: "배정전",
     status_changed_at: nowIso,
     merge_status: "active",
@@ -509,17 +524,16 @@ export async function ingestMetaLeadFromWebhook(
   if (metaCreated) insertRow.created_at = metaCreated;
 
   const { data: inserted, error: insErr } = await supabase
-    .from("leads")
+    .from(TABLE)
     .insert(insertRow)
     .select("id")
     .single();
 
   if (insErr) {
-    logSupabaseError("insert new lead", insErr, { leadgenId });
-    // 동시 재전송으로 unique 충돌 시 재조회
+    logSupabaseError("insert new candidate", insErr, { leadgenId });
     if (/duplicate|unique|meta_lead_id/i.test(insErr.message)) {
       const { data: again, error: againErr } = await supabase
-        .from("leads")
+        .from(TABLE)
         .select("id")
         .eq("meta_lead_id", leadgenId)
         .maybeSingle();
@@ -532,11 +546,17 @@ export async function ingestMetaLeadFromWebhook(
   }
 
   const leadId = String(inserted.id);
-  console.info("[meta-leads][supabase] insert ok:", { leadgenId, leadId, phone: maskPhoneForLog(phone) });
+  console.info("[meta-leads][supabase] insert ok:", {
+    table: TABLE,
+    leadgenId,
+    leadId,
+    phone: maskPhoneForLog(phone),
+  });
 
+  let assigned: { assigneeId: string; assigneeName: string } | null = null;
   try {
-    await tryAutoAssignLead({
-      table: "leads",
+    assigned = await tryAutoAssignLead({
+      table: TABLE,
       leadId,
       region: regionRaw,
       utmSource: "meta",
@@ -547,11 +567,12 @@ export async function ingestMetaLeadFromWebhook(
 
   try {
     await notifyAdminsNewLead({
-      kind: "consumers",
+      kind: "candidates",
       name,
       phone,
       leadId,
       region: regionRaw,
+      assigneeName: assigned?.assigneeName ?? null,
     });
   } catch (e) {
     console.warn("[meta-leads] push notify skipped:", e instanceof Error ? e.message : e);

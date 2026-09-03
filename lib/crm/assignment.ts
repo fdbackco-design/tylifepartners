@@ -248,7 +248,7 @@ export async function tryAutoAssignLead(opts: {
   leadId: string;
   region: string | null;
   utmSource?: string | null;
-}): Promise<void> {
+}): Promise<{ assigneeId: string; assigneeName: string } | null> {
   try {
     const supabase = getSupabaseAdmin();
     const enabled = await isAutoAssignEnabled();
@@ -259,7 +259,16 @@ export async function tryAutoAssignLead(opts: {
       .update({ region_zone: zone ?? null })
       .eq("id", opts.leadId);
 
-    if (!enabled) return;
+    if (!enabled) return null;
+
+    const resolveAssigneeName = async (staffId: string): Promise<string> => {
+      const { data } = await supabase
+        .from("staff_users")
+        .select("name")
+        .eq("id", staffId)
+        .maybeSingle();
+      return String(data?.name ?? "").trim() || "담당자";
+    };
 
     // 1) UTM 등록 담당자 우선
     const utmAssignee = await resolveAssigneeIdFromUtmSource(opts.utmSource);
@@ -272,16 +281,21 @@ export async function tryAutoAssignLead(opts: {
         changedByName: `UTM자동배정(${utmAssignee.utmLabel})`,
         regionZone: zone ?? null,
       });
-      if (ok) return;
+      if (ok) {
+        return {
+          assigneeId: utmAssignee.staffId,
+          assigneeName: await resolveAssigneeName(utmAssignee.staffId),
+        };
+      }
     }
 
     // 2) 지역 규칙 가중치 배정
     const rules = await loadAssignmentRules();
     const rule = matchRule(opts.region, rules);
-    if (!rule) return;
+    if (!rule) return null;
 
     const memberIds = rule.members.map((m) => m.staff_user_id).filter(Boolean);
-    if (!memberIds.length) return;
+    if (!memberIds.length) return null;
 
     const { data: staffRows } = await supabase
       .from("staff_users")
@@ -293,7 +307,7 @@ export async function tryAutoAssignLead(opts: {
     const allowed = new Set((staffRows ?? []).map((s) => s.id as string));
     const eligible = rule.members.filter((m) => allowed.has(m.staff_user_id));
     const member = pickWeightedMember(eligible);
-    if (!member) return;
+    if (!member) return null;
 
     const assigned = await assignLeadToStaff({
       table: opts.table,
@@ -308,9 +322,15 @@ export async function tryAutoAssignLead(opts: {
         .from("assignment_rule_members")
         .update({ assigned_count: member.assigned_count + 1 })
         .eq("id", member.id);
+      return {
+        assigneeId: member.staff_user_id,
+        assigneeName: await resolveAssigneeName(member.staff_user_id),
+      };
     }
+    return null;
   } catch (e) {
     console.error("tryAutoAssignLead:", e);
+    return null;
   }
 }
 

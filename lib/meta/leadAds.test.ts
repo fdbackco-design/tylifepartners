@@ -44,9 +44,19 @@ describe("parseMetaLeadFields", () => {
     const parsed = parseMetaLeadFields([
       { name: "이름", values: ["이영희"] },
       { name: "휴대전화", values: ["01011112222"] },
+      { name: "지역", values: ["경기"] },
+      { name: "상담가능시간", values: ["오후"] },
+      { name: "연령대", values: ["30대"] },
+      { name: "직업", values: ["보험설계사"] },
+      { name: "직급", values: ["팀장_이상"] },
     ]);
     assert.equal(parsed.name, "이영희");
     assert.equal(parsed.phone, "01011112222");
+    assert.equal(parsed.region, "경기");
+    assert.equal(parsed.available_time, "오후");
+    assert.equal(parsed.age_group, "30대");
+    assert.equal(parsed.job, "보험설계사");
+    assert.equal(parsed.job_rank, "팀장 이상");
   });
 
   it("maps phone / 전화번호 / mobile_phone aliases", () => {
