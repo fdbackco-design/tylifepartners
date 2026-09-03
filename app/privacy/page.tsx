@@ -11,13 +11,23 @@ export default function PrivacyPolicyPage() {
       style={{
         maxWidth: 720,
         margin: "0 auto",
-        padding: "32px 20px 64px",
-        color: "#212529",
-        lineHeight: 1.7,
-        fontFamily:
-          'Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif',
+        padding: "24px 16px 64px",
+        minHeight: "100vh",
+        boxSizing: "border-box",
       }}
     >
+      <article
+        style={{
+          background: "#ffffff",
+          borderRadius: 12,
+          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
+          padding: "32px 20px 40px",
+          color: "#212529",
+          lineHeight: 1.7,
+          fontFamily:
+            'Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif',
+        }}
+      >
       <h1 style={{ fontSize: 28, fontWeight: 800, margin: "0 0 8px", lineHeight: 1.3 }}>
         개인정보제공 동의 및 취급방침
       </h1>
@@ -123,6 +133,7 @@ export default function PrivacyPolicyPage() {
           채용 마케팅 광고성 정보(전화/문자/카카오톡/이메일) 수신에 동의합니다.
         </p>
       </section>
+      </article>
     </main>
   );
 }
