@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "type-check": "tsc --noEmit",
-    "test": "tsx --test lib/crm/regionZones.test.ts lib/crm/scope.test.ts lib/crm/merge/logic.test.ts lib/crm/excelImport/logic.test.ts lib/utm.meta.test.ts lib/landing-analytics/validate.behavior.test.ts lib/crm/calendar.test.ts lib/meta/insights.test.ts lib/crm/leadSearch.test.ts lib/meta/leadAds.test.ts lib/crm/metaLeadCsv.test.ts lib/meta/ads.creative.test.ts",
+    "test": "tsx --test lib/crm/regionZones.test.ts lib/crm/scope.test.ts lib/crm/merge/logic.test.ts lib/crm/excelImport/logic.test.ts lib/utm.meta.test.ts lib/landing-analytics/validate.behavior.test.ts lib/crm/calendar.test.ts lib/meta/insights.test.ts lib/crm/leadSearch.test.ts lib/meta/leadAds.test.ts lib/crm/metaLeadCsv.test.ts lib/meta/ads.creative.test.ts lib/slack/assignCommand.test.ts",
     "start": "next start",
     "lint": "next lint"
   },
