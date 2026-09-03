@@ -1,6 +1,7 @@
 import webpush from "web-push";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { formatPhoneKorean } from "@/lib/phone";
+import { notifySlackNewLead } from "@/lib/slackNotify";
 
 export type PushPayload = {
   title: string;
@@ -148,7 +149,7 @@ async function loadAdminSubscriptions(): Promise<SubRow[]> {
   return (data ?? []) as SubRow[];
 }
 
-/** 신규 상담 DB → 관리자(rank=admin) 전원 */
+/** 신규 상담 DB → 관리자(rank=admin) 웹푸시 + 슬랙 채널 */
 export async function notifyAdminsNewLead(opts: {
   kind: "consumers" | "candidates";
   name: string;
@@ -156,23 +157,33 @@ export async function notifyAdminsNewLead(opts: {
   leadId: string;
   region?: string | null;
 }): Promise<void> {
-  if (!isWebPushConfigured()) return;
-  const subs = await loadAdminSubscriptions();
-  if (!subs.length) return;
-
   const kindLabel = opts.kind === "candidates" ? "후보자" : "소비자";
   const url =
     opts.kind === "candidates"
       ? `/admin/candidates?search=${encodeURIComponent(opts.phone.replace(/\D/g, ""))}`
       : `/admin/consumers?search=${encodeURIComponent(opts.phone.replace(/\D/g, ""))}`;
   const region = String(opts.region ?? "").trim();
+  const title = `신규 ${kindLabel} DB`;
+  const body = `${opts.name} · ${formatPhoneKorean(opts.phone)}${region ? ` · ${region}` : ""}`;
 
-  await sendToSubscriptions(subs, {
-    title: `신규 ${kindLabel} DB`,
-    body: `${opts.name} · ${formatPhoneKorean(opts.phone)}${region ? ` · ${region}` : ""}`,
-    url,
-    tag: `new-lead-${opts.leadId}`,
-  });
+  const tasks: Promise<unknown>[] = [notifySlackNewLead(opts)];
+
+  if (isWebPushConfigured()) {
+    tasks.push(
+      (async () => {
+        const subs = await loadAdminSubscriptions();
+        if (!subs.length) return;
+        await sendToSubscriptions(subs, {
+          title,
+          body,
+          url,
+          tag: `new-lead-${opts.leadId}`,
+        });
+      })()
+    );
+  }
+
+  await Promise.all(tasks);
 }
 
 /** 담당자 지정/변경 → 해당 담당자 */

@@ -5,8 +5,10 @@ import {
   type MetaLeadCsvParseIssue,
   type MetaLeadCsvRow,
 } from "@/lib/crm/metaLeadCsv";
+import { fetchAndCacheMetaAdCreative } from "@/lib/meta/ads";
 import { isLeadSubmissionBlockedAsync, maskPhoneForLog } from "@/lib/phoneBlacklist";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { notifyAdminsNewLead } from "@/lib/webPush";
 
 export type MetaLeadCsvPreviewRow = {
   rowNumber: number;
@@ -220,12 +222,30 @@ export async function executeMetaLeadCsvImport(buffer: Buffer): Promise<{
       } catch (e) {
         console.warn("[meta-lead-csv] auto-assign:", e instanceof Error ? e.message : e);
       }
+      try {
+        await notifyAdminsNewLead({
+          kind: "candidates",
+          name: src.name,
+          phone: src.phone,
+          leadId,
+          region: src.region,
+        });
+      } catch (e) {
+        console.warn("[meta-lead-csv] notify:", e instanceof Error ? e.message : e);
+      }
     } catch (e) {
       failed += 1;
       const msg = e instanceof Error ? e.message : String(e);
       errors.push(`${row.rowNumber}: ${msg}`);
       resultRows.push({ ...row, reason: msg });
     }
+  }
+
+  // 목록 소재 썸네일용 — 반영된 ad_id 캐시 채우기
+  try {
+    await prefetchCreativesForCsvRows(parsed.rows);
+  } catch (e) {
+    console.warn("[meta-lead-csv] creative prefetch batch:", e instanceof Error ? e.message : e);
   }
 
   return {
@@ -240,4 +260,21 @@ export async function executeMetaLeadCsvImport(buffer: Buffer): Promise<{
     issues: preview.issues,
     errors,
   };
+}
+
+/** CSV에 등장한 ad_id 소재를 Graph에서 캐시 (목록 썸네일용) */
+async function prefetchCreativesForCsvRows(rows: MetaLeadCsvRow[]): Promise<void> {
+  const ids = Array.from(new Set(rows.map((r) => r.ad_id).filter(Boolean) as string[]));
+  if (!ids.length) return;
+  const concurrency = 3;
+  for (let i = 0; i < ids.length; i += concurrency) {
+    const chunk = ids.slice(i, i + concurrency);
+    await Promise.all(
+      chunk.map((id) =>
+        fetchAndCacheMetaAdCreative(id).catch((e) => {
+          console.warn("[meta-lead-csv] creative prefetch:", id, e instanceof Error ? e.message : e);
+        })
+      )
+    );
+  }
 }
