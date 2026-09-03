@@ -40,7 +40,7 @@ export type MetaLeadgenWebhookValue = {
 
 export type IngestMetaLeadResult =
   | { ok: true; created: boolean; leadId: string; skipped?: "blocked" }
-  | { ok: false; message: string; status?: number };
+  | { ok: false; message: string; status?: number; stage?: "graph" | "supabase" | "validate" };
 
 function fieldMap(fieldData: MetaLeadFieldData[] | undefined): Map<string, string> {
   const map = new Map<string, string>();
@@ -131,31 +131,92 @@ export function getMetaAppSecret(): string | null {
   return t || null;
 }
 
-/** X-Hub-Signature-256 검증 (App Secret 미설정 시 스킵하고 경고) */
-export function verifyMetaWebhookSignature(rawBody: string, signatureHeader: string | null): boolean {
+export type SignatureVerifyResult = {
+  ok: boolean;
+  reason?: "missing_header" | "bad_prefix" | "mismatch" | "skipped_no_secret";
+};
+
+/**
+ * X-Hub-Signature-256 검증 — 반드시 Webhook 원본 raw body 문자열로 HMAC-SHA256.
+ * JSON.parse 후 JSON.stringify 한 값으로 검증하면 안 된다.
+ */
+export function verifyMetaWebhookSignature(
+  rawBody: string,
+  signatureHeader: string | null
+): SignatureVerifyResult {
   const secret = getMetaAppSecret();
   if (!secret) {
-    console.warn("[meta-leads] META_APP_SECRET 미설정 — 서명 검증 생략");
-    return true;
+    console.warn("[meta-leads][signature] META_APP_SECRET 미설정 — 서명 검증 생략", {
+      rawBodyBytes: Buffer.byteLength(rawBody, "utf8"),
+      hasHeader: Boolean(signatureHeader),
+    });
+    return { ok: true, reason: "skipped_no_secret" };
   }
-  if (!signatureHeader || !signatureHeader.startsWith("sha256=")) return false;
-  const expected = createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
-  const incoming = signatureHeader.slice("sha256=".length);
+  if (!signatureHeader) {
+    console.error("[meta-leads][signature] X-Hub-Signature-256 헤더 없음", {
+      rawBodyBytes: Buffer.byteLength(rawBody, "utf8"),
+      hasAppSecret: true,
+    });
+    return { ok: false, reason: "missing_header" };
+  }
+  if (!signatureHeader.startsWith("sha256=")) {
+    console.error("[meta-leads][signature] 헤더 prefix 오류", {
+      headerPrefix: signatureHeader.slice(0, 16),
+      rawBodyBytes: Buffer.byteLength(rawBody, "utf8"),
+    });
+    return { ok: false, reason: "bad_prefix" };
+  }
+
+  const expectedHex = createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
+  const incomingHex = signatureHeader.slice("sha256=".length).trim().toLowerCase();
   try {
-    const a = Buffer.from(expected, "utf8");
-    const b = Buffer.from(incoming, "utf8");
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(a, b);
-  } catch {
-    return false;
+    const a = Buffer.from(expectedHex, "utf8");
+    const b = Buffer.from(incomingHex, "utf8");
+    const match = a.length === b.length && timingSafeEqual(a, b);
+    if (!match) {
+      console.error("[meta-leads][signature] HMAC mismatch", {
+        rawBodyBytes: Buffer.byteLength(rawBody, "utf8"),
+        expectedLen: expectedHex.length,
+        incomingLen: incomingHex.length,
+        // 토큰/시크릿/본문 전문은 절대 출력하지 않음
+      });
+      return { ok: false, reason: "mismatch" };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error("[meta-leads][signature] compare error:", e instanceof Error ? e.message : e);
+    return { ok: false, reason: "mismatch" };
   }
+}
+
+function sanitizeGraphErrorBody(json: unknown): Record<string, unknown> {
+  const err = (json as { error?: Record<string, unknown> })?.error;
+  if (!err || typeof err !== "object") {
+    return { hasErrorObject: false };
+  }
+  return {
+    message: err.message != null ? String(err.message) : undefined,
+    type: err.type != null ? String(err.type) : undefined,
+    code: err.code != null ? err.code : undefined,
+    error_subcode: err.error_subcode != null ? err.error_subcode : undefined,
+    fbtrace_id: err.fbtrace_id != null ? String(err.fbtrace_id) : undefined,
+  };
 }
 
 export async function fetchMetaLeadById(leadgenId: string): Promise<
   { ok: true; lead: MetaGraphLead } | { ok: false; status: number; message: string }
 > {
   const token = getMetaAccessToken();
-  if (!token) return { ok: false, status: 0, message: "META_ACCESS_TOKEN 미설정" };
+  const tokenLoaded = Boolean(token);
+  console.info("[meta-leads][graph] token loaded:", {
+    loaded: tokenLoaded,
+    tokenChars: token ? token.length : 0,
+    leadgenId,
+  });
+  if (!token) {
+    console.error("[meta-leads][graph] META_ACCESS_TOKEN 미설정 — 서버 env 확인 필요");
+    return { ok: false, status: 0, message: "META_ACCESS_TOKEN 미설정" };
+  }
 
   const id = String(leadgenId).trim();
   if (!id) return { ok: false, status: 400, message: "leadgen_id 없음" };
@@ -171,10 +232,28 @@ export async function fetchMetaLeadById(leadgenId: string): Promise<
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = String(json?.error?.message ?? res.statusText ?? "Meta Graph error");
-    console.error("[meta-leads] Graph lead fetch failed:", { leadgenId: id, status: res.status, message: msg });
+    console.error("[meta-leads][graph] fetch failed:", {
+      leadgenId: id,
+      httpStatus: res.status,
+      error: sanitizeGraphErrorBody(json),
+    });
     return { ok: false, status: res.status, message: msg };
   }
-  return { ok: true, lead: json as MetaGraphLead };
+
+  const lead = json as MetaGraphLead;
+  console.info("[meta-leads][graph] fetch ok:", {
+    leadgenId: id,
+    httpStatus: res.status,
+    form_id: lead.form_id ?? null,
+    ad_id: lead.ad_id ?? null,
+    adset_id: lead.adset_id ?? null,
+    campaign_id: lead.campaign_id ?? null,
+    fieldCount: Array.isArray(lead.field_data) ? lead.field_data.length : 0,
+    fieldNames: Array.isArray(lead.field_data)
+      ? lead.field_data.map((f) => f.name).filter(Boolean)
+      : [],
+  });
+  return { ok: true, lead };
 }
 
 function parseMetaCreatedTime(raw: string | number | undefined | null): string | null {
@@ -188,6 +267,16 @@ function parseMetaCreatedTime(raw: string | number | undefined | null): string |
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+function logSupabaseError(stage: string, error: { message?: string; details?: string; hint?: string; code?: string }, extra?: Record<string, unknown>) {
+  console.error(`[meta-leads][supabase] ${stage}:`, {
+    message: error.message ?? null,
+    details: error.details ?? null,
+    hint: error.hint ?? null,
+    code: error.code ?? null,
+    ...extra,
+  });
+}
+
 /**
  * Meta Instant Form 리드를 소비자 DB(leads)에 반영.
  * meta_lead_id 기준 중복 방지(재전송 UPSERT).
@@ -196,11 +285,25 @@ export async function ingestMetaLeadFromWebhook(
   value: MetaLeadgenWebhookValue
 ): Promise<IngestMetaLeadResult> {
   const leadgenId = String(value.leadgen_id ?? "").trim();
-  if (!leadgenId) return { ok: false, message: "leadgen_id 없음", status: 400 };
+  if (!leadgenId) {
+    return { ok: false, message: "leadgen_id 없음", status: 400, stage: "validate" };
+  }
+
+  console.info("[meta-leads][ingest] start:", {
+    leadgen_id: leadgenId,
+    form_id: value.form_id ?? null,
+    page_id: value.page_id ?? null,
+    ad_id: value.ad_id ?? null,
+  });
 
   const fetched = await fetchMetaLeadById(leadgenId);
   if (!fetched.ok) {
-    return { ok: false, message: fetched.message, status: fetched.status || 502 };
+    return {
+      ok: false,
+      message: fetched.message,
+      status: fetched.status || 502,
+      stage: "graph",
+    };
   }
 
   const graph = fetched.lead;
@@ -211,16 +314,16 @@ export async function ingestMetaLeadFromWebhook(
 
   const phone = parsed.phone;
   if (phone.length < 10 || phone.length > 11) {
-    console.error("[meta-leads] invalid phone:", {
+    console.error("[meta-leads][validate] invalid phone:", {
       leadgenId,
       phoneMasked: phone ? maskPhoneForLog(phone) : "(empty)",
-      fields: graph.field_data?.map((f) => f.name),
+      fieldNames: graph.field_data?.map((f) => f.name),
     });
-    return { ok: false, message: "유효한 전화번호가 없습니다.", status: 400 };
+    return { ok: false, message: "유효한 전화번호가 없습니다.", status: 400, stage: "validate" };
   }
 
   if (await isLeadSubmissionBlockedAsync(phone)) {
-    console.warn("[meta-leads] blocked phone skipped:", maskPhoneForLog(phone), leadgenId);
+    console.warn("[meta-leads][ingest] blocked phone skipped:", maskPhoneForLog(phone), leadgenId);
     return { ok: true, created: false, leadId: "", skipped: "blocked" };
   }
 
@@ -244,9 +347,18 @@ export async function ingestMetaLeadFromWebhook(
     .eq("meta_lead_id", leadgenId)
     .maybeSingle();
 
-  if (findErr && !/meta_lead_id|schema cache|column/i.test(findErr.message)) {
-    console.error("[meta-leads] lookup error:", findErr.message);
-    return { ok: false, message: findErr.message, status: 500 };
+  if (findErr) {
+    logSupabaseError("lookup by meta_lead_id", findErr, { leadgenId });
+    // 컬럼 미적용(039 미실행)이면 insert도 실패하므로 여기서 중단해 원인을 명확히 함
+    if (/meta_lead_id|schema cache|column/i.test(findErr.message)) {
+      return {
+        ok: false,
+        message: `Supabase 스키마 오류(meta_lead_id): ${findErr.message}. 마이그레이션 039를 적용하세요.`,
+        status: 500,
+        stage: "supabase",
+      };
+    }
+    return { ok: false, message: findErr.message, status: 500, stage: "supabase" };
   }
 
   if (existing?.id) {
@@ -273,10 +385,10 @@ export async function ingestMetaLeadFromWebhook(
       .eq("id", existing.id);
 
     if (updErr) {
-      console.error("[meta-leads] update error:", updErr.message, leadgenId);
-      return { ok: false, message: updErr.message, status: 500 };
+      logSupabaseError("update existing lead", updErr, { leadgenId, leadId: existing.id });
+      return { ok: false, message: updErr.message, status: 500, stage: "supabase" };
     }
-    console.info("[meta-leads] upsert update:", { leadgenId, leadId: existing.id });
+    console.info("[meta-leads][supabase] upsert update ok:", { leadgenId, leadId: existing.id });
     return { ok: true, created: false, leadId: String(existing.id) };
   }
 
@@ -314,23 +426,24 @@ export async function ingestMetaLeadFromWebhook(
     .single();
 
   if (insErr) {
+    logSupabaseError("insert new lead", insErr, { leadgenId });
     // 동시 재전송으로 unique 충돌 시 재조회
     if (/duplicate|unique|meta_lead_id/i.test(insErr.message)) {
-      const { data: again } = await supabase
+      const { data: again, error: againErr } = await supabase
         .from("leads")
         .select("id")
         .eq("meta_lead_id", leadgenId)
         .maybeSingle();
+      if (againErr) logSupabaseError("re-lookup after unique conflict", againErr, { leadgenId });
       if (again?.id) {
         return { ok: true, created: false, leadId: String(again.id) };
       }
     }
-    console.error("[meta-leads] insert error:", insErr.message, leadgenId);
-    return { ok: false, message: insErr.message, status: 500 };
+    return { ok: false, message: insErr.message, status: 500, stage: "supabase" };
   }
 
   const leadId = String(inserted.id);
-  console.info("[meta-leads] inserted:", { leadgenId, leadId, phone: maskPhoneForLog(phone) });
+  console.info("[meta-leads][supabase] insert ok:", { leadgenId, leadId, phone: maskPhoneForLog(phone) });
 
   try {
     await tryAutoAssignLead({
@@ -362,15 +475,47 @@ export async function ingestMetaLeadFromWebhook(
 export function extractLeadgenValues(body: unknown): MetaLeadgenWebhookValue[] {
   const out: MetaLeadgenWebhookValue[] = [];
   const root = body as { object?: string; entry?: unknown[] };
-  if (!root || !Array.isArray(root.entry)) return out;
+  if (!root || !Array.isArray(root.entry)) {
+    console.warn("[meta-leads][parse] entry 배열 없음", {
+      object: (root as { object?: string })?.object ?? null,
+      bodyType: typeof body,
+    });
+    return out;
+  }
 
   for (const entry of root.entry) {
+    const pageIdFromEntry = String((entry as { id?: string })?.id ?? "").trim() || null;
     const changes = (entry as { changes?: unknown[] })?.changes;
     if (!Array.isArray(changes)) continue;
     for (const ch of changes) {
       const c = ch as { field?: string; value?: MetaLeadgenWebhookValue };
-      if (c.field && c.field !== "leadgen") continue;
-      if (c.value?.leadgen_id) out.push(c.value);
+      if (c.field !== "leadgen") {
+        console.info("[meta-leads][parse] skip non-leadgen field:", c.field ?? null);
+        continue;
+      }
+      const value = c.value ?? {};
+      const leadgenId = String(value.leadgen_id ?? "").trim();
+      if (!leadgenId) {
+        console.warn("[meta-leads][parse] leadgen field without leadgen_id", {
+          form_id: value.form_id ?? null,
+          page_id: value.page_id ?? pageIdFromEntry,
+        });
+        continue;
+      }
+      const normalized: MetaLeadgenWebhookValue = {
+        ...value,
+        leadgen_id: leadgenId,
+        form_id: value.form_id ?? undefined,
+        page_id: value.page_id ?? pageIdFromEntry ?? undefined,
+      };
+      console.info("[meta-leads][parse] extracted leadgen:", {
+        leadgen_id: normalized.leadgen_id,
+        form_id: normalized.form_id ?? null,
+        page_id: normalized.page_id ?? null,
+        ad_id: normalized.ad_id ?? null,
+        adgroup_id: normalized.adgroup_id ?? null,
+      });
+      out.push(normalized);
     }
   }
   return out;
