@@ -212,8 +212,9 @@ export async function executeMetaLeadCsvImport(buffer: Buffer): Promise<{
       inserted += 1;
       const leadId = String(data.id);
       resultRows.push({ ...row, existing_id: leadId });
+      let assigned: { assigneeName: string } | null = null;
       try {
-        await tryAutoAssignLead({
+        assigned = await tryAutoAssignLead({
           table: "tylife_b2b",
           leadId,
           region: src.region,
@@ -229,6 +230,7 @@ export async function executeMetaLeadCsvImport(buffer: Buffer): Promise<{
           phone: src.phone,
           leadId,
           region: src.region,
+          assigneeName: assigned?.assigneeName ?? null,
         });
       } catch (e) {
         console.warn("[meta-lead-csv] notify:", e instanceof Error ? e.message : e);

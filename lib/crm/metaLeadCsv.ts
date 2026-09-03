@@ -120,6 +120,8 @@ function mapJobRank(raw: string): string | null {
   return JOB_RANK_MAP[s] ?? JOB_RANK_MAP[s.replace(/\s+/g, "_")] ?? (s.includes("팀장") ? "팀장 이상" : s.includes("지점장") ? "지점장 이상" : s.toUpperCase() === "FC" ? "FC" : null);
 }
 
+export { mapJobRank as mapMetaLeadJobRank };
+
 /**
  * Meta Ads Manager Lead CSV/TSV (utf-16 탭 구분 포함) → 후보자 매핑 행
  */

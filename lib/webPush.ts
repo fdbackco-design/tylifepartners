@@ -156,6 +156,8 @@ export async function notifyAdminsNewLead(opts: {
   phone: string;
   leadId: string;
   region?: string | null;
+  /** 자동 배정 완료 시 담당자 이름 — 슬랙 메시지에만 표시 */
+  assigneeName?: string | null;
 }): Promise<void> {
   const kindLabel = opts.kind === "candidates" ? "후보자" : "소비자";
   const url =

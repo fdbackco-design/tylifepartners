@@ -27,4 +27,21 @@ describe("extractCreativeMedia", () => {
     assert.equal(media.image_url, "https://cdn.example/feed.jpg");
     assert.equal(media.image_hash, "h1");
   });
+
+  it("reads carousel child_attachments image_hash", () => {
+    const media = extractCreativeMedia({
+      thumbnail_url: "https://cdn.example/thumb.jpg",
+      object_type: "SHARE",
+      object_story_spec: {
+        link_data: {
+          child_attachments: [
+            { image_hash: "carousel_hash_1", name: "카드1" },
+            { image_hash: "carousel_hash_2", name: "카드2" },
+          ],
+        },
+      },
+    });
+    assert.equal(media.thumbnail_url, "https://cdn.example/thumb.jpg");
+    assert.equal(media.image_hash, "carousel_hash_1");
+  });
 });

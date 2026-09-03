@@ -124,6 +124,7 @@ export async function POST(request: NextRequest) {
         meta_campaign_id: metaIds.meta_campaign_id,
         receivedAtIso: nowIso,
       });
+      let assigned: { assigneeName: string } | null = null;
       if (!attached.ok) {
         console.error("reinquiry attach failed:", attached.message);
       } else {
@@ -147,7 +148,7 @@ export async function POST(request: NextRequest) {
           pageUrl: entryPage,
         });
         if (!samePerson.assignee_id) {
-          await tryAutoAssignLead({
+          assigned = await tryAutoAssignLead({
             table: "leads",
             leadId: samePerson.id,
             region: regionRaw,
@@ -227,6 +228,7 @@ export async function POST(request: NextRequest) {
           phone,
           leadId: samePerson.id,
           region: location || region || null,
+          assigneeName: assigned?.assigneeName ?? null,
         })
       );
 
@@ -284,6 +286,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, message: msg }, { status: 500 });
     }
 
+    let assigned: { assigneeName: string } | null = null;
     if (insertedLead?.id) {
       await linkLandingSessionToLead({
         leadTable: "leads",
@@ -293,7 +296,7 @@ export async function POST(request: NextRequest) {
         landingKey: entryPage,
         pageUrl: entryPage,
       });
-      await tryAutoAssignLead({
+      assigned = await tryAutoAssignLead({
         table: "leads",
         leadId: insertedLead.id,
         region: regionRaw,
@@ -380,6 +383,7 @@ export async function POST(request: NextRequest) {
           phone,
           leadId: insertedLead.id,
           region: location || region || null,
+          assigneeName: assigned?.assigneeName ?? null,
         })
       );
     }

@@ -230,8 +230,9 @@ export async function POST(request: NextRequest) {
         landingKey: entryPage,
         pageUrl: entryPage,
       });
+      let assigned: { assigneeName: string } | null = null;
       if (!samePerson.assignee_id) {
-        await tryAutoAssignLead({
+        assigned = await tryAutoAssignLead({
           table: "tylife_b2b",
           leadId: samePerson.id,
           region: regionForDb,
@@ -264,6 +265,7 @@ export async function POST(request: NextRequest) {
           phone,
           leadId: samePerson.id,
           region: regionForDb,
+          assigneeName: assigned?.assigneeName ?? null,
         })
       );
       return NextResponse.json({ ok: true, reinquiry: true, lead_id: samePerson.id });
@@ -319,6 +321,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, message: msg }, { status: 500 });
     }
 
+    let assigned: { assigneeName: string } | null = null;
     if (insertedLead?.id) {
       await linkLandingSessionToLead({
         leadTable: "tylife_b2b",
@@ -328,7 +331,7 @@ export async function POST(request: NextRequest) {
         landingKey: entryPage,
         pageUrl: entryPage,
       });
-      await tryAutoAssignLead({
+      assigned = await tryAutoAssignLead({
         table: "tylife_b2b",
         leadId: insertedLead.id,
         region: regionForDb,
@@ -392,6 +395,7 @@ export async function POST(request: NextRequest) {
               phone,
               leadId: insertedLead.id,
               region: regionForDb,
+              assigneeName: assigned?.assigneeName ?? null,
             });
           }
         }

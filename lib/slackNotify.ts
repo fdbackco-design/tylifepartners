@@ -38,18 +38,21 @@ function buildNewLeadSlackText(opts: {
   phone: string;
   leadId: string;
   region?: string | null;
+  assigneeName?: string | null;
 }): { title: string; body: string; url: string; text: string } {
   const kindLabel = opts.kind === "candidates" ? "후보자" : "소비자";
   const title = `신규 ${kindLabel} DB`;
   const region = String(opts.region ?? "").trim();
   const body = `${opts.name} · ${formatPhoneKorean(opts.phone)}${region ? ` · ${region}` : ""}`;
+  const assignee = String(opts.assigneeName ?? "").trim();
+  const assignLine = assignee ? `\n- [${assignee}] 배정 완료` : "";
   const path =
     opts.kind === "candidates"
       ? `/admin/candidates?search=${encodeURIComponent(opts.phone.replace(/\D/g, ""))}`
       : `/admin/consumers?search=${encodeURIComponent(opts.phone.replace(/\D/g, ""))}`;
   const url = `${crmAppOrigin()}${path}`;
-  // 웹 푸시와 동일한 제목/본문 + CRM 링크
-  const text = `*${title}*\n${body}\n<${url}|CRM에서 보기>`;
+  // 웹 푸시와 동일한 제목/본문 + (자동배정 시) 담당자 + CRM 링크
+  const text = `*${title}*\n${body}${assignLine}\n<${url}|CRM에서 보기>`;
   return { title, body, url, text };
 }
 
@@ -101,6 +104,7 @@ export async function notifySlackNewLead(opts: {
   phone: string;
   leadId: string;
   region?: string | null;
+  assigneeName?: string | null;
 }): Promise<void> {
   if (!isSlackLeadNotifyConfigured()) return;
   const { text } = buildNewLeadSlackText(opts);
