@@ -60,7 +60,7 @@ function TodayDbCostBadge({ cost }: { cost: TodayDbCost | null }) {
     .join(" · ");
   return (
     <div className="crm-daily-db-cost" title={tip}>
-      <span className="crm-daily-db-cost__label">어제의 DB 비용</span>
+      <span className="crm-daily-db-cost__label">어제의 DB 당 단가</span>
       <strong className={`crm-daily-db-cost__value${cost.status === "ready" ? " is-ready" : " is-muted"}`}>
         {cost.label}
       </strong>
