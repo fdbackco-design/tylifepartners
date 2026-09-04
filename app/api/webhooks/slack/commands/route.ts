@@ -11,7 +11,7 @@ function formValue(params: URLSearchParams, key: string): string {
 function slackTextResponse(text: string, status = 200) {
   return NextResponse.json(
     {
-      response_type: "ephemeral",
+      response_type: "in_channel",
       text,
     },
     { status }
