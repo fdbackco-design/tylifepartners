@@ -24,7 +24,7 @@ type SortMode = "rate_desc" | "rate_asc";
 
 export default function DashboardPage() {
   const t = todayYmdLocal();
-  const [from, setFrom] = useState(() => addDaysLocal(t, -6));
+  const [from, setFrom] = useState(() => addDaysLocal(t, -3));
   const [to, setTo] = useState(t);
   const [rows, setRows] = useState<Row[]>([]);
   const [summary, setSummary] = useState<Summary>({ inbound: 0, contacted: 0, rate: null });
