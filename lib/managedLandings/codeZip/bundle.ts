@@ -1,4 +1,3 @@
-import * as esbuild from "esbuild";
 import { createRequire } from "module";
 import path from "path";
 import {
@@ -7,8 +6,6 @@ import {
   LANDING_IMAGE_SHIM,
   LANDING_LINK_SHIM,
 } from "@/lib/managedLandings/codeZip/shims";
-
-const nodeRequire = createRequire(path.join(process.cwd(), "package.json"));
 
 export type BundleInput = {
   pageCode: string;
@@ -21,12 +18,22 @@ export type BundleResult = {
   warnings: string[];
 };
 
+type Esbuild = typeof import("esbuild");
+
+async function loadEsbuild(): Promise<Esbuild> {
+  // Next/webpack이 esbuild 타입정의(.d.ts)를 파싱하지 않도록 런타임 로드
+  const req = createRequire(path.resolve(process.cwd(), "package.json"));
+  return req("esbuild") as Esbuild;
+}
+
 /**
  * React/Next 랜딩 소스를 호스트 React와 공유하는 CJS 번들로 빌드.
  * lucide-react 등은 cwd node_modules에서 번들, react는 external.
  */
 export async function bundleLandingCode(input: BundleInput): Promise<BundleResult> {
+  const esbuild = await loadEsbuild();
   const cwd = process.cwd();
+  const nodeRequire = createRequire(path.resolve(cwd, "package.json"));
   const virtualFiles: Record<string, string> = {
     "/virtual/__entry__.js": LANDING_ENTRY_WRAPPER,
     "/virtual/__page__.tsx": input.pageCode,
@@ -132,6 +139,6 @@ export async function bundleLandingCode(input: BundleInput): Promise<BundleResul
 
   return {
     js,
-    warnings: (result.warnings || []).map((w) => w.text),
+    warnings: (result.warnings || []).map((w: { text: string }) => w.text),
   };
 }
