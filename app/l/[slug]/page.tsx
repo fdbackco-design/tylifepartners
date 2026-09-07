@@ -26,6 +26,7 @@ export default async function ManagedLandingPublicPage({ params }: Props) {
         bundleUrl={landing.code_bundle_url}
         cssUrl={landing.code_css_url}
         sections={landing.sections}
+        formConfig={landing.form_config}
       />
     );
   }
