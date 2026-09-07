@@ -2,15 +2,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, posix as pathPosix } from "node:path";
 import {
   LANDING_CRM_BRIDGE_SHIM,
-  LANDING_ENTRY_WRAPPER,
   LANDING_IMAGE_SHIM,
   LANDING_LINK_SHIM,
 } from "@/lib/managedLandings/codeZip/shims";
 
 export type BundleInput = {
-  pageCode: string;
-  leadFormCode: string | null;
-  leadFormImportHint: string | null;
+  /** ZIP 내 페이지 경로 (예: app/page.tsx) */
+  pageFile: string;
+  /** ZIP 상대경로 → 변환된 소스 */
+  sourceFiles: Record<string, string>;
 };
 
 export type BundleResult = {
@@ -189,25 +189,24 @@ function formatEsbuildFailure(err: unknown): string {
 /**
  * React/Next 랜딩 소스를 호스트 React와 공유하는 CJS 번들로 빌드.
  * lucide-react·react는 external (호스트에서 require 주입).
+ * ZIP 상대 모듈은 /virtual/<zipPath> 로 마운트해 ./consultation-button 등을 해석.
  */
 export async function bundleLandingCode(input: BundleInput): Promise<BundleResult> {
   const esbuild = await loadEsbuild();
   const cwd = process.cwd();
   const req = nodeRequire();
+
+  const pageImport = "./" + input.pageFile.replace(/\.(tsx|jsx|ts|js)$/i, "");
   const virtualFiles: Record<string, string> = {
-    "/virtual/__entry__.js": LANDING_ENTRY_WRAPPER,
-    "/virtual/__page__.tsx": input.pageCode,
+    "/virtual/__entry__.js": `export { default } from ${JSON.stringify(pageImport)};\n`,
     "/virtual/__landing_image__.js": LANDING_IMAGE_SHIM,
     "/virtual/__landing_link__.js": LANDING_LINK_SHIM,
     "/virtual/__landing_crm_bridge__.js": LANDING_CRM_BRIDGE_SHIM,
   };
 
-  if (input.leadFormCode && input.leadFormImportHint) {
-    const base = input.leadFormImportHint.replace(/^\.\//, "");
-    virtualFiles[`/virtual/${base}.tsx`] = input.leadFormCode;
-    virtualFiles[`/virtual/${base}.jsx`] = input.leadFormCode;
-    virtualFiles[`/virtual/${base}.ts`] = input.leadFormCode;
-    virtualFiles[`/virtual/${base}.js`] = input.leadFormCode;
+  for (const [rel, code] of Object.entries(input.sourceFiles)) {
+    const key = rel.replace(/^\/+/, "");
+    virtualFiles[`/virtual/${key}`] = code;
   }
 
   let result: Awaited<ReturnType<EsbuildApi["build"]>>;
@@ -244,9 +243,6 @@ export async function bundleLandingCode(input: BundleInput): Promise<BundleResul
               if (args.path === "__landing_crm_bridge__") {
                 return { path: "/virtual/__landing_crm_bridge__.js", namespace: "virtual" };
               }
-              if (args.path === "./__page__" || args.path === "__page__") {
-                return { path: "/virtual/__page__.tsx", namespace: "virtual" };
-              }
 
               if (args.path.startsWith("/virtual/")) {
                 return { path: args.path, namespace: "virtual" };
@@ -265,6 +261,10 @@ export async function bundleLandingCode(input: BundleInput): Promise<BundleResul
                   `${resolved}.jsx`,
                   `${resolved}.ts`,
                   `${resolved}.js`,
+                  `${resolved}/index.tsx`,
+                  `${resolved}/index.jsx`,
+                  `${resolved}/index.ts`,
+                  `${resolved}/index.js`,
                 ];
                 for (const c of candidates) {
                   if (virtualFiles[c]) return { path: c, namespace: "virtual" };

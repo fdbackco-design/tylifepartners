@@ -6,7 +6,27 @@ export type CodeZipEntries = {
   cssFile: string;
   leadFormFile: string | null;
   assetFiles: string[];
+  /** 번들에 포함할 TS/JS 소스 (ZIP 상대경로) */
+  sourceFiles: string[];
 };
+
+const SOURCE_EXT = /\.(tsx|jsx|ts|js)$/i;
+
+function isBundledSourcePath(key: string): boolean {
+  if (!SOURCE_EXT.test(key)) return false;
+  if (key.endsWith(".d.ts")) return false;
+  const parts = key.split("/");
+  if (parts.includes("node_modules")) return false;
+  // app/api 등 서버 라우트 제외
+  if (parts.includes("api")) return false;
+  const base = parts[parts.length - 1] || "";
+  if (
+    /^(next\.config|vite\.config|tailwind\.config|postcss\.config|eslint\.config)/i.test(base)
+  ) {
+    return false;
+  }
+  return true;
+}
 
 export function detectCodeZipEntries(files: ZipFileMap): CodeZipEntries {
   const pageFile =
@@ -61,5 +81,11 @@ export function detectCodeZipEntries(files: ZipFileMap): CodeZipEntries {
     ...listUnder(files, "public"),
   ].filter((k, i, arr) => arr.indexOf(k) === i);
 
-  return { pageFile, cssFile, leadFormFile, assetFiles };
+  const sourceFiles = Array.from(files.keys())
+    .filter(isBundledSourcePath)
+    .sort();
+
+  if (!sourceFiles.includes(pageFile)) sourceFiles.unshift(pageFile);
+
+  return { pageFile, cssFile, leadFormFile, assetFiles, sourceFiles };
 }

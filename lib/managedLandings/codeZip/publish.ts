@@ -120,33 +120,27 @@ export async function publishCodeZip(input: PublishCodeZipInput): Promise<Publis
   const injected = injectAnalyticsSectionAttrs(pageCode);
   pageCode = injected.code;
 
-  // Fix relative imports of lead form to ./LeadForm virtual
-  let leadFormImportHint: string | null = null;
-  let leadFormCode: string | null = null;
+  const sourceFiles: Record<string, string> = {};
+  for (const rel of entries.sourceFiles) {
+    const raw = files.get(rel);
+    if (!raw) continue;
+    let code = decodeText(raw);
+    code = rewriteNextImports(code);
+    code = rewriteAssetPaths(code, assetBaseUrl, uploadedNames);
+    sourceFiles[rel] = code;
+  }
+  // 주입된 페이지·리드폼으로 덮어쓰기
+  sourceFiles[entries.pageFile] = pageCode;
+
   if (entries.leadFormFile) {
-    leadFormCode = decodeText(files.get(entries.leadFormFile)!);
+    let leadFormCode = sourceFiles[entries.leadFormFile] ?? decodeText(files.get(entries.leadFormFile)!);
     leadFormCode = rewriteNextImports(leadFormCode);
     leadFormCode = rewriteAssetPaths(leadFormCode, assetBaseUrl, uploadedNames);
-    // landing id filled after create — use placeholder then second pass rewrite in bundle? 
-    // Use __LANDING_ID__ placeholder; runtime bridge reads from window.__landingId
     leadFormCode = injectLeadFormCrmBridge(leadFormCode, {
       entryPage: path,
       landingIdPlaceholder: "__LANDING_ID__",
     });
-    leadFormImportHint = `__lead_form__`;
-    const leadBase = entries.leadFormFile.split("/").pop()!.replace(/\.(tsx|jsx|ts|js)$/, "");
-    pageCode = pageCode.replace(
-      new RegExp(`from\\s+[\\"']\\./${leadBase}[\\"']`, "g"),
-      `from "./__lead_form__"`
-    );
-    pageCode = pageCode.replace(
-      /from\s+["']\.\/lead-form["']/gi,
-      `from "./__lead_form__"`
-    );
-    pageCode = pageCode.replace(
-      /from\s+["']\.\/LeadForm["']/g,
-      `from "./__lead_form__"`
-    );
+    sourceFiles[entries.leadFormFile] = leadFormCode;
   }
 
   let cssCode = decodeText(files.get(entries.cssFile)!);
@@ -156,12 +150,9 @@ export async function publishCodeZip(input: PublishCodeZipInput): Promise<Publis
   cssCode = cssCode.replace(/@import\s+["']tailwindcss["'];?\s*/g, "");
 
   const bundled = await bundleLandingCode({
-    pageCode,
-    leadFormCode,
-    leadFormImportHint: leadFormCode ? "__lead_form__" : null,
+    pageFile: entries.pageFile,
+    sourceFiles,
   });
-
-  // If lead form uses __lead_form__, put it in virtual as that name — already handled via leadFormImportHint
 
   const bundleUrl = await uploadBytes(
     `code/${slug}/${stamp}/bundle.js`,
