@@ -2,6 +2,8 @@
 
 import { useEffect, useState, type ComponentType } from "react";
 import * as React from "react";
+import * as ReactDOM from "react-dom";
+import * as ReactDOMClient from "react-dom/client";
 import * as ReactJSXRuntime from "react/jsx-runtime";
 import * as LucideReact from "lucide-react";
 import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
@@ -36,10 +38,9 @@ function loadScriptCjs(code: string): { default?: ComponentType } {
     if (name === "react") return React;
     if (name === "react/jsx-runtime") return ReactJSXRuntime;
     if (name === "react/jsx-dev-runtime") return ReactJSXRuntime;
+    if (name === "react-dom") return ReactDOM;
+    if (name === "react-dom/client") return ReactDOMClient;
     if (name === "lucide-react") return LucideReact;
-    if (name === "react-dom" || name === "react-dom/client") {
-      throw new Error(`'${name}'는 코드 ZIP 랜딩에서 지원하지 않습니다.`);
-    }
     throw new Error(`Cannot require '${name}' in landing bundle`);
   };
   // eslint-disable-next-line no-new-func
@@ -125,6 +126,7 @@ export default function CodeLandingRuntime({
         body:has(.landing-code) { background: #f7f4ec; margin: 0; }
         body:has(.landing-code) main { max-width: none !important; width: 100% !important; margin: 0 !important; padding-bottom: 0 !important; }
         .landing-code { min-height: 100vh; width: 100%; }
+        .landing-code img { max-width: 100%; height: auto; }
         .landing-code-error { padding: 48px 24px; text-align: center; color: #b53535; font-family: sans-serif; }
       `}</style>
       {Page ? <LandingAnalyticsTracker landingKey={landingKey} sections={sections} /> : null}
