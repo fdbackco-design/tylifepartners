@@ -554,6 +554,34 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
   }
 
   if (item.kind === "code") {
+    const codeFormDirty =
+      Boolean(savedKey) &&
+      JSON.stringify(formConfig) !== JSON.stringify(applyItemToDraft(item).formConfig);
+
+    const saveCodeFormConfig = async () => {
+      setSaving(true);
+      setMsg("");
+      setError("");
+      try {
+        const res = await fetch(`/api/admin/landings/${landingId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ form_config: formConfig }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          setError(json.message || "저장 실패");
+          return;
+        }
+        hydrate(json.item as ManagedLandingRow);
+        setMsg("신청폼 설정이 저장되었습니다.");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setSaving(false);
+      }
+    };
+
     return (
       <div className="crm-ui-content">
         <CrmPageHeader
@@ -593,10 +621,11 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
             </div>
           }
         />
+        {msg ? <CrmAlert tone="success">{msg}</CrmAlert> : null}
         {error ? <CrmAlert tone="danger">{error}</CrmAlert> : null}
         <CrmAlert tone="info">
           템플릿 에디터 대신 목록의 <strong>ZIP 재배포</strong>로 소스를 갱신하세요. 스크롤 히트맵은 페이지의
-          섹션 마커를 자동 측정합니다.
+          섹션 마커를 자동 측정합니다. 상담 신청폼 필드 설정은 아래에서 변경할 수 있습니다.
         </CrmAlert>
         <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
           <CrmBadge>{item.published ? "공개" : "비공개"}</CrmBadge>
@@ -610,6 +639,66 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
             </a>
           </div>
         ) : null}
+
+        <div
+          style={{
+            marginTop: 24,
+            padding: 16,
+            border: "1px solid var(--crm-border, #e2e8f0)",
+            borderRadius: 12,
+            display: "grid",
+            gap: 12,
+            maxWidth: 560,
+          }}
+        >
+          <div>
+            <strong style={{ fontSize: 15 }}>신청폼 설정</strong>
+            <p className="crm-ui-hint" style={{ margin: "6px 0 0" }}>
+              호스트 하단 상담 신청 시트에 반영됩니다. ZIP 재배포 후에도 이 설정은 유지됩니다.
+            </p>
+          </div>
+
+          <CrmCheckbox
+            checked={formConfig.includeRegion}
+            onChange={(v) => setFormConfig((c) => ({ ...c, includeRegion: v }))}
+            label="지역 필드 포함"
+          />
+          <CrmCheckbox
+            checked={formConfig.allowRegionDetail}
+            disabled={!formConfig.includeRegion}
+            onChange={(v) => setFormConfig((c) => ({ ...c, allowRegionDetail: v }))}
+            label="지역 상세(구/시) 필수 입력"
+          />
+          <CrmCheckbox
+            checked={formConfig.includeAvailableTime}
+            onChange={(v) => setFormConfig((c) => ({ ...c, includeAvailableTime: v }))}
+            label="상담가능시간 필드 포함"
+          />
+          <CrmCheckbox
+            checked={formConfig.includeAgeGroup}
+            onChange={(v) => setFormConfig((c) => ({ ...c, includeAgeGroup: v }))}
+            label="연령대 필드 포함"
+          />
+          <CrmCheckbox
+            checked={formConfig.includeJob}
+            onChange={(v) => setFormConfig((c) => ({ ...c, includeJob: v }))}
+            label="직업/직급 필드 포함"
+          />
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <CrmButton
+              type="button"
+              variant="primary"
+              onClick={() => void saveCodeFormConfig()}
+              disabled={saving || !codeFormDirty}
+            >
+              {saving ? "저장 중…" : "신청폼 설정 저장"}
+            </CrmButton>
+            {codeFormDirty ? (
+              <span style={{ fontSize: 13, color: "var(--crm-muted)" }}>저장되지 않은 변경이 있습니다.</span>
+            ) : null}
+          </div>
+        </div>
       </div>
     );
   }

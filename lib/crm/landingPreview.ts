@@ -3,8 +3,11 @@ import {
   type LandingKey,
 } from "@/lib/landing-analytics/sections";
 import { BUILTIN_LANDINGS } from "@/lib/managedLandings/builtinLandings";
+import { isCodeLandingPreviewImageName } from "@/lib/managedLandings/codeZip/previewImages";
 import { getManagedLandingByPath, getManagedLandingBySlug } from "@/lib/managedLandings/store";
+import type { ManagedLandingRow } from "@/lib/managedLandings/types";
 import { slugFromManagedLandingKey } from "@/lib/managedLandings/types";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 const THUMBS: Record<string, string> = {
   "/": "/assets/hero_b2c_01.jpg",
@@ -45,6 +48,8 @@ const LANDING_HEROES: Record<string, string[]> = {
   ],
 };
 
+const CODE_ASSET_BUCKET = "landing-assets";
+
 export function normalizeEntryPage(raw: string | null | undefined): string {
   const s = String(raw ?? "").trim();
   if (!s) return "";
@@ -81,6 +86,80 @@ function pathFromLandingKey(landingKey: string): string | null {
   return label.split(" ")[0] || null;
 }
 
+function previewImagesFromCodeMeta(row: ManagedLandingRow): string[] {
+  const fromMeta = row.code_meta?.preview_images;
+  if (Array.isArray(fromMeta) && fromMeta.length) {
+    return fromMeta.map((u) => String(u ?? "").trim()).filter(Boolean);
+  }
+  return [row.hero1_url, row.hero2_url].map((u) => String(u ?? "").trim()).filter(Boolean);
+}
+
+function storagePrefixFromAssetBase(assetBase: string): string | null {
+  const marker = `/object/public/${CODE_ASSET_BUCKET}/`;
+  const idx = assetBase.indexOf(marker);
+  if (idx < 0) return null;
+  let prefix = assetBase.slice(idx + marker.length);
+  if (prefix.endsWith("/")) prefix = prefix.slice(0, -1);
+  return prefix || null;
+}
+
+/** 이미 배포된 코드 랜딩 — 스토리지 에셋 목록으로 미리보기 복원 */
+async function listCodeLandingPreviewFromStorage(row: ManagedLandingRow): Promise<string[]> {
+  const base = String(row.code_asset_base ?? "").trim();
+  if (!base) return [];
+  const prefix = storagePrefixFromAssetBase(base);
+  if (!prefix) return [];
+
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase.storage.from(CODE_ASSET_BUCKET).list(prefix, {
+      limit: 100,
+      sortBy: { column: "name", order: "asc" },
+    });
+    if (error || !data?.length) return [];
+
+    const baseUrl = base.endsWith("/") ? base : `${base}/`;
+    const names = data
+      .map((f) => f.name)
+      .filter((n) => n && isCodeLandingPreviewImageName(n));
+    return names.map((n) => `${baseUrl}${n}`);
+  } catch {
+    return [];
+  }
+}
+
+async function scrapePreviewFromBundle(row: ManagedLandingRow): Promise<string[]> {
+  const bundleUrl = String(row.code_bundle_url ?? "").trim();
+  if (!bundleUrl) return [];
+  try {
+    const res = await fetch(bundleUrl, { cache: "force-cache" });
+    if (!res.ok) return [];
+    const text = await res.text();
+    const re = /https?:\/\/[^"'`\s)]+\.(?:png|jpe?g|webp|gif|avif)/gi;
+    const out: string[] = [];
+    const seen = new Set<string>();
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text))) {
+      const url = m[0];
+      const name = url.split("/").pop() || "";
+      if (!isCodeLandingPreviewImageName(name) || seen.has(url)) continue;
+      seen.add(url);
+      out.push(url);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+async function resolveCodeLandingImages(row: ManagedLandingRow): Promise<string[]> {
+  const fromMeta = previewImagesFromCodeMeta(row);
+  if (fromMeta.length) return fromMeta;
+  const fromStorage = await listCodeLandingPreviewFromStorage(row);
+  if (fromStorage.length) return fromStorage;
+  return scrapePreviewFromBundle(row);
+}
+
 /**
  * 히트맵 우측 미리보기용 — 랜딩 히어로 이미지 목록
  * managed 랜딩은 DB hero1/hero2, 고정 랜딩은 에셋 맵 사용
@@ -94,10 +173,11 @@ export async function resolveLandingPageImages(opts: {
     const slug = slugFromManagedLandingKey(key);
     if (slug) {
       const row = await getManagedLandingBySlug(slug);
+      if (row?.kind === "code") {
+        return resolveCodeLandingImages(row);
+      }
       const imgs = [row?.hero1_url, row?.hero2_url].map((u) => String(u ?? "").trim()).filter(Boolean);
       if (imgs.length) return imgs;
-      // ZIP 코드 배포 등은 히어로가 비어 있음 — 다른 랜딩 기본 이미지로 대체하지 않음
-      if (row?.kind === "code") return [];
     }
   }
 
@@ -123,9 +203,11 @@ export async function resolveLandingPageImages(opts: {
 
   if (path && !LANDING_HEROES[path] && !THUMBS[path]) {
     const row = await getManagedLandingByPath(path);
+    if (row?.kind === "code") {
+      return resolveCodeLandingImages(row);
+    }
     const imgs = [row?.hero1_url, row?.hero2_url].map((u) => String(u ?? "").trim()).filter(Boolean);
     if (imgs.length) return imgs;
-    if (row?.kind === "code") return [];
   }
 
   return staticHeroImages(opts.entryPage || keyPath);
