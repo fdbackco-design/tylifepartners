@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
+import { BUILTIN_LANDINGS, mergeBuiltinLandings } from "@/lib/managedLandings/builtinLandings";
 import {
   createManagedLanding,
   listManagedLandings,
@@ -17,24 +18,46 @@ export async function GET(request: NextRequest) {
     const lite = request.nextUrl.searchParams.get("lite") === "1";
     if (lite) {
       const items = await listManagedLandingsLite();
-      return NextResponse.json({ ok: true, items });
+      const paths = new Set(items.map((i) => i.path));
+      const extras = BUILTIN_LANDINGS.filter((b) => !paths.has(b.path)).map((b) => ({
+        id: b.id,
+        path: b.path,
+        slug: b.slug,
+        title: b.title,
+        published: b.published,
+      }));
+      return NextResponse.json({ ok: true, items: [...extras, ...items] });
     }
     const items = await listManagedLandings();
+    const merged = mergeBuiltinLandings(items);
     const supabase = (await import("@/lib/supabase")).getSupabaseAdmin();
-    const paths = items.map((i) => i.path);
+
+    const pathAliases = new Map<string, string>(); // alias → canonical path
+    for (const it of merged) {
+      pathAliases.set(it.path, it.path);
+    }
+    for (const b of BUILTIN_LANDINGS) {
+      for (const ep of b.entry_pages) pathAliases.set(ep, b.path);
+    }
+
+    const queryPages = Array.from(pathAliases.keys());
     const leadCountByPath = new Map<string, number>();
-    if (paths.length) {
-      const { data: leads } = await supabase.from("leads").select("entry_page").in("entry_page", paths);
-      const { data: b2b } = await supabase.from("tylife_b2b").select("entry_page").in("entry_page", paths);
+    if (queryPages.length) {
+      const { data: leads } = await supabase.from("leads").select("entry_page").in("entry_page", queryPages);
+      const { data: b2b } = await supabase.from("tylife_b2b").select("entry_page").in("entry_page", queryPages);
       for (const row of [...(leads ?? []), ...(b2b ?? [])]) {
-        const p = String((row as { entry_page?: string }).entry_page ?? "");
-        if (!p) continue;
-        leadCountByPath.set(p, (leadCountByPath.get(p) ?? 0) + 1);
+        const raw = String((row as { entry_page?: string }).entry_page ?? "");
+        if (!raw) continue;
+        const canonical = pathAliases.get(raw) ?? raw;
+        leadCountByPath.set(canonical, (leadCountByPath.get(canonical) ?? 0) + 1);
       }
     }
     return NextResponse.json({
       ok: true,
-      items: items.map((it) => ({ ...it, lead_count: leadCountByPath.get(it.path) ?? 0 })),
+      items: merged.map((it) => ({
+        ...it,
+        lead_count: leadCountByPath.get(it.path) ?? 0,
+      })),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
