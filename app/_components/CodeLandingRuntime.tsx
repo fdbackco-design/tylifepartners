@@ -3,6 +3,7 @@
 import { useEffect, useState, type ComponentType } from "react";
 import * as React from "react";
 import * as ReactJSXRuntime from "react/jsx-runtime";
+import * as LucideReact from "lucide-react";
 import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
 import { useMeasuredLandingSections } from "@/app/_components/useMeasuredLandingSections";
 import { trackLeadSubmitEvent } from "@/lib/landing-analytics/client";
@@ -35,6 +36,7 @@ function loadScriptCjs(code: string): { default?: ComponentType } {
     if (name === "react") return React;
     if (name === "react/jsx-runtime") return ReactJSXRuntime;
     if (name === "react/jsx-dev-runtime") return ReactJSXRuntime;
+    if (name === "lucide-react") return LucideReact;
     if (name === "react-dom" || name === "react-dom/client") {
       throw new Error(`'${name}'는 코드 ZIP 랜딩에서 지원하지 않습니다.`);
     }

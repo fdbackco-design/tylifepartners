@@ -40,6 +40,14 @@ export function calendarDaysInclusive(fromIso: string, toDate: Date = new Date()
   return Math.max(1, diff + 1);
 }
 
+/** 상태 변경 당일을 0일차로 세는 경과 일수 (KST 자정 기준) */
+export function calendarDaysElapsed(fromIso: string, toDate: Date = new Date()): number {
+  const a = kstYmd(new Date(fromIso));
+  const b = kstYmd(toDate);
+  const diff = Math.round((parseKstYmd(b).getTime() - parseKstYmd(a).getTime()) / 86400000);
+  return Math.max(0, diff);
+}
+
 export function startOfKstDayIso(ymd: string): string {
   return parseKstYmd(ymd).toISOString();
 }
