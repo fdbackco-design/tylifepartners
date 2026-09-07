@@ -21,6 +21,8 @@ export type ManagedLandingCodeMeta = {
   asset_count?: number;
   section_count?: number;
   bundled_at?: string;
+  /** 히트맵/목록 미리보기용 — 페이지 등장 순 이미지 URL */
+  preview_images?: string[];
 };
 
 export type ManagedLandingRow = {
@@ -99,7 +101,15 @@ export function normalizeLandingKind(raw: unknown): ManagedLandingKind {
 
 export function normalizeCodeMeta(raw: unknown): ManagedLandingCodeMeta {
   if (!raw || typeof raw !== "object") return {};
-  return raw as ManagedLandingCodeMeta;
+  const src = raw as Record<string, unknown>;
+  const previewRaw = src.preview_images ?? src.previewImages;
+  const preview_images = Array.isArray(previewRaw)
+    ? previewRaw.map((u) => String(u ?? "").trim()).filter(Boolean)
+    : undefined;
+  return {
+    ...(raw as ManagedLandingCodeMeta),
+    ...(preview_images?.length ? { preview_images } : {}),
+  };
 }
 
 export function normalizeSections(raw: unknown): ManagedLandingSection[] {

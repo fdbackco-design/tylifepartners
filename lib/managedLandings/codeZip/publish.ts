@@ -5,6 +5,7 @@ import {
   stripSingleRootFolder,
 } from "@/lib/managedLandings/codeZip/extract";
 import { bundleLandingCode } from "@/lib/managedLandings/codeZip/bundle";
+import { buildCodeLandingPreviewImages } from "@/lib/managedLandings/codeZip/previewImages";
 import {
   injectAnalyticsSectionAttrs,
   injectLeadFormCrmBridge,
@@ -115,6 +116,11 @@ export async function publishCodeZip(input: PublishCodeZipInput): Promise<Publis
   const assetBaseUrl = placeholderPublic.publicUrl.replace(/\/\.keep$/, "/");
 
   let pageCode = decodeText(files.get(entries.pageFile)!);
+  const previewImages = buildCodeLandingPreviewImages({
+    assetBaseUrl,
+    pageSource: pageCode,
+    uploadedNames,
+  });
   pageCode = rewriteNextImports(pageCode);
   pageCode = rewriteAssetPaths(pageCode, assetBaseUrl, uploadedNames);
   const injected = injectAnalyticsSectionAttrs(pageCode);
@@ -174,6 +180,7 @@ export async function publishCodeZip(input: PublishCodeZipInput): Promise<Publis
     asset_count: uploadedNames.size,
     section_count: injected.markers.length,
     bundled_at: new Date().toISOString(),
+    preview_images: previewImages,
   };
 
   const payload = {
@@ -181,8 +188,8 @@ export async function publishCodeZip(input: PublishCodeZipInput): Promise<Publis
     title: (input.title ?? "상담 안내").trim() || "상담 안내",
     published: Boolean(input.published),
     kind: "code" as const,
-    hero1_url: "",
-    hero2_url: "",
+    hero1_url: previewImages[0] || "",
+    hero2_url: previewImages[1] || "",
     show_brochure: false,
     brochure_url: null,
     sections,
