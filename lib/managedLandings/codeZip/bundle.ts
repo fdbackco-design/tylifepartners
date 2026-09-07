@@ -1,6 +1,5 @@
-import { createRequire } from "module";
-import path from "path";
-import { readFileSync, existsSync } from "fs";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, posix as pathPosix } from "node:path";
 import {
   LANDING_CRM_BRIDGE_SHIM,
   LANDING_ENTRY_WRAPPER,
@@ -46,46 +45,79 @@ const EXTERNAL_MODULES = new Set([
 let wasmInitialized = false;
 let cachedApi: EsbuildApi | null = null;
 
-function packageRequire(): NodeRequire {
-  return createRequire(path.resolve(process.cwd(), "package.json"));
-}
+/**
+ * webpack이 createRequire/path default import를 깨뜨려 require.resolve가 사라지는 경우가 있음.
+ * 서버리스에서는 Node 실제 require를 우선 확보한다.
+ */
+function nodeRequire(): NodeRequire {
+  const candidates: Array<() => NodeRequire> = [
+    () => {
+      // webpack 우회 — 런타임 Node require
+      // eslint-disable-next-line no-eval, @typescript-eslint/no-unsafe-call
+      return eval("require") as NodeRequire;
+    },
+    () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { createRequire } = require("node:module") as typeof import("node:module");
+      return createRequire(join(process.cwd(), "package.json"));
+    },
+    () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { createRequire } = require("module") as typeof import("module");
+      return createRequire(join(process.cwd(), "package.json"));
+    },
+  ];
 
-function resolveWasmPath(nodeRequire: NodeRequire): string {
-  try {
-    return nodeRequire.resolve("esbuild-wasm/esbuild.wasm");
-  } catch {
-    const pkg = nodeRequire.resolve("esbuild-wasm/package.json");
-    const candidate = path.join(path.dirname(pkg), "esbuild.wasm");
-    if (!existsSync(candidate)) {
-      throw new Error(`esbuild.wasm을 찾을 수 없습니다: ${candidate}`);
+  const errors: string[] = [];
+  for (const make of candidates) {
+    try {
+      const req = make();
+      if (typeof req === "function" && typeof req.resolve === "function") {
+        return req;
+      }
+      errors.push("require.resolve 없음");
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
     }
-    return candidate;
   }
+  throw new Error(`Node require를 확보하지 못했습니다: ${errors.join(" / ")}`);
 }
 
-async function loadWasmEsbuild(nodeRequire: NodeRequire): Promise<EsbuildApi> {
-  // NFT 추적용 리터럴
-  nodeRequire.resolve("esbuild-wasm");
-  const esbuild = nodeRequire("esbuild-wasm") as EsbuildWasmApi;
+function resolveWasmPath(req: NodeRequire): string {
+  const candidates = [
+    () => req.resolve("esbuild-wasm/esbuild.wasm"),
+    () => join(dirname(req.resolve("esbuild-wasm/package.json")), "esbuild.wasm"),
+    () => join(process.cwd(), "node_modules", "esbuild-wasm", "esbuild.wasm"),
+    () => join("/var/task", "node_modules", "esbuild-wasm", "esbuild.wasm"),
+  ];
+  for (const get of candidates) {
+    try {
+      const p = get();
+      if (p && existsSync(p)) return p;
+    } catch {
+      /* try next */
+    }
+  }
+  throw new Error("esbuild.wasm을 찾을 수 없습니다.");
+}
+
+async function loadWasmEsbuild(req: NodeRequire): Promise<EsbuildApi> {
+  const esbuild = req("esbuild-wasm") as EsbuildWasmApi;
   if (!wasmInitialized) {
-    const wasmPath = resolveWasmPath(nodeRequire);
+    const wasmPath = resolveWasmPath(req);
     const wasmModule = await WebAssembly.compile(readFileSync(wasmPath));
     await esbuild.initialize({ wasmModule, worker: false });
     wasmInitialized = true;
   }
-  // smoke test — native 깨짐과 같은 "(void 0) is not a function"을 여기서 잡음
+  if (typeof esbuild.transform !== "function" || typeof esbuild.build !== "function") {
+    throw new Error("esbuild-wasm API가 불완전합니다.");
+  }
   await esbuild.transform("export {}", { loader: "js" });
   return esbuild;
 }
 
-async function loadNativeEsbuild(nodeRequire: NodeRequire): Promise<EsbuildApi> {
-  nodeRequire.resolve("esbuild");
-  try {
-    nodeRequire.resolve("@esbuild/linux-x64");
-  } catch {
-    /* local/darwin 등 */
-  }
-  const esbuild = nodeRequire("esbuild") as EsbuildApi;
+async function loadNativeEsbuild(req: NodeRequire): Promise<EsbuildApi> {
+  const esbuild = req("esbuild") as EsbuildApi;
   if (typeof esbuild.transform !== "function" || typeof esbuild.build !== "function") {
     throw new Error("native esbuild API가 불완전합니다.");
   }
@@ -100,7 +132,7 @@ async function loadNativeEsbuild(nodeRequire: NodeRequire): Promise<EsbuildApi> 
 async function loadEsbuild(): Promise<EsbuildApi> {
   if (cachedApi) return cachedApi;
 
-  const nodeRequire = packageRequire();
+  const req = nodeRequire();
   const onServerless = Boolean(
     process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV
   );
@@ -109,26 +141,26 @@ async function loadEsbuild(): Promise<EsbuildApi> {
 
   if (onServerless) {
     try {
-      cachedApi = await loadWasmEsbuild(nodeRequire);
+      cachedApi = await loadWasmEsbuild(req);
       return cachedApi;
     } catch (e) {
       errors.push(`wasm: ${e instanceof Error ? e.message : String(e)}`);
     }
     try {
-      cachedApi = await loadNativeEsbuild(nodeRequire);
+      cachedApi = await loadNativeEsbuild(req);
       return cachedApi;
     } catch (e) {
       errors.push(`native: ${e instanceof Error ? e.message : String(e)}`);
     }
   } else {
     try {
-      cachedApi = await loadNativeEsbuild(nodeRequire);
+      cachedApi = await loadNativeEsbuild(req);
       return cachedApi;
     } catch (e) {
       errors.push(`native: ${e instanceof Error ? e.message : String(e)}`);
     }
     try {
-      cachedApi = await loadWasmEsbuild(nodeRequire);
+      cachedApi = await loadWasmEsbuild(req);
       return cachedApi;
     } catch (e) {
       errors.push(`wasm: ${e instanceof Error ? e.message : String(e)}`);
@@ -161,7 +193,7 @@ function formatEsbuildFailure(err: unknown): string {
 export async function bundleLandingCode(input: BundleInput): Promise<BundleResult> {
   const esbuild = await loadEsbuild();
   const cwd = process.cwd();
-  const nodeRequire = packageRequire();
+  const req = nodeRequire();
   const virtualFiles: Record<string, string> = {
     "/virtual/__entry__.js": LANDING_ENTRY_WRAPPER,
     "/virtual/__page__.tsx": input.pageCode,
@@ -225,8 +257,8 @@ export async function bundleLandingCode(input: BundleInput): Promise<BundleResul
                 (args.namespace === "virtual" || args.importer.startsWith("/virtual/"))
               ) {
                 const importerPath = args.importer.replace(/^virtual:/, "");
-                const dir = path.posix.dirname(importerPath);
-                const resolved = path.posix.normalize(path.posix.join(dir, args.path));
+                const dir = pathPosix.dirname(importerPath);
+                const resolved = pathPosix.normalize(pathPosix.join(dir, args.path));
                 const candidates = [
                   resolved,
                   `${resolved}.tsx`,
@@ -258,7 +290,7 @@ export async function bundleLandingCode(input: BundleInput): Promise<BundleResul
                 }
                 try {
                   return {
-                    path: nodeRequire.resolve(args.path),
+                    path: req.resolve(args.path),
                     namespace: "file",
                   };
                 } catch {
