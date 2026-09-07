@@ -10,7 +10,8 @@ export type LandingKey =
   | "landing_0623"
   | "landing_0623s"
   | "landing_0715"
-  | "landing_0715s";
+  | "landing_0715s"
+  | "landing_0907";
 
 export type LandingSection = {
   name: string;
@@ -33,6 +34,7 @@ export const LANDING_KEYS: LandingKey[] = [
   "landing_0623s",
   "landing_0715",
   "landing_0715s",
+  "landing_0907",
 ];
 
 export const LANDING_SECTIONS: Record<LandingKey, LandingSection[]> = {
@@ -153,6 +155,20 @@ export const LANDING_SECTIONS: Record<LandingKey, LandingSection[]> = {
     { name: "section_09", label: "9. 파트너 상담 신청", start: 0.8474, end: 0.9232 },
     { name: "section_10", label: "10. 약관", start: 0.9232, end: 1.0 },
   ],
+  /** start/end는 DOM 자동 측정이 우선. 아래는 어드민 리포트 폴백(데스크톱 측정값) */
+  landing_0907: [
+    { name: "section_01", label: "1. 히어로", start: 0.0, end: 0.097, memo: "메인 후킹" },
+    { name: "section_02", label: "2. 병목 인사이트", start: 0.097, end: 0.1602, memo: "THE REAL BOTTLENECK" },
+    { name: "section_03", label: "3. Before→After", start: 0.1602, end: 0.1733, memo: "접점 미리보기" },
+    { name: "section_04", label: "4. 다음 대화", start: 0.1733, end: 0.2788, memo: "대화 전환" },
+    { name: "section_05", label: "5. 라이프케어 상품", start: 0.2788, end: 0.541, memo: "세 가지 접점" },
+    { name: "section_06", label: "6. 보험 병행 안심", start: 0.541, end: 0.5917, memo: "대체 아님" },
+    { name: "section_07", label: "7. 팀/설계사", start: 0.5917, end: 0.7657, memo: "대상별 안내" },
+    { name: "section_08", label: "8. 진행 절차", start: 0.7657, end: 0.8323, memo: "HOW IT STARTS" },
+    { name: "section_09", label: "9. FAQ", start: 0.8323, end: 0.8775, memo: "FAQ" },
+    { name: "section_10", label: "10. 상담 신청", start: 0.8775, end: 0.9466, memo: "CTA 폼" },
+    { name: "section_11", label: "11. 푸터", start: 0.9466, end: 1.0, memo: "약관·고지" },
+  ],
 };
 
 export const DEFAULT_LANDING_SECTIONS: LandingSection[] = [
@@ -200,6 +216,7 @@ export const LANDING_KEY_LABELS: Record<LandingKey, string> = {
   landing_0623s: "/0623s",
   landing_0715: "/0715",
   landing_0715s: "/0715s",
+  landing_0907: "/0907",
 };
 
 /** entry_page → landing_key (히트맵 페이지 딥링크용) */

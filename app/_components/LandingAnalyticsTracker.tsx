@@ -12,6 +12,7 @@ import {
 import {
   initSubmissionSnapshot,
   refreshSubmissionSnapshot,
+  setSubmissionSnapshotSections,
 } from "@/lib/landing-analytics/submissionSnapshot";
 import { SectionDwellAccumulator } from "@/lib/landing-analytics/sectionDwell";
 import type { LandingTrackPayload } from "@/lib/landing-analytics/types";
@@ -27,7 +28,7 @@ const SCROLL_SAMPLE_BUCKET = 10;
 
 type Props = {
   landingKey: string;
-  /** managed landing 등 DB 섹션 오버라이드 */
+  /** managed landing 등 DB 섹션 오버라이드 / DOM 자동 측정 */
   sections?: LandingSection[] | null;
 };
 
@@ -54,6 +55,13 @@ export default function LandingAnalyticsTracker({ landingKey, sections }: Props)
   const heartbeatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dwellTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dwellAccumulatorRef = useRef<SectionDwellAccumulator | null>(null);
+  const sectionsRef = useRef(sections);
+  sectionsRef.current = sections;
+
+  // DOM 측정 등으로 구간만 바뀌는 경우 세션 이벤트는 유지하고 스냅샷만 갱신
+  useEffect(() => {
+    setSubmissionSnapshotSections(sections);
+  }, [sections]);
 
   useEffect(() => {
     startMsRef.current = Date.now();
@@ -61,8 +69,11 @@ export default function LandingAnalyticsTracker({ landingKey, sections }: Props)
     sentDepthsRef.current = new Set();
     sentSampleBucketsRef.current = new Set();
     lastSampleAtRef.current = 0;
-    dwellAccumulatorRef.current = new SectionDwellAccumulator(landingKey, sections);
-    initSubmissionSnapshot(landingKey, sections);
+    dwellAccumulatorRef.current = new SectionDwellAccumulator(
+      landingKey,
+      () => sectionsRef.current ?? null
+    );
+    initSubmissionSnapshot(landingKey, sectionsRef.current);
 
     const base = () => buildBasePayload(landingKey);
 
@@ -212,7 +223,11 @@ export default function LandingAnalyticsTracker({ landingKey, sections }: Props)
       const x_ratio = Math.min(1, Math.max(0, e.clientX / viewportWidth));
       const absoluteY = e.clientY + scrollY;
       const y_ratio = Math.min(1, Math.max(0, absoluteY / documentHeight));
-      const section = getLandingSectionByRatio(landingKey, y_ratio, sections);
+      const section = getLandingSectionByRatio(
+        landingKey,
+        y_ratio,
+        sectionsRef.current
+      );
       const cta = isCtaTarget(target);
 
       sendLandingEvent({
@@ -254,7 +269,7 @@ export default function LandingAnalyticsTracker({ landingKey, sections }: Props)
       if (dwellTickRef.current) clearInterval(dwellTickRef.current);
       sendLeave(true);
     };
-  }, [landingKey, sections]);
+  }, [landingKey]);
 
   return null;
 }

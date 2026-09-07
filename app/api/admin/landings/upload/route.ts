@@ -4,7 +4,7 @@ import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const BUCKET = "landing-assets";
-const MAX_BYTES = 15 * 1024 * 1024;
+const MAX_BYTES = 40 * 1024 * 1024;
 
 /**
  * POST /api/admin/landings/upload
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
     if (!Number.isFinite(size) || size <= 0 || size > MAX_BYTES) {
       return NextResponse.json(
-        { ok: false, message: "파일 크기는 1바이트~15MB여야 합니다." },
+        { ok: false, message: "파일 크기는 1바이트~40MB여야 합니다." },
         { status: 400 }
       );
     }

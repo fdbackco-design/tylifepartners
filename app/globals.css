@@ -107,6 +107,34 @@ body:has(.crm-app) main {
   margin: 0;
 }
 
+/* /0907 풀폭 랜딩 — 전역 main(max-width:480px) 해제 */
+body:has(.landing-0907) {
+  background: #f7f4ec;
+  overflow-x: clip;
+}
+
+body:has(.landing-0907) main {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding-bottom: 0;
+  min-height: auto;
+}
+
+/* 코드 ZIP 배포 랜딩 */
+body:has(.landing-code) {
+  background: #f7f4ec;
+  overflow-x: clip;
+}
+
+body:has(.landing-code) main {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding-bottom: 0;
+  min-height: auto;
+}
+
 .crm-app {
   min-height: 100vh;
   background: var(--crm-bg);

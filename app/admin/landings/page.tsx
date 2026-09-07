@@ -55,11 +55,14 @@ export default function AdminLandingsListPage() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [createMode, setCreateMode] = useState<"template" | "code">("template");
   const [creating, setCreating] = useState(false);
   const [newPath, setNewPath] = useState("");
   const [newTitle, setNewTitle] = useState("상담 안내");
   const [newPublished, setNewPublished] = useState(false);
+  const [zipFile, setZipFile] = useState<File | null>(null);
   const [formError, setFormError] = useState("");
+  const [redeployId, setRedeployId] = useState<string | null>(null);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
@@ -100,12 +103,51 @@ export default function AdminLandingsListPage() {
   const fullPreview = pathPreview ? absoluteUrl(pathPreview) : "";
   const pathDuplicate = !!pathPreview && items.some((it) => normalizeLandingPath(it.path) === pathPreview);
 
-  const openCreate = () => {
+  const openCreate = (mode: "template" | "code" = "template") => {
+    setCreateMode(mode);
     setNewPath("");
     setNewTitle("상담 안내");
     setNewPublished(false);
+    setZipFile(null);
+    setRedeployId(null);
     setFormError("");
     setSheetOpen(true);
+  };
+
+  const openRedeploy = (it: LandingItem) => {
+    setCreateMode("code");
+    setRedeployId(it.id);
+    setNewPath(it.path);
+    setNewTitle(it.title);
+    setNewPublished(it.published);
+    setZipFile(null);
+    setFormError("");
+    setSheetOpen(true);
+  };
+
+  const uploadZipToStorage = async (file: File): Promise<string> => {
+    const prep = await fetch("/api/admin/landings/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename: file.name,
+        contentType: file.type || "application/zip",
+        size: file.size,
+      }),
+    });
+    const prepJson = await prep.json();
+    if (!prep.ok) throw new Error(prepJson.message || "업로드 준비 실패");
+
+    const put = await fetch(prepJson.signedUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type || "application/zip",
+        ...(prepJson.token ? { Authorization: `Bearer ${prepJson.token}` } : {}),
+      },
+      body: file,
+    });
+    if (!put.ok) throw new Error("ZIP Storage 업로드 실패");
+    return String(prepJson.path);
   };
 
   const create = async () => {
@@ -114,10 +156,54 @@ export default function AdminLandingsListPage() {
       setFormError("URL 경로를 입력해 주세요.");
       return;
     }
-    if (pathDuplicate) {
+    if (!redeployId && pathDuplicate) {
       setFormError("이미 사용 중인 경로입니다.");
       return;
     }
+
+    if (createMode === "code") {
+      if (!zipFile) {
+        setFormError("React/Next 소스 ZIP 파일을 선택해 주세요.");
+        return;
+      }
+      setCreating(true);
+      try {
+        const storagePath = await uploadZipToStorage(zipFile);
+        const res = await fetch("/api/admin/landings/deploy-zip", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storagePath,
+            path: pathPreview,
+            title: newTitle.trim() || "상담 안내",
+            published: newPublished,
+            replaceId: redeployId,
+            sourceZipName: zipFile.name,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          setFormError(json.message || "ZIP 배포 실패");
+          return;
+        }
+        setSheetOpen(false);
+        setToast(
+          json.warnings?.length
+            ? `배포 완료 (경고 ${json.warnings.length}건)`
+            : "코드 ZIP 랜딩을 배포했습니다."
+        );
+        await load();
+        if (!redeployId && json.landing?.id) {
+          window.location.href = `/admin/landings/${json.landing.id}`;
+        }
+      } catch (e) {
+        setFormError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setCreating(false);
+      }
+      return;
+    }
+
     setCreating(true);
     try {
       const res = await fetch("/api/admin/landings", {
@@ -216,9 +302,14 @@ export default function AdminLandingsListPage() {
         title="랜딩페이지 관리"
         description="상담 유입용 랜딩페이지를 만들고 공개 상태를 관리합니다."
         actions={
-          <CrmButton variant="primary" onClick={openCreate}>
-            <IconPlus /> 새 랜딩페이지
-          </CrmButton>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <CrmButton variant="secondary" onClick={() => openCreate("code")}>
+              코드 ZIP 배포
+            </CrmButton>
+            <CrmButton variant="primary" onClick={() => openCreate("template")}>
+              <IconPlus /> 템플릿 랜딩
+            </CrmButton>
+          </div>
         }
       />
 
@@ -259,9 +350,14 @@ export default function AdminLandingsListPage() {
           title="랜딩페이지가 없습니다"
           description="상담 신청을 받는 랜딩페이지를 만들어 유입 경로와 전환을 관리하세요."
           action={
-            <CrmButton variant="primary" onClick={openCreate}>
-              <IconPlus /> 첫 랜딩페이지 만들기
-            </CrmButton>
+            <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+              <CrmButton variant="secondary" onClick={() => openCreate("code")}>
+                코드 ZIP 배포
+              </CrmButton>
+              <CrmButton variant="primary" onClick={() => openCreate("template")}>
+                <IconPlus /> 템플릿 랜딩
+              </CrmButton>
+            </div>
           }
         />
       ) : filtered.length === 0 ? (
@@ -283,7 +379,10 @@ export default function AdminLandingsListPage() {
                 <div className="crm-ui-landing-body">
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
                     <h3 className="crm-ui-landing-title">{it.title}</h3>
-                    <CrmBadge tone={it.published ? "success" : "neutral"}>{it.published ? "공개" : "비공개"}</CrmBadge>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      {it.kind === "code" ? <CrmBadge>코드</CrmBadge> : null}
+                      <CrmBadge tone={it.published ? "success" : "neutral"}>{it.published ? "공개" : "비공개"}</CrmBadge>
+                    </div>
                   </div>
                   <div className="crm-ui-landing-url">
                     <span>{url}</span>
@@ -310,12 +409,20 @@ export default function AdminLandingsListPage() {
                     >
                       미리보기
                     </CrmButton>
-                    <Link href={`/admin/landings/${it.id}`} className="crm-ui-btn crm-ui-btn-primary crm-ui-btn-sm">
-                      편집
-                    </Link>
+                    {it.kind === "code" ? (
+                      <CrmButton size="sm" variant="primary" onClick={() => openRedeploy(it)}>
+                        ZIP 재배포
+                      </CrmButton>
+                    ) : (
+                      <Link href={`/admin/landings/${it.id}`} className="crm-ui-btn crm-ui-btn-primary crm-ui-btn-sm">
+                        편집
+                      </Link>
+                    )}
                     <CrmMenu trigger={<IconDots />} align="right">
                       <CrmMenuItem onClick={() => void copyUrl(it)}>URL 복사</CrmMenuItem>
-                      <CrmMenuItem onClick={() => void duplicate(it)}>복제</CrmMenuItem>
+                      {it.kind !== "code" ? (
+                        <CrmMenuItem onClick={() => void duplicate(it)}>복제</CrmMenuItem>
+                      ) : null}
                       <CrmMenuItem tone="danger" onClick={() => setDeleteId(it.id)}>
                         삭제
                       </CrmMenuItem>
@@ -331,33 +438,72 @@ export default function AdminLandingsListPage() {
       <CrmSheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
-        title="새 랜딩페이지"
+        title={
+          createMode === "code"
+            ? redeployId
+              ? "코드 ZIP 재배포"
+              : "코드 ZIP 배포"
+            : "새 템플릿 랜딩"
+        }
         footer={
           <>
             <CrmButton variant="secondary" onClick={() => setSheetOpen(false)}>
               취소
             </CrmButton>
             <CrmButton variant="primary" disabled={creating} onClick={() => void create()}>
-              {creating ? "생성 중…" : "생성"}
+              {creating
+                ? createMode === "code"
+                  ? "배포 중…"
+                  : "생성 중…"
+                : createMode === "code"
+                  ? "배포"
+                  : "생성"}
             </CrmButton>
           </>
         }
       >
+        {createMode === "code" ? (
+          <CrmAlert tone="info">
+            React/Next 소스 ZIP (`app/page.tsx`, CSS, `public/assets`, lead-form)을 올리면 경로에 배포되고
+            스크롤 히트맵·상담 CRM이 자동 연결됩니다.
+          </CrmAlert>
+        ) : null}
         <CrmField label="랜딩페이지 이름" htmlFor="lp-title">
           <CrmInput id="lp-title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="상담 안내" />
         </CrmField>
         <CrmField
-          label="URL 경로"
+          label="배포 경로"
           htmlFor="lp-path"
-          hint="예: /promo-a"
-          error={pathDuplicate ? "이미 사용 중인 경로입니다." : undefined}
+          hint="예: /0908 또는 /promo-a"
+          error={!redeployId && pathDuplicate ? "이미 사용 중인 경로입니다." : undefined}
         >
-          <CrmInput id="lp-path" value={newPath} onChange={(e) => setNewPath(e.target.value)} placeholder="/promo-a" />
+          <CrmInput
+            id="lp-path"
+            value={newPath}
+            onChange={(e) => setNewPath(e.target.value)}
+            placeholder="/promo-a"
+            disabled={!!redeployId}
+          />
         </CrmField>
         {fullPreview ? (
           <CrmAlert tone="info">
-            미리보기 URL: <strong>{fullPreview}</strong>
+            공개 URL: <strong>{fullPreview}</strong>
           </CrmAlert>
+        ) : null}
+        {createMode === "code" ? (
+          <CrmField label="소스 ZIP" htmlFor="lp-zip" hint="최대 40MB · app/page.tsx 포함">
+            <input
+              id="lp-zip"
+              type="file"
+              accept=".zip,application/zip"
+              onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
+            />
+            {zipFile ? (
+              <div style={{ marginTop: 8, fontSize: 13, color: "var(--crm-muted)" }}>
+                {zipFile.name} ({Math.round(zipFile.size / 1024)} KB)
+              </div>
+            ) : null}
+          </CrmField>
         ) : null}
         <CrmField label="공개 상태">
           <CrmSwitch checked={newPublished} onChange={setNewPublished} label={newPublished ? "공개" : "비공개"} />

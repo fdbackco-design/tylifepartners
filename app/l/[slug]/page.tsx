@@ -1,5 +1,6 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
+import CodeLandingRuntime from "@/app/_components/CodeLandingRuntime";
 import ManagedLandingPage from "@/app/_components/ManagedLandingPage";
 import { getManagedLandingBySlug } from "@/lib/managedLandings/store";
 
@@ -13,6 +14,21 @@ export default async function ManagedLandingPublicPage({ params }: Props) {
   const { slug } = await params;
   const landing = await getManagedLandingBySlug(slug, { publishedOnly: true });
   if (!landing) notFound();
+
+  if (landing.kind === "code") {
+    if (!landing.code_bundle_url) notFound();
+    return (
+      <CodeLandingRuntime
+        id={landing.id}
+        slug={landing.slug}
+        path={landing.path}
+        title={landing.title}
+        bundleUrl={landing.code_bundle_url}
+        cssUrl={landing.code_css_url}
+        sections={landing.sections}
+      />
+    );
+  }
 
   return (
     <ManagedLandingPage

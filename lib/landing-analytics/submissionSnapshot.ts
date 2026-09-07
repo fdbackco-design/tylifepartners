@@ -40,6 +40,14 @@ export function initSubmissionSnapshot(
   refreshSubmissionSnapshot(0);
 }
 
+/** DOM 측정 등으로 섹션 구간이 갱신될 때 (세션 초기화 없이) */
+export function setSubmissionSnapshotSections(
+  sections?: LandingSection[] | null
+): void {
+  activeSections = sections?.length ? sections : null;
+  refreshSubmissionSnapshot();
+}
+
 export function refreshSubmissionSnapshot(maxScrollY?: number): void {
   if (!activeLandingKey || !snapshot) return;
 

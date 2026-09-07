@@ -4,11 +4,23 @@ export type { ManagedFormConfig } from "@/lib/managedLandings/formConfig";
 
 export type ManagedCtaPosition = "always" | "from_bottom" | "after_bottom";
 
+export type ManagedLandingKind = "template" | "code";
+
 export type ManagedLandingSection = {
   name: string;
   label: string;
   start: number;
   end: number;
+};
+
+export type ManagedLandingCodeMeta = {
+  source_zip?: string;
+  page_file?: string;
+  css_file?: string;
+  lead_form_file?: string | null;
+  asset_count?: number;
+  section_count?: number;
+  bundled_at?: string;
 };
 
 export type ManagedLandingRow = {
@@ -25,6 +37,11 @@ export type ManagedLandingRow = {
   sections: ManagedLandingSection[];
   form_config: ManagedFormConfig;
   published: boolean;
+  kind: ManagedLandingKind;
+  code_bundle_url: string | null;
+  code_css_url: string | null;
+  code_asset_base: string | null;
+  code_meta: ManagedLandingCodeMeta;
   created_at: string;
   updated_at: string;
 };
@@ -41,6 +58,11 @@ export type ManagedLandingInput = {
   sections?: ManagedLandingSection[];
   form_config?: ManagedFormConfig;
   published?: boolean;
+  kind?: ManagedLandingKind;
+  code_bundle_url?: string | null;
+  code_css_url?: string | null;
+  code_asset_base?: string | null;
+  code_meta?: ManagedLandingCodeMeta;
 };
 
 export function landingKeyForManaged(slug: string): string {
@@ -71,6 +93,15 @@ export function slugFromPath(path: string): string {
   return s || "landing";
 }
 
+export function normalizeLandingKind(raw: unknown): ManagedLandingKind {
+  return raw === "code" ? "code" : "template";
+}
+
+export function normalizeCodeMeta(raw: unknown): ManagedLandingCodeMeta {
+  if (!raw || typeof raw !== "object") return {};
+  return raw as ManagedLandingCodeMeta;
+}
+
 export function normalizeSections(raw: unknown): ManagedLandingSection[] {
   if (!Array.isArray(raw)) return [];
   const out: ManagedLandingSection[] = [];
@@ -90,4 +121,18 @@ export function normalizeSections(raw: unknown): ManagedLandingSection[] {
     });
   }
   return out.sort((a, b) => a.start - b.start);
+}
+
+/** data-analytics-section 마커 순서만으로 균등 폴백 구간 생성 */
+export function sectionsFromMarkers(
+  markers: Array<{ name: string; label: string }>
+): ManagedLandingSection[] {
+  if (!markers.length) return [];
+  const n = markers.length;
+  return markers.map((m, i) => ({
+    name: m.name,
+    label: m.label,
+    start: i / n,
+    end: (i + 1) / n,
+  }));
 }
