@@ -6,6 +6,10 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 
 const BUCKET = "landing-assets";
 
+/** ZIP 언팩 + esbuild 번들 — 서버리스 한도 여유 */
+export const maxDuration = 60;
+export const runtime = "nodejs";
+
 /**
  * POST /api/admin/landings/deploy-zip
  * JSON: { storagePath, path, title?, published?, replaceId? }
