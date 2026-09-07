@@ -1,6 +1,6 @@
 import { createRequire } from "module";
 import path from "path";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import {
   LANDING_CRM_BRIDGE_SHIM,
   LANDING_ENTRY_WRAPPER,
@@ -24,6 +24,14 @@ type EsbuildApi = {
   transform: typeof import("esbuild").transform;
 };
 
+type EsbuildWasmApi = EsbuildApi & {
+  initialize: (opts: {
+    wasmModule?: WebAssembly.Module;
+    wasmURL?: string | URL;
+    worker?: boolean;
+  }) => Promise<void>;
+};
+
 /** 호스트(Next)와 공유 — 플러그인이 절대경로로 resolve하면 external이 무시되므로 명시 마킹 */
 const EXTERNAL_MODULES = new Set([
   "react",
@@ -36,9 +44,41 @@ const EXTERNAL_MODULES = new Set([
 ]);
 
 let wasmInitialized = false;
+let cachedApi: EsbuildApi | null = null;
+
+function packageRequire(): NodeRequire {
+  return createRequire(path.resolve(process.cwd(), "package.json"));
+}
+
+function resolveWasmPath(nodeRequire: NodeRequire): string {
+  try {
+    return nodeRequire.resolve("esbuild-wasm/esbuild.wasm");
+  } catch {
+    const pkg = nodeRequire.resolve("esbuild-wasm/package.json");
+    const candidate = path.join(path.dirname(pkg), "esbuild.wasm");
+    if (!existsSync(candidate)) {
+      throw new Error(`esbuild.wasm을 찾을 수 없습니다: ${candidate}`);
+    }
+    return candidate;
+  }
+}
+
+async function loadWasmEsbuild(nodeRequire: NodeRequire): Promise<EsbuildApi> {
+  // NFT 추적용 리터럴
+  nodeRequire.resolve("esbuild-wasm");
+  const esbuild = nodeRequire("esbuild-wasm") as EsbuildWasmApi;
+  if (!wasmInitialized) {
+    const wasmPath = resolveWasmPath(nodeRequire);
+    const wasmModule = await WebAssembly.compile(readFileSync(wasmPath));
+    await esbuild.initialize({ wasmModule, worker: false });
+    wasmInitialized = true;
+  }
+  // smoke test — native 깨짐과 같은 "(void 0) is not a function"을 여기서 잡음
+  await esbuild.transform("export {}", { loader: "js" });
+  return esbuild;
+}
 
 async function loadNativeEsbuild(nodeRequire: NodeRequire): Promise<EsbuildApi> {
-  // NFT가 따라갈 수 있도록 문자열 리터럴 resolve
   nodeRequire.resolve("esbuild");
   try {
     nodeRequire.resolve("@esbuild/linux-x64");
@@ -46,40 +86,56 @@ async function loadNativeEsbuild(nodeRequire: NodeRequire): Promise<EsbuildApi> 
     /* local/darwin 등 */
   }
   const esbuild = nodeRequire("esbuild") as EsbuildApi;
+  if (typeof esbuild.transform !== "function" || typeof esbuild.build !== "function") {
+    throw new Error("native esbuild API가 불완전합니다.");
+  }
   await esbuild.transform("export {}", { loader: "js" });
   return esbuild;
 }
 
-async function loadWasmEsbuild(nodeRequire: NodeRequire): Promise<EsbuildApi> {
-  const esbuild = nodeRequire("esbuild-wasm") as EsbuildApi & {
-    initialize: (opts: { wasmModule?: WebAssembly.Module; worker?: boolean }) => Promise<void>;
-  };
-  if (!wasmInitialized) {
-    const wasmPath = nodeRequire.resolve("esbuild-wasm/esbuild.wasm");
-    const wasmModule = await WebAssembly.compile(readFileSync(wasmPath));
-    await esbuild.initialize({ wasmModule, worker: false });
-    wasmInitialized = true;
-  }
-  return esbuild;
-}
-
+/**
+ * Vercel/Lambda에서는 native esbuild 바이너리가 자주 깨져
+ * `(void 0) is not a function`이 나므로 wasm을 우선 사용.
+ */
 async function loadEsbuild(): Promise<EsbuildApi> {
-  const nodeRequire = createRequire(path.resolve(process.cwd(), "package.json"));
-  try {
-    return await loadNativeEsbuild(nodeRequire);
-  } catch (nativeErr) {
-    console.warn(
-      "native esbuild unavailable, using esbuild-wasm:",
-      nativeErr instanceof Error ? nativeErr.message : nativeErr
-    );
+  if (cachedApi) return cachedApi;
+
+  const nodeRequire = packageRequire();
+  const onServerless = Boolean(
+    process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV
+  );
+
+  const errors: string[] = [];
+
+  if (onServerless) {
     try {
-      return await loadWasmEsbuild(nodeRequire);
-    } catch (wasmErr) {
-      const a = nativeErr instanceof Error ? nativeErr.message : String(nativeErr);
-      const b = wasmErr instanceof Error ? wasmErr.message : String(wasmErr);
-      throw new Error(`esbuild를 초기화하지 못했습니다. native: ${a} / wasm: ${b}`);
+      cachedApi = await loadWasmEsbuild(nodeRequire);
+      return cachedApi;
+    } catch (e) {
+      errors.push(`wasm: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    try {
+      cachedApi = await loadNativeEsbuild(nodeRequire);
+      return cachedApi;
+    } catch (e) {
+      errors.push(`native: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  } else {
+    try {
+      cachedApi = await loadNativeEsbuild(nodeRequire);
+      return cachedApi;
+    } catch (e) {
+      errors.push(`native: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    try {
+      cachedApi = await loadWasmEsbuild(nodeRequire);
+      return cachedApi;
+    } catch (e) {
+      errors.push(`wasm: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
+
+  throw new Error(`esbuild를 초기화하지 못했습니다. ${errors.join(" / ")}`);
 }
 
 function formatEsbuildFailure(err: unknown): string {
@@ -105,7 +161,7 @@ function formatEsbuildFailure(err: unknown): string {
 export async function bundleLandingCode(input: BundleInput): Promise<BundleResult> {
   const esbuild = await loadEsbuild();
   const cwd = process.cwd();
-  const nodeRequire = createRequire(path.resolve(cwd, "package.json"));
+  const nodeRequire = packageRequire();
   const virtualFiles: Record<string, string> = {
     "/virtual/__entry__.js": LANDING_ENTRY_WRAPPER,
     "/virtual/__page__.tsx": input.pageCode,
@@ -143,8 +199,6 @@ export async function bundleLandingCode(input: BundleInput): Promise<BundleResul
           name: "virtual-fs",
           setup(build) {
             build.onResolve({ filter: /.*/ }, (args) => {
-              // 반드시 절대경로 resolve보다 먼저 — 안 그러면 React가 번들에 포함되어
-              // 호스트 React와 이중 로딩 → 런타임 "(void 0) is not a function"
               if (EXTERNAL_MODULES.has(args.path)) {
                 return { path: args.path, external: true };
               }
@@ -192,9 +246,7 @@ export async function bundleLandingCode(input: BundleInput): Promise<BundleResul
                 };
               }
 
-              // bare imports — node_modules (lucide/react는 위에서 external)
               if (!args.path.startsWith(".") && !args.path.startsWith("/")) {
-                // @/ alias, next/* 등 미지원
                 if (args.path.startsWith("@/") || args.path.startsWith("next/")) {
                   return {
                     errors: [
