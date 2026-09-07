@@ -553,6 +553,38 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
     return <CrmAlert tone="danger">{error || "랜딩을 찾을 수 없습니다."}</CrmAlert>;
   }
 
+  if (item.kind === "code") {
+    return (
+      <div className="crm-ui-content">
+        <CrmPageHeader
+          title={item.title}
+          description="코드 ZIP으로 배포된 랜딩입니다."
+          actions={
+            <Link href="/admin/landings" className="crm-ui-btn crm-ui-btn-ghost crm-ui-btn-md">
+              목록
+            </Link>
+          }
+        />
+        <CrmAlert tone="info">
+          템플릿 에디터 대신 목록의 <strong>ZIP 재배포</strong>로 소스를 갱신하세요. 스크롤 히트맵은 페이지의
+          섹션 마커를 자동 측정합니다.
+        </CrmAlert>
+        <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <CrmBadge>{item.published ? "공개" : "비공개"}</CrmBadge>
+          <CrmBadge>코드 ZIP</CrmBadge>
+          <span style={{ fontSize: 13, color: "var(--crm-muted)" }}>{item.path}</span>
+        </div>
+        {item.published ? (
+          <div style={{ marginTop: 16 }}>
+            <a className="crm-ui-btn crm-ui-btn-primary crm-ui-btn-md" href={item.path} target="_blank" rel="noreferrer">
+              공개 페이지 열기
+            </a>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="crm-landing-editor">
       <CrmPageHeader

@@ -23,12 +23,20 @@ export function getCurrentSection(landingKey: string, sectionsOverride?: Landing
 
 export class SectionDwellAccumulator {
   private readonly landingKey: string;
-  private readonly sectionsOverride: LandingSection[] | null;
+  private readonly getSectionsOverride: () => LandingSection[] | null;
   private readonly dwell = new Map<string, SectionDwellEntry>();
 
-  constructor(landingKey: string, sectionsOverride?: LandingSection[] | null) {
+  constructor(
+    landingKey: string,
+    sectionsOverride?: LandingSection[] | null | (() => LandingSection[] | null | undefined)
+  ) {
     this.landingKey = landingKey;
-    this.sectionsOverride = sectionsOverride ?? null;
+    if (typeof sectionsOverride === "function") {
+      this.getSectionsOverride = () => sectionsOverride() ?? null;
+    } else {
+      const fixed = sectionsOverride ?? null;
+      this.getSectionsOverride = () => fixed;
+    }
   }
 
   /** visible 상태에서 1초마다 호출 */
@@ -36,7 +44,7 @@ export class SectionDwellAccumulator {
     if (typeof document !== "undefined" && document.visibilityState !== "visible") {
       return;
     }
-    const section = getCurrentSection(this.landingKey, this.sectionsOverride);
+    const section = getCurrentSection(this.landingKey, this.getSectionsOverride());
     if (!section) return;
 
     const cur = this.dwell.get(section.name);

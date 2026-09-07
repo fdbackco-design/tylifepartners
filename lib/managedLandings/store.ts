@@ -4,17 +4,21 @@ import {
   normalizeFormConfig,
 } from "@/lib/managedLandings/formConfig";
 import {
+  normalizeCodeMeta,
+  normalizeLandingKind,
   normalizeLandingPath,
   normalizeSections,
   slugFromPath,
   type ManagedCtaPosition,
+  type ManagedLandingCodeMeta,
   type ManagedLandingInput,
+  type ManagedLandingKind,
   type ManagedLandingRow,
   type ManagedLandingSection,
 } from "@/lib/managedLandings/types";
 
 const SELECT_COLS =
-  "id, path, slug, title, custom_host, hero1_url, hero2_url, show_brochure, brochure_url, cta_position, sections, form_config, published, created_at, updated_at";
+  "id, path, slug, title, custom_host, hero1_url, hero2_url, show_brochure, brochure_url, cta_position, sections, form_config, published, kind, code_bundle_url, code_css_url, code_asset_base, code_meta, created_at, updated_at";
 
 function mapRow(raw: Record<string, unknown>): ManagedLandingRow {
   return {
@@ -31,6 +35,11 @@ function mapRow(raw: Record<string, unknown>): ManagedLandingRow {
     sections: normalizeSections(raw.sections),
     form_config: normalizeFormConfig(raw.form_config ?? DEFAULT_FORM_CONFIG),
     published: Boolean(raw.published),
+    kind: normalizeLandingKind(raw.kind),
+    code_bundle_url: raw.code_bundle_url != null ? String(raw.code_bundle_url) : null,
+    code_css_url: raw.code_css_url != null ? String(raw.code_css_url) : null,
+    code_asset_base: raw.code_asset_base != null ? String(raw.code_asset_base) : null,
+    code_meta: normalizeCodeMeta(raw.code_meta),
     created_at: String(raw.created_at),
     updated_at: String(raw.updated_at),
   };
@@ -45,6 +54,7 @@ const RESERVED_PATHS = new Set([
   "/me",
   "/sidejob",
   "/no-clawback",
+  "/privacy",
   "/v1",
   "/v2",
   "/v3",
@@ -52,6 +62,7 @@ const RESERVED_PATHS = new Set([
   "/0623s",
   "/0715",
   "/0715s",
+  "/0907",
   "/l",
 ]);
 
@@ -175,6 +186,7 @@ export async function createManagedLanding(
 
   const supabase = getSupabaseAdmin();
   const now = new Date().toISOString();
+  const kind: ManagedLandingKind = input.kind === "code" ? "code" : "template";
   const { data, error } = await supabase
     .from("managed_landings")
     .insert({
@@ -190,6 +202,11 @@ export async function createManagedLanding(
       sections: normalizeSections(input.sections ?? []),
       form_config: normalizeFormConfig(input.form_config ?? DEFAULT_FORM_CONFIG),
       published: Boolean(input.published),
+      kind,
+      code_bundle_url: input.code_bundle_url?.trim() || null,
+      code_css_url: input.code_css_url?.trim() || null,
+      code_asset_base: input.code_asset_base?.trim() || null,
+      code_meta: (input.code_meta ?? {}) as ManagedLandingCodeMeta,
       updated_at: now,
     })
     .select(SELECT_COLS)
@@ -237,6 +254,17 @@ export async function updateManagedLanding(
   if (input.sections != null) patch.sections = normalizeSections(input.sections);
   if (input.form_config != null) patch.form_config = normalizeFormConfig(input.form_config);
   if (input.published != null) patch.published = Boolean(input.published);
+  if (input.kind != null) patch.kind = normalizeLandingKind(input.kind);
+  if (input.code_bundle_url !== undefined) {
+    patch.code_bundle_url = input.code_bundle_url?.trim() || null;
+  }
+  if (input.code_css_url !== undefined) {
+    patch.code_css_url = input.code_css_url?.trim() || null;
+  }
+  if (input.code_asset_base !== undefined) {
+    patch.code_asset_base = input.code_asset_base?.trim() || null;
+  }
+  if (input.code_meta !== undefined) patch.code_meta = input.code_meta ?? {};
 
   if (patch.show_brochure === false) patch.brochure_url = null;
 
