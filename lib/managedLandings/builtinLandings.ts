@@ -1,4 +1,3 @@
-import { DEFAULT_FORM_CONFIG } from "@/lib/managedLandings/formConfig";
 import type { ManagedLandingRow } from "@/lib/managedLandings/types";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -9,35 +8,8 @@ export type BuiltinLanding = ManagedLandingRow & {
   entry_pages: string[];
 };
 
-const now = "2026-09-07T00:00:00.000Z";
-
-export const BUILTIN_LANDINGS: BuiltinLanding[] = [
-  {
-    id: "builtin_0907",
-    path: "/0907",
-    slug: "0907",
-    title: "FEED LIFE 리크루팅",
-    custom_host: null,
-    hero1_url: "/assets/0907/sun-cruise.webp",
-    hero2_url: "/assets/0907/all-life-health.webp",
-    show_brochure: false,
-    brochure_url: null,
-    cta_position: "from_bottom",
-    sections: [],
-    form_config: DEFAULT_FORM_CONFIG,
-    published: true,
-    kind: "code",
-    code_bundle_url: null,
-    code_css_url: null,
-    code_asset_base: null,
-    code_meta: { source_zip: "app/0907 (고정 배포)" },
-    created_at: now,
-    updated_at: now,
-    builtin: true,
-    landing_key: "landing_0907",
-    entry_pages: ["/0907", "0907"],
-  },
-];
+/** 고정 배포 랜딩 목록 (비어 있으면 관리 목록에 고정 항목 없음) */
+export const BUILTIN_LANDINGS: BuiltinLanding[] = [];
 
 export const BUILTIN_LANDING_PATHS = new Set(BUILTIN_LANDINGS.map((b) => b.path));
 
@@ -98,7 +70,7 @@ export async function mergeBuiltinLandings(
   const extras = BUILTIN_LANDINGS.filter((b) => !paths.has(b.path)).map((b) => ({
     ...b,
     published: publishMap[b.path] !== false,
-    updated_at: now,
+    updated_at: new Date().toISOString(),
   }));
   return [...extras, ...items];
 }
