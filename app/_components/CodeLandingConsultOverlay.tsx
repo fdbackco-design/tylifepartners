@@ -204,56 +204,61 @@ export default function CodeLandingConsultOverlay({ id, path, formConfig: formCo
           bottom: 0,
           left: 0,
           right: 0,
-          padding: "10px 16px",
-          paddingBottom: "calc(10px + var(--safe-bottom, 0px))",
           background: "var(--bg-page, #fff)",
-          maxWidth: 480,
-          margin: "0 auto",
           boxShadow: "0 -2px 10px rgba(0,0,0,0.06)",
           zIndex: 40,
         }}
       >
-        <button
-          type="button"
-          onClick={() => openSheet("host-sticky")}
-          disabled={submitted}
+        <div
           style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 12,
-            width: "100%",
-            padding: "15px 18px",
-            background: submitted ? "#adb5bd" : "var(--cta-bg, #5b19c6)",
-            color: "#fff",
-            border: "none",
-            borderRadius: "var(--radius, 10px)",
-            fontSize: 22,
-            fontWeight: 800,
-            cursor: submitted ? "default" : "pointer",
+            maxWidth: 480,
+            margin: "0 auto",
+            padding: "10px 16px",
+            paddingBottom: "calc(10px + var(--safe-bottom, 0px))",
           }}
         >
-          {!submitted && (
-            <span
-              aria-hidden
-              style={{
-                width: 22,
-                height: 22,
-                flexShrink: 0,
-                backgroundColor: "#fff",
-                WebkitMaskImage: `url(${CONSULTATION_ICON})`,
-                WebkitMaskSize: "contain",
-                WebkitMaskRepeat: "no-repeat",
-                WebkitMaskPosition: "center",
-                maskImage: `url(${CONSULTATION_ICON})`,
-                maskSize: "contain",
-                maskRepeat: "no-repeat",
-                maskPosition: "center",
-              }}
-            />
-          )}
-          {submitted ? "접수 완료" : "상담 신청하기"}
-        </button>
+          <button
+            type="button"
+            onClick={() => openSheet("host-sticky")}
+            disabled={submitted}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 12,
+              width: "100%",
+              padding: "15px 18px",
+              background: submitted ? "#adb5bd" : "var(--cta-bg, #5b19c6)",
+              color: "#fff",
+              border: "none",
+              borderRadius: "var(--radius, 10px)",
+              fontSize: 22,
+              fontWeight: 800,
+              cursor: submitted ? "default" : "pointer",
+            }}
+          >
+            {!submitted && (
+              <span
+                aria-hidden
+                style={{
+                  width: 22,
+                  height: 22,
+                  flexShrink: 0,
+                  backgroundColor: "#fff",
+                  WebkitMaskImage: `url(${CONSULTATION_ICON})`,
+                  WebkitMaskSize: "contain",
+                  WebkitMaskRepeat: "no-repeat",
+                  WebkitMaskPosition: "center",
+                  maskImage: `url(${CONSULTATION_ICON})`,
+                  maskSize: "contain",
+                  maskRepeat: "no-repeat",
+                  maskPosition: "center",
+                }}
+              />
+            )}
+            {submitted ? "접수 완료" : "상담 신청하기"}
+          </button>
+        </div>
       </div>
 
       {sheetOpen && (
