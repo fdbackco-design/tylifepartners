@@ -2,16 +2,37 @@
 
 export const LANDING_IMAGE_SHIM = `
 import * as React from "react";
+
+function pxFromSizes(sizes) {
+  const s = String(sizes || "").trim();
+  if (/^\\d+px$/.test(s)) return s;
+  return undefined;
+}
+
 export default function Image(props) {
   const {
     src, alt, width, height, fill, sizes, priority, className, style, ...rest
   } = props || {};
+  const sizeHint = pxFromSizes(sizes);
   const imgStyle = fill
     ? { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", ...(style || {}) }
-    : style;
+    : {
+        // next/image는 width/height를 레이아웃 힌트로 쓰고 CSS로 축소함.
+        // plain <img>에 속성만 넘기면 1639px 등으로 커지므로 height:auto + sizes 힌트를 강제.
+        maxWidth: "100%",
+        height: "auto",
+        ...(sizeHint ? { width: sizeHint } : {}),
+        ...(style || {}),
+      };
   return React.createElement("img", {
-    src, alt: alt || "", width: fill ? undefined : width, height: fill ? undefined : height,
-    className, style: imgStyle, loading: priority ? "eager" : "lazy", ...rest
+    src,
+    alt: alt || "",
+    width: fill ? undefined : width,
+    height: fill ? undefined : height,
+    className,
+    style: imgStyle,
+    loading: priority ? "eager" : "lazy",
+    ...rest
   });
 }
 `;

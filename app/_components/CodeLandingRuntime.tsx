@@ -125,6 +125,7 @@ export default function CodeLandingRuntime({
         body:has(.landing-code) { background: #f7f4ec; margin: 0; }
         body:has(.landing-code) main { max-width: none !important; width: 100% !important; margin: 0 !important; padding-bottom: 0 !important; }
         .landing-code { min-height: 100vh; width: 100%; }
+        .landing-code img { max-width: 100%; height: auto; }
         .landing-code-error { padding: 48px 24px; text-align: center; color: #b53535; font-family: sans-serif; }
       `}</style>
       {Page ? <LandingAnalyticsTracker landingKey={landingKey} sections={sections} /> : null}
