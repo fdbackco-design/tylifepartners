@@ -81,7 +81,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("POST /api/admin/landings/deploy-zip:", msg);
-    return NextResponse.json({ ok: false, message: msg }, { status: 500 });
+    const stack = e instanceof Error ? e.stack : undefined;
+    console.error("POST /api/admin/landings/deploy-zip:", msg, stack);
+    return NextResponse.json(
+      {
+        ok: false,
+        message: msg || "ZIP 배포 중 오류가 발생했습니다.",
+      },
+      { status: 500 }
+    );
   }
 }
