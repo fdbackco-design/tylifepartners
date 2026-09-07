@@ -287,8 +287,44 @@ export async function updateManagedLanding(
 
 export async function deleteManagedLanding(id: string): Promise<void> {
   const supabase = getSupabaseAdmin();
+  const existing = await getManagedLandingById(id);
+
   const { error } = await supabase.from("managed_landings").delete().eq("id", id);
   if (error) throw new Error(error.message);
+
+  // 코드 ZIP 배포 산출물 정리 (실패해도 DB 삭제는 유지)
+  if (existing?.kind === "code" && existing.slug) {
+    try {
+      const prefix = `code/${existing.slug}`;
+      const { data: entries } = await supabase.storage.from("landing-assets").list(prefix, {
+        limit: 1000,
+      });
+      // list는 한 단계만 — 하위 stamp 폴더를 순회
+      const folders = (entries ?? []).filter((e) => !e.id || e.name);
+      const toRemove: string[] = [];
+      for (const entry of folders) {
+        const sub = `${prefix}/${entry.name}`;
+        const { data: files } = await supabase.storage.from("landing-assets").list(sub, {
+          limit: 1000,
+        });
+        for (const f of files ?? []) {
+          if (f.name) toRemove.push(`${sub}/${f.name}`);
+        }
+        // assets 하위
+        const { data: assetFiles } = await supabase.storage
+          .from("landing-assets")
+          .list(`${sub}/assets`, { limit: 1000 });
+        for (const f of assetFiles ?? []) {
+          if (f.name) toRemove.push(`${sub}/assets/${f.name}`);
+        }
+      }
+      if (toRemove.length) {
+        await supabase.storage.from("landing-assets").remove(toRemove);
+      }
+    } catch (e) {
+      console.error("code landing storage cleanup:", e);
+    }
+  }
 }
 
 /** 미들웨어용: 공개된 path → slug 목록 */
