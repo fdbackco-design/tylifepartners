@@ -444,9 +444,17 @@ export default function AdminLandingsListPage() {
                         ) : null}
                       </>
                     ) : it.kind === "code" ? (
-                      <CrmButton size="sm" variant="primary" onClick={() => openRedeploy(it)}>
-                        ZIP 재배포
-                      </CrmButton>
+                      <>
+                        <Link
+                          href={`/admin/landings/${it.id}`}
+                          className="crm-ui-btn crm-ui-btn-secondary crm-ui-btn-sm"
+                        >
+                          편집
+                        </Link>
+                        <CrmButton size="sm" variant="primary" onClick={() => openRedeploy(it)}>
+                          ZIP 재배포
+                        </CrmButton>
+                      </>
                     ) : (
                       <Link href={`/admin/landings/${it.id}`} className="crm-ui-btn crm-ui-btn-primary crm-ui-btn-sm">
                         편집
