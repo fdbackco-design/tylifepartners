@@ -24,7 +24,11 @@ import {
   IconSearch,
 } from "@/app/admin/_components/crm/ui";
 
-type LandingItem = ManagedLandingRow & { lead_count?: number };
+type LandingItem = ManagedLandingRow & {
+  lead_count?: number;
+  builtin?: boolean;
+  landing_key?: string;
+};
 
 function absoluteUrl(path: string, host?: string | null) {
   if (typeof window === "undefined") return path;
@@ -225,6 +229,10 @@ export default function AdminLandingsListPage() {
   };
 
   const togglePublished = async (it: LandingItem) => {
+    if (it.builtin) {
+      setToast("고정 배포 랜딩은 공개 상태를 변경할 수 없습니다.");
+      return;
+    }
     const res = await fetch(`/api/admin/landings/${it.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -380,7 +388,8 @@ export default function AdminLandingsListPage() {
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
                     <h3 className="crm-ui-landing-title">{it.title}</h3>
                     <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                      {it.kind === "code" ? <CrmBadge>코드</CrmBadge> : null}
+                      {it.builtin ? <CrmBadge tone="primary">고정</CrmBadge> : null}
+                      {!it.builtin && it.kind === "code" ? <CrmBadge>코드</CrmBadge> : null}
                       <CrmBadge tone={it.published ? "success" : "neutral"}>{it.published ? "공개" : "비공개"}</CrmBadge>
                     </div>
                   </div>
@@ -396,20 +405,42 @@ export default function AdminLandingsListPage() {
                     <span>유입 DB {Number(it.lead_count ?? 0).toLocaleString()}건</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <CrmSwitch checked={it.published} onChange={() => void togglePublished(it)} label={it.published ? "공개" : "비공개"} />
+                    {it.builtin ? (
+                      <span style={{ fontSize: 13, color: "var(--crm-muted)" }}>코드 고정 배포 · 항상 공개</span>
+                    ) : (
+                      <CrmSwitch checked={it.published} onChange={() => void togglePublished(it)} label={it.published ? "공개" : "비공개"} />
+                    )}
                   </div>
                   <div className="crm-ui-landing-actions">
                     <CrmButton
                       size="sm"
                       variant="secondary"
                       onClick={() => {
-                        const sep = it.path.includes("?") ? "&" : "?";
-                        setPreviewSrc(`${it.path}${sep}adminPreview=1`);
+                        setPreviewSrc(it.path);
                       }}
                     >
                       미리보기
                     </CrmButton>
-                    {it.kind === "code" ? (
+                    {it.builtin ? (
+                      <>
+                        <a
+                          className="crm-ui-btn crm-ui-btn-primary crm-ui-btn-sm"
+                          href={it.path}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          열기
+                        </a>
+                        {it.landing_key ? (
+                          <Link
+                            href={`/admin/landing-analytics?landing_key=${encodeURIComponent(it.landing_key)}`}
+                            className="crm-ui-btn crm-ui-btn-secondary crm-ui-btn-sm"
+                          >
+                            히트맵
+                          </Link>
+                        ) : null}
+                      </>
+                    ) : it.kind === "code" ? (
                       <CrmButton size="sm" variant="primary" onClick={() => openRedeploy(it)}>
                         ZIP 재배포
                       </CrmButton>
@@ -420,12 +451,14 @@ export default function AdminLandingsListPage() {
                     )}
                     <CrmMenu trigger={<IconDots />} align="right">
                       <CrmMenuItem onClick={() => void copyUrl(it)}>URL 복사</CrmMenuItem>
-                      {it.kind !== "code" ? (
+                      {!it.builtin && it.kind !== "code" ? (
                         <CrmMenuItem onClick={() => void duplicate(it)}>복제</CrmMenuItem>
                       ) : null}
-                      <CrmMenuItem tone="danger" onClick={() => setDeleteId(it.id)}>
-                        삭제
-                      </CrmMenuItem>
+                      {!it.builtin ? (
+                        <CrmMenuItem tone="danger" onClick={() => setDeleteId(it.id)}>
+                          삭제
+                        </CrmMenuItem>
+                      ) : null}
                     </CrmMenu>
                   </div>
                 </div>
