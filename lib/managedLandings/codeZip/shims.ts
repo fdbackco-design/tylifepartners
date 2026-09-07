@@ -1,7 +1,7 @@
 /** 번들에 주입되는 런타임 심 — esbuild alias 대상 */
 
 export const LANDING_IMAGE_SHIM = `
-import React from "react";
+import * as React from "react";
 export default function Image(props) {
   const {
     src, alt, width, height, fill, sizes, priority, className, style, ...rest
@@ -17,7 +17,7 @@ export default function Image(props) {
 `;
 
 export const LANDING_LINK_SHIM = `
-import React from "react";
+import * as React from "react";
 export default function Link({ href, children, className, style, ...rest }) {
   return React.createElement("a", { href, className, style, ...rest }, children);
 }

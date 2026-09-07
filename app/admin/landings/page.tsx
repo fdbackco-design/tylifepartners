@@ -452,6 +452,11 @@ export default function AdminLandingsListPage() {
                         편집
                       </Link>
                     )}
+                    {!it.builtin ? (
+                      <CrmButton size="sm" variant="danger" onClick={() => setDeleteId(it.id)}>
+                        삭제
+                      </CrmButton>
+                    ) : null}
                     <CrmMenu trigger={<IconDots />} align="right">
                       <CrmMenuItem onClick={() => void copyUrl(it)}>URL 복사</CrmMenuItem>
                       {!it.builtin && it.kind !== "code" ? (
@@ -563,7 +568,8 @@ export default function AdminLandingsListPage() {
         }
       >
         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
-          이 랜딩페이지를 삭제할까요? 이미 수집된 상담 신청 데이터는 유지됩니다.
+          이 랜딩페이지를 삭제할까요? 코드 ZIP 배포본은 스토리지 파일도 함께 정리됩니다. 이미 수집된 상담
+          신청 데이터는 유지됩니다.
         </p>
       </CrmDialog>
 

@@ -560,11 +560,40 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
           title={item.title}
           description="코드 ZIP으로 배포된 랜딩입니다."
           actions={
-            <Link href="/admin/landings" className="crm-ui-btn crm-ui-btn-ghost crm-ui-btn-md">
-              목록
-            </Link>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Link href="/admin/landings" className="crm-ui-btn crm-ui-btn-ghost crm-ui-btn-md">
+                목록
+              </Link>
+              <CrmButton
+                variant="danger"
+                onClick={async () => {
+                  if (!window.confirm("이 코드 랜딩을 삭제할까요? 스토리지 파일도 함께 정리됩니다.")) {
+                    return;
+                  }
+                  setSaving(true);
+                  setError("");
+                  try {
+                    const res = await fetch(`/api/admin/landings/${item.id}`, { method: "DELETE" });
+                    const json = await parseJsonResponse(res);
+                    if (!res.ok) {
+                      setError(String(json.message || "삭제 실패"));
+                      return;
+                    }
+                    window.location.href = "/admin/landings";
+                  } catch {
+                    setError("네트워크 오류");
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving}
+              >
+                삭제
+              </CrmButton>
+            </div>
           }
         />
+        {error ? <CrmAlert tone="danger">{error}</CrmAlert> : null}
         <CrmAlert tone="info">
           템플릿 에디터 대신 목록의 <strong>ZIP 재배포</strong>로 소스를 갱신하세요. 스크롤 히트맵은 페이지의
           섹션 마커를 자동 측정합니다.

@@ -29,18 +29,30 @@ declare global {
 }
 
 function loadScriptCjs(code: string): { default?: ComponentType } {
-  const module = { exports: {} as { default?: ComponentType } };
+  const module: { exports: unknown } = { exports: {} };
   const exports = module.exports;
   const require = (name: string) => {
     if (name === "react") return React;
     if (name === "react/jsx-runtime") return ReactJSXRuntime;
     if (name === "react/jsx-dev-runtime") return ReactJSXRuntime;
+    if (name === "react-dom" || name === "react-dom/client") {
+      throw new Error(`'${name}'는 코드 ZIP 랜딩에서 지원하지 않습니다.`);
+    }
     throw new Error(`Cannot require '${name}' in landing bundle`);
   };
   // eslint-disable-next-line no-new-func
   const fn = new Function("require", "module", "exports", code);
   fn(require, module, exports);
-  return module.exports;
+  const mod = module.exports;
+  // CJS interop: module.exports = Component 또는 { default: Component }
+  if (typeof mod === "function") {
+    return { default: mod as ComponentType };
+  }
+  if (mod && typeof mod === "object" && "default" in mod) {
+    const def = (mod as { default?: unknown }).default;
+    if (typeof def === "function") return { default: def as ComponentType };
+  }
+  return {};
 }
 
 export default function CodeLandingRuntime({

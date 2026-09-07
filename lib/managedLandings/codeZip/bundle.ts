@@ -20,6 +20,15 @@ export type BundleResult = {
 
 type Esbuild = typeof import("esbuild");
 
+/** 호스트(Next) React와 공유 — 플러그인이 절대경로로 resolve하면 external이 무시되므로 명시 마킹 */
+const EXTERNAL_MODULES = new Set([
+  "react",
+  "react-dom",
+  "react-dom/client",
+  "react/jsx-runtime",
+  "react/jsx-dev-runtime",
+]);
+
 async function loadEsbuild(): Promise<Esbuild> {
   // Next/webpack이 esbuild 타입정의(.d.ts)를 파싱하지 않도록 런타임 로드
   const req = createRequire(path.resolve(process.cwd(), "package.json"));
@@ -59,13 +68,22 @@ export async function bundleLandingCode(input: BundleInput): Promise<BundleResul
     platform: "browser",
     target: ["es2019"],
     jsx: "automatic",
-    external: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
+    external: Array.from(EXTERNAL_MODULES),
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
     logLevel: "silent",
     plugins: [
       {
         name: "virtual-fs",
         setup(build) {
           build.onResolve({ filter: /.*/ }, (args) => {
+            // 반드시 절대경로 resolve보다 먼저 — 안 그러면 React가 번들에 포함되어
+            // 호스트 React와 이중 로딩 → 런타임 "(void 0) is not a function"
+            if (EXTERNAL_MODULES.has(args.path)) {
+              return { path: args.path, external: true };
+            }
+
             if (args.path === "__landing_image__") {
               return { path: "/virtual/__landing_image__.js", namespace: "virtual" };
             }
