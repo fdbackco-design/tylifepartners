@@ -1,4 +1,4 @@
-import { calendarDaysInclusive } from "@/lib/crm/kst";
+import { calendarDaysElapsed, calendarDaysInclusive } from "@/lib/crm/kst";
 import type { AdminStatusInfo, LeadStatus, SessionUser } from "@/lib/crm/types";
 import { LEAD_STATUSES } from "@/lib/crm/types";
 
@@ -26,25 +26,30 @@ export function getAdminStatus(
     return { key: "need_assign", label: "담당자 지정 필요", tone: "danger" };
   }
 
-  const days = calendarDaysInclusive(statusChangedAt || createdAt);
+  const since = statusChangedAt || createdAt;
 
   if (st === "배정전") {
     // 담당자는 있는데 상태가 아직 배정전인 경우에도 지정 필요로 두지 않고 대기 취급
-    return { key: "waiting_day", label: "대기 1일차", tone: "danger" };
+    return { key: "waiting_day", label: "대기 0일차", tone: "danger" };
   }
   if (st === "대기") {
-    if (days >= 3) return { key: "need_reassign", label: "담당자 변경 필요", tone: "danger" };
+    // 대기 전환 당일 = 0일차, 4일차부터 담당자 변경 필요
+    const days = calendarDaysElapsed(since);
+    if (days >= 4) return { key: "need_reassign", label: "담당자 변경 필요", tone: "danger" };
     return { key: "waiting_day", label: `대기 ${days}일차`, tone: "danger" };
   }
   if (st === "1차컨택") {
+    const days = calendarDaysInclusive(since);
     if (days >= 3) return { key: "need_reassign", label: "담당자 변경 필요", tone: "danger" };
     return { key: "first_contact_day", label: `1차컨택 ${days}일차`, tone: "danger" };
   }
   if (st === "부재(메신저완료)") {
+    const days = calendarDaysInclusive(since);
     if (days >= 3) return { key: "need_reassign", label: "담당자 변경 필요", tone: "danger" };
     return { key: "absent_day", label: `부재 ${days}일차`, tone: "danger" };
   }
   if (st === "상담완료") {
+    const days = calendarDaysInclusive(since);
     if (days > 7) return { key: "need_recontact", label: "재컨택 필요", tone: "danger" };
     return { key: "done_day", label: `상담완료 ${days}일차`, tone: "danger" };
   }
