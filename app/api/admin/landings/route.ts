@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
-import { BUILTIN_LANDINGS, mergeBuiltinLandings } from "@/lib/managedLandings/builtinLandings";
+import { BUILTIN_LANDINGS, fetchBuiltinPublishMap, mergeBuiltinLandings } from "@/lib/managedLandings/builtinLandings";
 import {
   createManagedLanding,
   listManagedLandings,
@@ -18,18 +18,19 @@ export async function GET(request: NextRequest) {
     const lite = request.nextUrl.searchParams.get("lite") === "1";
     if (lite) {
       const items = await listManagedLandingsLite();
+      const publishMap = await fetchBuiltinPublishMap();
       const paths = new Set(items.map((i) => i.path));
       const extras = BUILTIN_LANDINGS.filter((b) => !paths.has(b.path)).map((b) => ({
         id: b.id,
         path: b.path,
         slug: b.slug,
         title: b.title,
-        published: b.published,
+        published: publishMap[b.path] !== false,
       }));
       return NextResponse.json({ ok: true, items: [...extras, ...items] });
     }
     const items = await listManagedLandings();
-    const merged = mergeBuiltinLandings(items);
+    const merged = await mergeBuiltinLandings(items);
     const supabase = (await import("@/lib/supabase")).getSupabaseAdmin();
 
     const pathAliases = new Map<string, string>(); // alias → canonical path

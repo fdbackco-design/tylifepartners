@@ -1,3 +1,8 @@
+import {
+  LANDING_KEY_LABELS,
+  type LandingKey,
+} from "@/lib/landing-analytics/sections";
+import { BUILTIN_LANDINGS } from "@/lib/managedLandings/builtinLandings";
 import { getManagedLandingByPath, getManagedLandingBySlug } from "@/lib/managedLandings/store";
 import { slugFromManagedLandingKey } from "@/lib/managedLandings/types";
 
@@ -14,6 +19,7 @@ const THUMBS: Record<string, string> = {
   "/0623s": "/assets/hero_0623_2s.jpg",
   "/0715": "/assets/hero_0715_1.png",
   "/0715s": "/assets/hero_0715_2s.png",
+  "/0907": "/assets/0907/sun-cruise.webp",
 };
 
 /** 랜딩 전체 미리보기용 히어로 이미지 (위에서 아래 순서) */
@@ -30,6 +36,13 @@ const LANDING_HEROES: Record<string, string[]> = {
   "/0623s": ["/assets/hero_0623_1.jpg", "/assets/hero_0623_2s.jpg"],
   "/0715": ["/assets/hero_0715_1.png", "/assets/hero_0715_2.png"],
   "/0715s": ["/assets/hero_0715_1.png", "/assets/hero_0715_2s.png"],
+  "/0907": [
+    "/assets/0907/sun-cruise.webp",
+    "/assets/0907/all-life-health.webp",
+    "/assets/0907/all-life-report.webp",
+    "/assets/0907/special-life-home.webp",
+    "/assets/0907/feedlife-beaver.jpg",
+  ],
 };
 
 export function normalizeEntryPage(raw: string | null | undefined): string {
@@ -55,10 +68,17 @@ export function landingPreviewSrc(entryPage: string | null | undefined, heroUrl?
 
 function staticHeroImages(entryPage: string | null | undefined): string[] {
   const p = normalizeEntryPage(entryPage);
-  const heroes = LANDING_HEROES[p] || LANDING_HEROES[p.replace(/\/$/, "") || "/"];
+  const normalized = p.replace(/\/$/, "") || "/";
+  const heroes = LANDING_HEROES[p] || LANDING_HEROES[normalized];
   if (heroes?.length) return heroes.filter(Boolean);
-  const thumb = landingPreviewSrc(entryPage);
+  const thumb = THUMBS[p] || THUMBS[normalized];
   return thumb ? [thumb] : [];
+}
+
+function pathFromLandingKey(landingKey: string): string | null {
+  const label = LANDING_KEY_LABELS[landingKey as LandingKey];
+  if (!label) return null;
+  return label.split(" ")[0] || null;
 }
 
 /**
@@ -76,15 +96,37 @@ export async function resolveLandingPageImages(opts: {
       const row = await getManagedLandingBySlug(slug);
       const imgs = [row?.hero1_url, row?.hero2_url].map((u) => String(u ?? "").trim()).filter(Boolean);
       if (imgs.length) return imgs;
+      // ZIP 코드 배포 등은 히어로가 비어 있음 — 다른 랜딩 기본 이미지로 대체하지 않음
+      if (row?.kind === "code") return [];
     }
   }
 
+  // landing_key 기준 고정 에셋 (entry_page 누락·오매핑 대비)
+  const keyPath = key ? pathFromLandingKey(key) : null;
+  if (keyPath) {
+    const fromKey = staticHeroImages(keyPath);
+    if (fromKey.length) return fromKey;
+  }
+
   const path = normalizeEntryPage(opts.entryPage);
+  const builtin =
+    BUILTIN_LANDINGS.find((b) => b.landing_key === key) ||
+    BUILTIN_LANDINGS.find((b) => b.path === path || b.path === keyPath);
+  if (builtin) {
+    const fromMap = staticHeroImages(builtin.path);
+    if (fromMap.length) return fromMap;
+    const imgs = [builtin.hero1_url, builtin.hero2_url]
+      .map((u) => String(u ?? "").trim())
+      .filter(Boolean);
+    if (imgs.length) return imgs;
+  }
+
   if (path && !LANDING_HEROES[path] && !THUMBS[path]) {
     const row = await getManagedLandingByPath(path);
     const imgs = [row?.hero1_url, row?.hero2_url].map((u) => String(u ?? "").trim()).filter(Boolean);
     if (imgs.length) return imgs;
+    if (row?.kind === "code") return [];
   }
 
-  return staticHeroImages(opts.entryPage);
+  return staticHeroImages(opts.entryPage || keyPath);
 }

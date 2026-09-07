@@ -229,10 +229,6 @@ export default function AdminLandingsListPage() {
   };
 
   const togglePublished = async (it: LandingItem) => {
-    if (it.builtin) {
-      setToast("고정 배포 랜딩은 공개 상태를 변경할 수 없습니다.");
-      return;
-    }
     const res = await fetch(`/api/admin/landings/${it.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -243,7 +239,11 @@ export default function AdminLandingsListPage() {
       setToast(json.message || "상태 변경 실패");
       return;
     }
-    setItems((prev) => prev.map((x) => (x.id === it.id ? { ...x, ...json.item } : x)));
+    setItems((prev) =>
+      prev.map((x) =>
+        x.id === it.id ? { ...x, ...json.item, builtin: x.builtin, landing_key: x.landing_key } : x
+      )
+    );
     setToast(it.published ? "비공개로 변경했습니다." : "공개로 변경했습니다.");
   };
 
@@ -405,11 +405,14 @@ export default function AdminLandingsListPage() {
                     <span>유입 DB {Number(it.lead_count ?? 0).toLocaleString()}건</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <CrmSwitch
+                      checked={it.published}
+                      onChange={() => void togglePublished(it)}
+                      label={it.published ? "공개" : "비공개"}
+                    />
                     {it.builtin ? (
-                      <span style={{ fontSize: 13, color: "var(--crm-muted)" }}>코드 고정 배포 · 항상 공개</span>
-                    ) : (
-                      <CrmSwitch checked={it.published} onChange={() => void togglePublished(it)} label={it.published ? "공개" : "비공개"} />
-                    )}
+                      <span style={{ fontSize: 12, color: "var(--crm-muted)" }}>고정 배포</span>
+                    ) : null}
                   </div>
                   <div className="crm-ui-landing-actions">
                     <CrmButton

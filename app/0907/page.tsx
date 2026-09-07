@@ -11,10 +11,19 @@ import {
   UsersRound,
 } from "lucide-react";
 import Image from "next/image";
+import { notFound } from "next/navigation";
+import { getSession } from "@/lib/adminSession";
+import { fetchBuiltinPublishMap } from "@/lib/managedLandings/builtinLandings";
 import LeadForm from "./LeadForm";
 import Landing0907Analytics from "./Landing0907Analytics";
 
-export default function Landing0907() {
+export default async function Landing0907() {
+  const publishMap = await fetchBuiltinPublishMap();
+  if (publishMap["/0907"] === false) {
+    const session = await getSession();
+    if (!session) notFound();
+  }
+
   return (
     <div className="landing-0907">
       <Landing0907Analytics />
