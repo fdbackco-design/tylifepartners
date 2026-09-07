@@ -17,11 +17,10 @@ const RESERVED_EXACT = new Set([
   "/0623s",
   "/0715",
   "/0715s",
-  "/0907",
 ]);
 
 /** 공개 토글 가능한 고정 코드 랜딩 */
-const BUILTIN_TOGGLEABLE = new Set(["/0907"]);
+const BUILTIN_TOGGLEABLE = new Set<string>([]);
 
 let pathCache: { at: number; map: Record<string, string> } | null = null;
 let builtinPublishCache: { at: number; map: Record<string, boolean> } | null = null;

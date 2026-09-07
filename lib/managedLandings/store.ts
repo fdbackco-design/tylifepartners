@@ -62,7 +62,6 @@ const RESERVED_PATHS = new Set([
   "/0623s",
   "/0715",
   "/0715s",
-  "/0907",
   "/l",
 ]);
 
