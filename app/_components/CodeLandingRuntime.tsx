@@ -6,10 +6,12 @@ import * as ReactDOM from "react-dom";
 import * as ReactDOMClient from "react-dom/client";
 import * as ReactJSXRuntime from "react/jsx-runtime";
 import * as LucideReact from "lucide-react";
+import CodeLandingConsultOverlay from "@/app/_components/CodeLandingConsultOverlay";
 import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
 import { useMeasuredLandingSections } from "@/app/_components/useMeasuredLandingSections";
 import { trackLeadSubmitEvent } from "@/lib/landing-analytics/client";
 import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
+import type { ManagedFormConfig } from "@/lib/managedLandings/formConfig";
 import { landingKeyForManaged } from "@/lib/managedLandings/types";
 import type { ManagedLandingSection } from "@/lib/managedLandings/types";
 
@@ -21,6 +23,7 @@ type Props = {
   bundleUrl: string;
   cssUrl: string | null;
   sections?: ManagedLandingSection[] | null;
+  formConfig?: ManagedFormConfig | null;
 };
 
 declare global {
@@ -66,6 +69,7 @@ export default function CodeLandingRuntime({
   bundleUrl,
   cssUrl,
   sections: sectionsFallback,
+  formConfig,
 }: Props) {
   const landingKey = landingKeyForManaged(slug);
   const measured = useMeasuredLandingSections(".landing-code");
@@ -125,13 +129,16 @@ export default function CodeLandingRuntime({
       <style>{`
         body:has(.landing-code) { background: #f7f4ec; margin: 0; }
         body:has(.landing-code) main { max-width: none !important; width: 100% !important; margin: 0 !important; padding-bottom: 0 !important; }
-        .landing-code { min-height: 100vh; width: 100%; }
+        .landing-code { min-height: 100vh; width: 100%; padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
         .landing-code img { max-width: 100%; height: auto; }
         .landing-code-error { padding: 48px 24px; text-align: center; color: #b53535; font-family: sans-serif; }
+        /* 호스트 하단 CTA와 중복 방지 */
+        .landing-code .mobile-sticky-cta { display: none !important; }
       `}</style>
       {Page ? <LandingAnalyticsTracker landingKey={landingKey} sections={sections} /> : null}
       {error ? <div className="landing-code-error">{error}</div> : null}
       {Page ? <Page /> : null}
+      {Page ? <CodeLandingConsultOverlay id={id} path={path} formConfig={formConfig} /> : null}
     </div>
   );
 }
