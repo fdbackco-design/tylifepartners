@@ -1413,6 +1413,35 @@ main.crm-admin-login {
   color: var(--crm-text);
 }
 
+.crm-customer-name-editable {
+  cursor: text;
+  border-radius: 4px;
+  padding: 0 2px;
+  margin: 0 -2px;
+}
+
+.crm-customer-name-editable:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.crm-customer-name-input {
+  width: 100%;
+  max-width: 140px;
+  font: inherit;
+  font-weight: 650;
+  color: var(--crm-text);
+  border: 1px solid var(--crm-border, #cbd5e1);
+  border-radius: 6px;
+  padding: 2px 6px;
+  outline: none;
+  background: #fff;
+}
+
+.crm-customer-name-input:focus {
+  border-color: var(--crm-primary, #5b19c6);
+  box-shadow: 0 0 0 2px rgba(91, 25, 198, 0.15);
+}
+
 .crm-customer-phone {
   font-size: 12px;
   color: var(--crm-muted);

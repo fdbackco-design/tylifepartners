@@ -153,7 +153,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     assigneeChanged = true;
 
     // 담당자만 바꾼 경우: 재조회·스태프·이력을 병렬로 끝내고 즉시 응답
-    if (body.status == null && body.memo == null && body.admin_comment == null && body.meeting_at === undefined) {
+    if (body.status == null && body.memo == null && body.admin_comment == null && body.meeting_at === undefined && body.name == null) {
       const [{ data: fresh }, { staffById, parentNameById }] = await Promise.all([
         (supabase.from(table) as any).select(select).eq("id", id).maybeSingle(),
         loadStaffMaps(),
@@ -238,6 +238,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     patch.meeting_at = body.meeting_at ? String(body.meeting_at) : null;
   }
 
+  if (body.name != null) {
+    if (session.rank !== "admin") {
+      return NextResponse.json({ ok: false, message: "이름은 관리자만 수정할 수 있습니다." }, { status: 403 });
+    }
+    const nextName = String(body.name).trim();
+    if (nextName.length < 2 || nextName.length > 10) {
+      return NextResponse.json(
+        { ok: false, message: "이름은 2~10자로 입력해주세요." },
+        { status: 400 }
+      );
+    }
+    patch.name = nextName;
+  }
+
   if (Object.keys(patch).length === 0 && !assigneeChanged) {
     return NextResponse.json({ ok: false, message: "수정할 내용이 없습니다." }, { status: 400 });
   }
@@ -269,6 +283,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         memo: body.memo != null ? true : undefined,
         admin_comment: body.admin_comment != null ? true : undefined,
         meeting_at: body.meeting_at !== undefined ? body.meeting_at : undefined,
+        name: body.name != null ? String(body.name) : undefined,
       },
     },
     request,
