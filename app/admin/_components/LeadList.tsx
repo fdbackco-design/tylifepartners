@@ -5,10 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatPhoneKorean } from "@/lib/phone";
 import { fromKstHourLocalInput, toKstHourLocalInput } from "@/lib/crm/kst";
-import { ADMIN_STATUS_FILTER_OPTIONS, allowedStatusesFor, isMemoEditable, rowBackground } from "@/lib/crm/status";
+import { ADMIN_STATUS_FILTER_OPTIONS, allowedStatusesFor, isMemoEditable, isScheduledStatus, rowBackground } from "@/lib/crm/status";
 import { formatKstDateTime } from "@/lib/crm/kst";
 import { formatYmdDot } from "@/lib/crm/ui";
 import type { LeadCategory, LeadRow, LeadStatus, SessionUser } from "@/lib/crm/types";
+import { LEAD_STATUSES } from "@/lib/crm/types";
 import type { TodayDbCost } from "@/lib/meta/insights";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
 import DateRangePicker from "@/app/admin/_components/crm/DateRangePicker";
@@ -1172,7 +1173,7 @@ export default function LeadList({
     {
       key: "statuses",
       label: "상담상태",
-      options: ["배정전", "대기", "1차컨택", "부재(메신저완료)", "상담완료", "대면확정", "가입완료"].map((v) => ({
+      options: LEAD_STATUSES.map((v) => ({
         value: v,
         label: v,
       })),
@@ -1723,7 +1724,7 @@ export default function LeadList({
                                   options={allowed}
                                   onChange={(status) => void patch(row, { status })}
                                 />
-                                {row.status === "대면확정" && (
+                                {isScheduledStatus(row.status) && (
                                   <input
                                     className="crm-input"
                                     type="datetime-local"
@@ -1732,6 +1733,7 @@ export default function LeadList({
                                     onChange={(e) =>
                                       void patch(row, { meeting_at: fromKstHourLocalInput(e.target.value) })
                                     }
+                                    aria-label={row.status === "통화약속" ? "통화 일정" : "대면 일정"}
                                     style={{ display: "block", marginTop: 6, height: 32, fontSize: 12, minWidth: 180 }}
                                   />
                                 )}
@@ -1879,14 +1881,14 @@ export default function LeadList({
                               options={allowed}
                               onChange={(status) => void patch(row, { status })}
                             />
-                            {row.status === "대면확정" && (
+                            {isScheduledStatus(row.status) && (
                               <input
                                 className="crm-input"
                                 type="datetime-local"
                                 step={3600}
                                 value={toKstHourLocalInput(row.meeting_at)}
                                 onChange={(e) => void patch(row, { meeting_at: fromKstHourLocalInput(e.target.value) })}
-                                aria-label="대면 일정"
+                                aria-label={row.status === "통화약속" ? "통화 일정" : "대면 일정"}
                               />
                             )}
                           </div>

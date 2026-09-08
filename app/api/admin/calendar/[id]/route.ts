@@ -73,7 +73,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const { id } = await params;
   if (!id || id.startsWith("lead:")) {
-    return NextResponse.json({ ok: false, message: "대면확정일(고객)은 고객 DB에서 수정해 주세요." }, { status: 400 });
+    return NextResponse.json({ ok: false, message: "고객 일정(대면·통화약속)은 고객 DB에서 수정해 주세요." }, { status: 400 });
   }
 
   const staff = await loadStaff();
@@ -159,7 +159,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   const { id } = await params;
   if (!id || id.startsWith("lead:")) {
-    return NextResponse.json({ ok: false, message: "대면확정일(고객)은 삭제할 수 없습니다." }, { status: 400 });
+    return NextResponse.json({ ok: false, message: "고객 일정(대면·통화약속)은 삭제할 수 없습니다." }, { status: 400 });
   }
 
   const staff = await loadStaff();

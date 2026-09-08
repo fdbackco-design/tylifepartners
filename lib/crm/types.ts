@@ -7,6 +7,7 @@ export const LEAD_STATUSES = [
   "1차컨택",
   "부재(메신저완료)",
   "상담완료",
+  "통화약속",
   "대면확정",
   "가입완료",
 ] as const;

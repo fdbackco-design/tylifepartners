@@ -81,3 +81,16 @@ export function fromKstHourLocalInput(local: string | null | undefined): string 
   const [, ymd, hh] = m;
   return new Date(`${ymd}T${hh}:00:00+09:00`).toISOString();
 }
+
+/** ISO → KST HH:mm */
+export function formatKstHm(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: KST,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${map.hour}:${map.minute}`;
+}

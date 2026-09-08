@@ -6,7 +6,14 @@ import { changeLeadAssignee } from "@/lib/crm/assignLead";
 import { attachAssigneeHistories } from "@/lib/crm/assigneeHistory";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
 import { visibleAssigneeIds, canEditAdminComment } from "@/lib/crm/scope";
-import { allowedStatusesFor, isLeadStatus, isMemoEditable, normalizeStatus, tableForCategory } from "@/lib/crm/status";
+import {
+  allowedStatusesFor,
+  isLeadStatus,
+  isMemoEditable,
+  isScheduledStatus,
+  normalizeStatus,
+  tableForCategory,
+} from "@/lib/crm/status";
 import type { LeadCategory, LeadRow, SessionUser } from "@/lib/crm/types";
 import { attachMetaCreatives } from "@/lib/meta/ads";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -232,8 +239,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   if (body.meeting_at !== undefined) {
-    if (nextStatus !== "대면확정" && body.meeting_at) {
-      return NextResponse.json({ ok: false, message: "대면확정 상태에서만 일정을 지정할 수 있습니다." }, { status: 400 });
+    if (!isScheduledStatus(nextStatus) && body.meeting_at) {
+      return NextResponse.json(
+        { ok: false, message: "대면확정·통화약속 상태에서만 일정을 지정할 수 있습니다." },
+        { status: 400 }
+      );
     }
     patch.meeting_at = body.meeting_at ? String(body.meeting_at) : null;
   }

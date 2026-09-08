@@ -459,8 +459,24 @@
   text-overflow: ellipsis;
 }
 
+.wc-ev--call {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wc-ev__phone {
+  flex-shrink: 0;
+  width: 11px;
+  height: 11px;
+  opacity: 0.95;
+}
+
 .wc-ev b {
   font-weight: 800;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .wc-day__more {

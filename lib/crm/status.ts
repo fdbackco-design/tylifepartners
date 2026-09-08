@@ -81,16 +81,21 @@ export function matchesAdminStatusFilter(
  * 상담상태 선택지:
  * - 배정전: 배정전만
  * - 대기: 대기, 1차컨택만
- * - 1차컨택 이후: 1차컨택, 부재(메신저완료), 상담완료, 대면확정, 가입완료
+ * - 1차컨택 이후: 1차컨택, 부재(메신저완료), 상담완료, 통화약속, 대면확정, 가입완료
  */
 export function allowedStatusesFor(_session: SessionUser, current: LeadStatus): LeadStatus[] {
   if (current === "배정전") return ["배정전"];
   if (current === "대기") return ["대기", "1차컨택"];
-  return ["1차컨택", "부재(메신저완료)", "상담완료", "대면확정", "가입완료"];
+  return ["1차컨택", "부재(메신저완료)", "상담완료", "통화약속", "대면확정", "가입완료"];
 }
 
 export function isMemoEditable(status: LeadStatus): boolean {
   return status !== "배정전" && status !== "대기";
+}
+
+/** 일정(날짜·시간) 지정이 가능한 상담상태 */
+export function isScheduledStatus(status: LeadStatus): boolean {
+  return status === "대면확정" || status === "통화약속";
 }
 
 export function rowBackground(
@@ -100,6 +105,7 @@ export function rowBackground(
   if (adminStatusKey === "need_assign") return "#ffebee";
   if (status === "배정전") return "#fff4e6";
   if (status === "대기" || status === "부재(메신저완료)") return "#fffde7";
+  if (status === "통화약속") return "#fffbeb";
   if (status === "대면확정") return "#e8f5e9";
   return undefined;
 }

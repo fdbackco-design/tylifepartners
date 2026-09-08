@@ -17,6 +17,7 @@ import {
   peekPendingOpenCalendarEvent,
   takePendingOpenCalendarEvent,
 } from "@/lib/crm/pushDeepLink";
+import { formatKstHm } from "@/lib/crm/kst";
 import { todayYmdLocal } from "@/lib/crm/ui";
 import "./calendar.css";
 
@@ -30,6 +31,24 @@ type DayModal =
 const WD = ["일", "월", "화", "수", "목", "금", "토"];
 const CELL_MAX = 2;
 const MONTH_RE = /^\d{4}-\d{2}$/;
+
+function PhoneIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="currentColor">
+      <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.2 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1l-2.2 2.9z" />
+    </svg>
+  );
+}
+
+/** 통화약속: 고객명 + 시간 / 그 외: 기존 제목 */
+function calendarEventLabel(ev: CalendarEventRow): string {
+  if (ev.event_type === "call") {
+    const name = (ev.lead_name || eventTitle(ev)).trim() || "(이름 없음)";
+    const hm = formatKstHm(ev.start_at);
+    return hm ? `${name} ${hm}` : name;
+  }
+  return eventTitle(ev);
+}
 
 function shiftMonth(ym: string, delta: number) {
   const [y, m] = ym.split("-").map(Number);
@@ -237,7 +256,7 @@ function CalendarPageInner() {
   const openEdit = (ev: CalendarEventRow) => {
     if (ev.read_only || ev.source === "lead_meeting") {
       setModal({ mode: "day", date: ev.event_date });
-      showToast("고객 대면일은 고객 DB에서 수정해 주세요.");
+      showToast("고객 일정(대면·통화약속)은 고객 DB에서 수정해 주세요.");
       return;
     }
     if (!canEdit) {
@@ -611,10 +630,11 @@ function CalendarPageInner() {
                   <div className="wc-day__items">
                     {shown.map((ev) => {
                       const col = CALENDAR_EVENT_TYPE_COLORS[ev.event_type];
+                      const isCall = ev.event_type === "call";
                       return (
                         <span
                           key={ev.id}
-                          className="wc-ev"
+                          className={isCall ? "wc-ev wc-ev--call" : "wc-ev"}
                           style={{ borderLeftColor: col.accent, background: col.bg, color: col.text }}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -622,7 +642,8 @@ function CalendarPageInner() {
                           }}
                           role="presentation"
                         >
-                          <b>{eventTitle(ev)}</b>
+                          {isCall && <PhoneIcon className="wc-ev__phone" />}
+                          <b>{calendarEventLabel(ev)}</b>
                         </span>
                       );
                     })}
@@ -669,7 +690,10 @@ function CalendarPageInner() {
                       <i>{WD[d.getDay()]}</i>
                     </span>
                     <span className="wc-ag__body">
-                      <b style={{ color: col.text }}>{eventTitle(ev)}</b>
+                      <b style={{ color: col.text, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        {ev.event_type === "call" && <PhoneIcon className="wc-ev__phone" />}
+                        {calendarEventLabel(ev)}
+                      </b>
                       {ev.body && ev.body !== ev.title ? ev.body.split("\n").slice(0, 2).join(" ") : ""}
                     </span>
                     <span className="wc-ag__tag">{CALENDAR_EVENT_TYPE_LABELS[ev.event_type]}</span>
@@ -726,7 +750,10 @@ function CalendarPageInner() {
                         onClick={() => openEdit(ev)}
                       >
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <strong style={{ color: col.text }}>{eventTitle(ev)}</strong>
+                          <strong style={{ color: col.text, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            {ev.event_type === "call" && <PhoneIcon className="wc-ev__phone" />}
+                            {calendarEventLabel(ev)}
+                          </strong>
                           <span>
                             {CALENDAR_EVENT_TYPE_LABELS[ev.event_type]}
                             {ev.source === "lead_meeting" ? " · 고객 DB" : ""}
