@@ -25,7 +25,7 @@ import {
 import { getManagedLandingById } from "@/lib/managedLandings/store";
 import { verifyAdminSession } from "@/lib/adminSession";
 import { parseBaseRegion } from "@/lib/regions";
-import { parseMetaIdsFromBody } from "@/lib/utm";
+import { parseMetaIdsFromBody, parseUTMFromHref } from "@/lib/utm";
 import { notifyAdminsNewLead } from "@/lib/webPush";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
@@ -60,15 +60,35 @@ export async function POST(request: NextRequest) {
         ? normalizeLanding0715EntryPage(entryPageRaw)
         : entryPageRaw;
     const is0623Landing = isLanding0623EntryPage(entryPage);
-    const utmSource = body.utm_source != null ? String(body.utm_source).trim() : null;
-    const utmMedium = body.utm_medium != null ? String(body.utm_medium).trim() : null;
-    const utmCampaign = body.utm_campaign != null ? String(body.utm_campaign).trim() : null;
-    const utmContent = body.utm_content != null ? String(body.utm_content).trim() : null;
-    const utmTerm = body.utm_term != null ? String(body.utm_term).trim() : null;
-    const metaIds = parseMetaIdsFromBody(body as Record<string, unknown>, {
-      utm_content: utmContent,
-      utm_campaign: utmCampaign,
-    });
+    const pageUrlRaw = body.page_url != null ? String(body.page_url).trim() : "";
+    const pageUtm = parseUTMFromHref(pageUrlRaw);
+    const pickAttr = (...vals: unknown[]): string | null => {
+      for (const v of vals) {
+        if (v == null) continue;
+        const s = String(v).trim();
+        if (s) return s;
+      }
+      return null;
+    };
+    const utmSource = pickAttr(body.utm_source, pageUtm.utm_source);
+    const utmMedium = pickAttr(body.utm_medium, pageUtm.utm_medium);
+    const utmCampaign = pickAttr(body.utm_campaign, pageUtm.utm_campaign);
+    const utmContent = pickAttr(body.utm_content, pageUtm.utm_content);
+    const utmTerm = pickAttr(body.utm_term, pageUtm.utm_term);
+    const metaIds = parseMetaIdsFromBody(
+      {
+        meta_ad_id: body.meta_ad_id ?? pageUtm.meta_ad_id,
+        meta_adset_id: body.meta_adset_id ?? pageUtm.meta_adset_id,
+        meta_campaign_id: body.meta_campaign_id ?? pageUtm.meta_campaign_id,
+        ad_id: body.ad_id,
+        adset_id: body.adset_id,
+        campaign_id: body.campaign_id,
+      } as Record<string, unknown>,
+      {
+        utm_content: utmContent,
+        utm_campaign: utmCampaign,
+      }
+    );
     const marketingConsent =
       body.marketing_consent === 1 || body.marketing_consent === "1" ? 1 : null;
     const region = body.region != null ? String(body.region).trim() : body.location != null ? String(body.location).trim() : "";

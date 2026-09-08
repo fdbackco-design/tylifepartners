@@ -161,7 +161,8 @@ export async function attachInboundToExistingLead(opts: {
 
   const stamp = new Date(opts.receivedAtIso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
   const prevMemo = String(prev.memo ?? "").trim();
-  const note = `[재유입 · ${stamp}]\nUTM: ${opts.utm_source ?? "-"} / ${opts.utm_campaign ?? "-"} / ${opts.entry_page ?? "-"}`;
+  const adNote = opts.meta_ad_id ? ` · ad:${opts.meta_ad_id}` : "";
+  const note = `[재유입 · ${stamp}]\nUTM: ${opts.utm_source ?? "-"} / ${opts.utm_campaign ?? "-"} / ${opts.entry_page ?? "-"}${adNote}`;
   const nextMemo = prevMemo ? `${prevMemo}\n\n${note}` : note;
 
   // 목록 신청시간·정렬이 최신 유입 기준으로 올라가도록 created_at 갱신

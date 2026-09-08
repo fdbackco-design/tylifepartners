@@ -775,7 +775,9 @@ export default function LeadList({
       return true;
     });
   }, [staff, category]);
-  const showHeatmapFor = (_row: LeadRow) => category === "candidates" || category === "consumers" || category === "all";
+  const showHeatmapFor = (row: LeadRow) =>
+    (category === "candidates" || category === "consumers" || category === "all") &&
+    Boolean(row.has_landing_heatmap);
 
   const visibleDesktopCols = useMemo(
     () =>

@@ -11,7 +11,7 @@ import {
   type ManagedFormConfig,
 } from "@/lib/managedLandings/formConfig";
 import { formatRegionValue, getDistrictsForRegion } from "@/lib/regions";
-import { attributionFieldsFromUtm } from "@/lib/utm";
+import { attributionFieldsFromUtm, parseUTMFromUrl, type UTMParams } from "@/lib/utm";
 import { useUTM } from "@/lib/useUTM";
 
 const CONSULTATION_ICON = "/assets/icon-consultation-write.png";
@@ -56,15 +56,17 @@ export default function CodeLandingConsultOverlay({ id, path, formConfig: formCo
   const [marketingChecked, setMarketingChecked] = useState(false);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [consultSource, setConsultSource] = useState<string | null>(null);
+  const [utmOverride, setUtmOverride] = useState<UTMParams>({});
 
   const showToast = useCallback((msg: string, error?: boolean) => {
     setToast({ msg, error });
     setTimeout(() => setToast(null), 2500);
   }, []);
 
-  const openSheet = useCallback((source?: string | null) => {
+  const openSheet = useCallback((source?: string | null, extraUtm?: UTMParams) => {
     if (submitted) return;
     setConsultSource(source || null);
+    if (extraUtm && Object.keys(extraUtm).length) setUtmOverride(extraUtm);
     setSheetOpen(true);
   }, [submitted]);
 
@@ -74,11 +76,27 @@ export default function CodeLandingConsultOverlay({ id, path, formConfig: formCo
     const onConsult = (event: Event) => {
       const e = event as CustomEvent;
       e.preventDefault();
-      const source =
-        e.detail && typeof e.detail === "object" && "source" in e.detail
-          ? String((e.detail as { source?: string }).source || "")
-          : "";
-      openSheet(source || null);
+      const detail =
+        e.detail && typeof e.detail === "object" ? (e.detail as Record<string, unknown>) : {};
+      const source = detail.source != null ? String(detail.source) : "";
+      const pageUrl = detail.pageUrl != null ? String(detail.pageUrl) : "";
+      const fromEventUrl = pageUrl
+        ? parseUTMFromUrl(pageUrl.includes("?") ? pageUrl.slice(pageUrl.indexOf("?")) : "")
+        : parseUTMFromUrl(typeof window !== "undefined" ? window.location.search : "");
+      const attr =
+        detail.attribution && typeof detail.attribution === "object"
+          ? (detail.attribution as Record<string, string>)
+          : {};
+      const fromAttr: UTMParams = {
+        ...fromEventUrl,
+        ...(attr.utm_source ? { utm_source: attr.utm_source } : {}),
+        ...(attr.utm_medium ? { utm_medium: attr.utm_medium } : {}),
+        ...(attr.utm_campaign ? { utm_campaign: attr.utm_campaign } : {}),
+        ...(attr.utm_content ? { utm_content: attr.utm_content } : {}),
+        ...(attr.utm_term ? { utm_term: attr.utm_term } : {}),
+      };
+      if (attr.ad_id && /^\d{5,30}$/.test(attr.ad_id)) fromAttr.meta_ad_id = attr.ad_id;
+      openSheet(source || null, fromAttr);
     };
     window.addEventListener("feedlife:consult", onConsult);
     return () => window.removeEventListener("feedlife:consult", onConsult);
@@ -133,14 +151,19 @@ export default function CodeLandingConsultOverlay({ id, path, formConfig: formCo
 
     setLoading(true);
     try {
+      const liveUtm =
+        typeof window !== "undefined"
+          ? parseUTMFromUrl(window.location.search)
+          : {};
+      const mergedUtm = { ...utm, ...utmOverride, ...liveUtm };
       const res = await fetch("/api/business-lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
           phone: rawPhone,
-          source: utm.utm_source || path.replace(/^\//, "") || "landing",
-          ...attributionFieldsFromUtm(utm),
+          source: mergedUtm.utm_source || path.replace(/^\//, "") || "landing",
+          ...attributionFieldsFromUtm(mergedUtm),
           marketing_consent: marketingChecked ? 1 : null,
           region: formConfig.includeRegion
             ? formatRegionValue(region, formConfig.allowRegionDetail ? district : null)

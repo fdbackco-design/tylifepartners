@@ -62,7 +62,7 @@ export function parseUTMFromUrl(search: string = ""): UTMParams {
   if (typeof window !== "undefined" && !search) {
     search = window.location.search;
   }
-  const params = new URLSearchParams(search);
+  const params = new URLSearchParams(search.startsWith("?") || !search ? search : `?${search}`);
   const utm: UTMParams = {};
   const utmSource = params.get("utm_source");
   const utmMedium = params.get("utm_medium");
@@ -88,6 +88,19 @@ export function parseUTMFromUrl(search: string = ""): UTMParams {
   if (campaignId && isLikelyMetaObjectId(campaignId)) utm.meta_campaign_id = campaignId;
 
   return utm;
+}
+
+/** 전체 URL(href)에서 UTM·Meta 광고 ID 추출 — 서버에서 page_url 보완용 */
+export function parseUTMFromHref(href: string | null | undefined): UTMParams {
+  const raw = String(href ?? "").trim();
+  if (!raw) return {};
+  try {
+    const u = new URL(raw);
+    return parseUTMFromUrl(u.search);
+  } catch {
+    const q = raw.includes("?") ? raw.slice(raw.indexOf("?")) : "";
+    return q ? parseUTMFromUrl(q) : {};
+  }
 }
 
 /** 상담 신청 body에 넣을 attribution 필드 */
