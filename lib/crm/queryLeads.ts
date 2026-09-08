@@ -10,6 +10,48 @@ import { attachMetaCreatives } from "@/lib/meta/ads";
 import { loadActiveBlacklistPhones } from "@/lib/phoneBlacklist";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
+async function attachLandingHeatmapFlags(items: LeadRow[]): Promise<LeadRow[]> {
+  const missing = items.filter((it) => !it.has_landing_heatmap);
+  if (!missing.length) return items;
+
+  const byTable = new Map<"tylife_b2b" | "leads", string[]>();
+  for (const it of missing) {
+    const table = it.type === "후보자" ? "tylife_b2b" : "leads";
+    const list = byTable.get(table) ?? [];
+    list.push(it.id);
+    byTable.set(table, list);
+  }
+
+  const linked = new Set<string>();
+  const supabase = getSupabaseAdmin();
+  for (const [leadTable, ids] of Array.from(byTable.entries())) {
+    const chunkSize = 200;
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      const { data, error } = await supabase
+        .from("landing_lead_sessions")
+        .select("lead_id")
+        .eq("lead_table", leadTable)
+        .in("lead_id", chunk)
+        .limit(chunk.length * 5);
+      if (error) {
+        if (!/landing_lead_sessions|schema cache/i.test(error.message)) {
+          console.warn("[queryLeads] landing heatmap flags:", error.message);
+        }
+        continue;
+      }
+      for (const row of data ?? []) {
+        if (row.lead_id) linked.add(String(row.lead_id));
+      }
+    }
+  }
+
+  if (!linked.size) return items;
+  return items.map((it) =>
+    it.has_landing_heatmap || !linked.has(it.id) ? it : { ...it, has_landing_heatmap: true }
+  );
+}
+
 async function enrichLeads(
   items: LeadRow[],
   session: SessionUser,
@@ -21,6 +63,12 @@ async function enrichLeads(
     withMeta = await attachMetaCreatives(items, { cacheOnly: true });
   } catch (e) {
     console.warn("[queryLeads] meta creative attach skipped:", e instanceof Error ? e.message : e);
+  }
+
+  try {
+    withMeta = await attachLandingHeatmapFlags(withMeta);
+  } catch (e) {
+    console.warn("[queryLeads] landing heatmap flags skipped:", e instanceof Error ? e.message : e);
   }
 
   // 담당자 이력 체인은 관리자 목록에서만 표시 → 영업자/매니저는 스킵
@@ -201,7 +249,9 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
       .replace(", meta_ad_id", "")
       .replace("meta_ad_id, ", "")
       .replace(", admin_comment", "")
-      .replace("admin_comment, ", "");
+      .replace("admin_comment, ", "")
+      .replace(", analytics_session_id, max_scroll_depth, last_section_name", "")
+      .replace("analytics_session_id, max_scroll_depth, last_section_name, ", "");
 
     // 관리자상태는 DB 컬럼이 아니라 계산값 → 필터 시 넉넉히 가져온 뒤 메모리에서 걸러 페이징
     const needsMemoryPaging = q.category === "all" || Boolean(q.adminStatuses?.length);

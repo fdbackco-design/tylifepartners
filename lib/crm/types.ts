@@ -89,6 +89,8 @@ export type LeadRow = {
   status_changed_at: string | null;
   meeting_at: string | null;
   admin_status: AdminStatusInfo | null;
+  /** 랜딩 스크롤 히트맵 연결 여부 (세션/링크 없음이면 목록에서 버튼 숨김) */
+  has_landing_heatmap: boolean;
 };
 
 export type AssignmentLog = {

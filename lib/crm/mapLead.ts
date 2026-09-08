@@ -60,14 +60,19 @@ export function mapLeadRow(
     status_changed_at: statusChanged,
     meeting_at: row.meeting_at ? String(row.meeting_at) : null,
     admin_status: getAdminStatus(status, statusChanged, createdIso, assigneeId),
+    has_landing_heatmap: Boolean(
+      row.analytics_session_id ||
+        (row.max_scroll_depth != null && Number(row.max_scroll_depth) > 0) ||
+        row.last_section_name
+    ),
   };
 }
 
 export const CONSUMER_SELECT =
-  "id, name, phone, created_at, status, memo, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, location, desired_time, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, normalized_phone";
+  "id, name, phone, created_at, status, memo, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, location, desired_time, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, normalized_phone, analytics_session_id, max_scroll_depth, last_section_name";
 
 export const CANDIDATE_SELECT =
-  "id, name, phone, created_at, status, memo, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, normalized_phone";
+  "id, name, phone, created_at, status, memo, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, normalized_phone, analytics_session_id, max_scroll_depth, last_section_name";
 
 const STAFF_MAPS_CACHE_KEY = "crm:staff-maps";
 const STAFF_MAPS_TTL_MS = 30_000;
