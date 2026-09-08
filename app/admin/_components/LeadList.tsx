@@ -199,6 +199,8 @@ export default function LeadList({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [patchingAssigneeIds, setPatchingAssigneeIds] = useState<Set<string>>(() => new Set());
+  const [nameEdit, setNameEdit] = useState<{ id: string; value: string } | null>(null);
+  const [nameSavingId, setNameSavingId] = useState<string | null>(null);
   const [assigneeIds, setAssigneeIds] = useState(csvParam(searchParams.get("assignee_ids")));
   const [teamIds, setTeamIds] = useState(csvParam(searchParams.get("team_ids")));
   const [regions, setRegions] = useState(csvParam(searchParams.get("regions")));
@@ -474,6 +476,75 @@ export default function LeadList({
     }
     alert(data.message || "저장 실패");
     return null;
+  };
+
+  const startNameEdit = (row: LeadRow) => {
+    if (!isAdmin || nameSavingId) return;
+    setNameEdit({ id: row.id, value: row.name });
+  };
+
+  const cancelNameEdit = () => setNameEdit(null);
+
+  const commitNameEdit = async (row: LeadRow) => {
+    if (!nameEdit || nameEdit.id !== row.id) return;
+    const next = nameEdit.value.trim();
+    setNameEdit(null);
+    if (!next || next === row.name) return;
+    if (next.length < 2 || next.length > 10) {
+      alert("이름은 2~10자로 입력해주세요.");
+      return;
+    }
+    setNameSavingId(row.id);
+    try {
+      await patch(row, { name: next });
+    } finally {
+      setNameSavingId(null);
+    }
+  };
+
+  const renderCustomerName = (row: LeadRow, className?: string) => {
+    const editing = nameEdit?.id === row.id;
+    if (editing) {
+      return (
+        <input
+          className="crm-customer-name-input"
+          value={nameEdit.value}
+          autoFocus
+          maxLength={10}
+          disabled={nameSavingId === row.id}
+          aria-label="고객 이름 수정"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => setNameEdit({ id: row.id, value: e.target.value })}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void commitNameEdit(row);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              cancelNameEdit();
+            }
+          }}
+          onBlur={() => void commitNameEdit(row)}
+        />
+      );
+    }
+    return (
+      <span
+        className={[className || "crm-customer-name", isAdmin ? "crm-customer-name-editable" : ""]
+          .filter(Boolean)
+          .join(" ")}
+        title={isAdmin ? "더블클릭하여 이름 수정" : undefined}
+        onDoubleClick={(e) => {
+          if (!isAdmin) return;
+          e.stopPropagation();
+          e.preventDefault();
+          startNameEdit(row);
+        }}
+      >
+        {row.name}
+      </span>
+    );
   };
 
   const patchAssignee = async (row: LeadRow, nextId: string | null) => {
@@ -1548,7 +1619,7 @@ export default function LeadList({
                             return (
                               <td key={colId} className={meta.tdClass}>
                                 <div className="crm-customer">
-                                  <span className="crm-customer-name">{row.name}</span>
+                                  {renderCustomerName(row)}
                                   <span className="crm-customer-phone">{formatPhoneKorean(row.phone)}</span>
                                 </div>
                               </td>
@@ -1769,7 +1840,7 @@ export default function LeadList({
                             />
                           </td>
                         )}
-                        <td className="crm-lead-mobile-name">{row.name}</td>
+                        <td className="crm-lead-mobile-name">{renderCustomerName(row, "crm-lead-mobile-name-text")}</td>
                         <td className="crm-lead-mobile-phone">{formatPhoneKorean(row.phone)}</td>
                         <td className="crm-lead-mobile-date">{row.created_at}</td>
                         <td onClick={(e) => e.stopPropagation()}>
