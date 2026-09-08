@@ -1,6 +1,6 @@
 -- 자료 공유 (관리자 작성 · 전 직원 열람)
 -- 적용: Supabase Dashboard → SQL Editor
--- Storage: public 버킷 `resource-shares` 생성 후 File size limit을 충분히 올려 주세요 (권장 200MB+).
+-- Storage: public 버킷 `resource-shares` 생성 후 File size limit을 맞춰 주세요 (권장 50MB+).
 
 CREATE TABLE IF NOT EXISTS public.resource_posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

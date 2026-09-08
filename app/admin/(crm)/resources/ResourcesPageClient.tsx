@@ -72,7 +72,7 @@ export default function ResourcesPageClient() {
 
   const [items, setItems] = useState<ResourcePostRow[]>([]);
   const [canWrite, setCanWrite] = useState(false);
-  const [maxBytes, setMaxBytes] = useState(200 * 1024 * 1024);
+  const [maxBytes, setMaxBytes] = useState(50 * 1024 * 1024);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
