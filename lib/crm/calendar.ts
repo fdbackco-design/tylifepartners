@@ -8,6 +8,7 @@ export const CALENDAR_EVENT_TYPES = [
   "deadline",
   "holiday",
   "meeting",
+  "call",
 ] as const;
 
 export type CalendarEventType = (typeof CALENDAR_EVENT_TYPES)[number];
@@ -19,6 +20,7 @@ export const CALENDAR_EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
   deadline: "마감",
   holiday: "휴무",
   meeting: "대면일",
+  call: "통화약속",
 };
 
 /** HTML 디자인 토큰에 맞춘 색상 */
@@ -32,6 +34,7 @@ export const CALENDAR_EVENT_TYPE_COLORS: Record<
   deadline: { accent: "#25C55E", bg: "rgba(74,255,134,.20)", text: "#0C7A38" },
   holiday: { accent: "#CFC7E0", bg: "#FAF9FC", text: "#867A9C" },
   meeting: { accent: "#5A13BF", bg: "rgba(90,19,191,.08)", text: "#5A13BF" },
+  call: { accent: "#EAB308", bg: "rgba(234,179,8,.18)", text: "#A16207" },
 };
 
 export const CALENDAR_VISIBILITIES = ["all", "admin_plus", "managers", "sales"] as const;
@@ -61,7 +64,7 @@ export type CalendarEventRow = {
   team_root_id: string | null;
   created_at: string;
   updated_at: string;
-  /** lead 대면일 가상 일정 */
+  /** lead 대면일·통화약속 가상 일정 */
   source?: "calendar" | "lead_meeting";
   lead_category?: "consumers" | "candidates";
   lead_name?: string;

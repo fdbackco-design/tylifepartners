@@ -1278,6 +1278,7 @@ main.crm-admin-login {
 .crm-status-부재메신저완료 { background: #fffde7; color: #9a6700; border-color: #f5e6a8; }
 .crm-status-1차컨택 { background: #eef2ff; color: #3730a3; border-color: #c7d2fe; }
 .crm-status-상담완료 { background: #f3f4f6; color: #374151; border-color: #e5e7eb; }
+.crm-status-통화약속 { background: #fffbeb; color: #a16207; border-color: #fde68a; }
 .crm-status-대면확정 { background: #e8f5e9; color: #166534; border-color: #bbf7d0; }
 .crm-status-가입완료 { background: #f3e5f5; color: #6b21a8; border-color: #e9d5ff; }
 

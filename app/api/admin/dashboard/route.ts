@@ -5,7 +5,7 @@ import { loadHiddenLeadIdMaps, type HiddenLeadMaps } from "@/lib/crm/leadListHid
 import { getTtlCache, setTtlCache } from "@/lib/crm/ttlCache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-const CONTACT_STATUSES = ["1차컨택", "부재(메신저완료)", "상담완료", "대면확정", "가입완료"] as const;
+const CONTACT_STATUSES = ["1차컨택", "부재(메신저완료)", "상담완료", "통화약속", "대면확정", "가입완료"] as const;
 const DASHBOARD_CACHE_TTL_MS = 30_000;
 const PAGE_SIZE = 1000;
 

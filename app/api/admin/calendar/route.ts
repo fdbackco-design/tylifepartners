@@ -84,6 +84,7 @@ async function fetchLeadMeetings(
       .from(table)
       .select("id, name, phone, status, assignee_id, meeting_at")
       .or("merge_status.eq.active,merge_status.is.null")
+      .in("status", ["대면확정", "통화약속"])
       .gte("meeting_at", startOfKstDayIso(start))
       .lt("meeting_at", startOfKstDayIso(nextMonth))
       .not("meeting_at", "is", null)
@@ -95,13 +96,16 @@ async function fetchLeadMeetings(
     return (data ?? []).map((r) => {
       const date = r.meeting_at ? kstYmd(new Date(r.meeting_at)) : "";
       const assignee = r.assignee_id ? staffById.get(String(r.assignee_id)) : null;
-      const title = `${r.name}${assignee ? ` · ${assignee.name}` : ""}`;
+      const isCall = String(r.status) === "통화약속";
+      const title = isCall
+        ? String(r.name ?? "")
+        : `${r.name}${assignee ? ` · ${assignee.name}` : ""}`;
       return {
         id: `lead:${kind}:${r.id}`,
         title,
         body: `${r.name}\n${r.phone || ""}\n담당: ${assignee?.name || "미배정"}`,
         event_date: date,
-        event_type: "meeting" as const,
+        event_type: isCall ? ("call" as const) : ("meeting" as const),
         all_day: false,
         start_at: r.meeting_at ? String(r.meeting_at) : null,
         end_at: null,
@@ -184,7 +188,7 @@ export async function GET(request: NextRequest) {
     .map((r) => mapDbRow(r, staffById))
     .filter((ev) => canViewCalendarEvent(session, ev, staff));
 
-  // 대면확정일(리드) — 기존 meeting_at 호환. 스코프는 담당자 기준
+  // 대면확정·통화약속(리드) — meeting_at 호환. 스코프는 담당자 기준
   const scoped = await visibleAssigneeIds(session);
   const leadItems = (await fetchLeadMeetings(month, staffById)).filter((ev) =>
     canViewLeadMeeting(session, ev, scoped)
