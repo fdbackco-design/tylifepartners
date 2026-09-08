@@ -2,7 +2,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const RESOURCE_SHARES_BUCKET = "resource-shares";
 /** 서명 업로드는 서버를 거치지 않음. Supabase 버킷 file size limit도 맞춰 주세요. */
-export const RESOURCE_MAX_BYTES = 200 * 1024 * 1024;
+export const RESOURCE_MAX_BYTES = 50 * 1024 * 1024;
 
 export type ResourceFileRow = {
   id: string;
