@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatPhoneKorean } from "@/lib/phone";
-import { fromKstHourLocalInput, toKstHourLocalInput } from "@/lib/crm/kst";
+import { fromKstHourLocalInput, fromKstMinuteLocalInput, toKstHourLocalInput, toKstMinuteLocalInput } from "@/lib/crm/kst";
 import { ADMIN_STATUS_FILTER_OPTIONS, allowedStatusesFor, isMemoEditable, isScheduledStatus, rowBackground } from "@/lib/crm/status";
 import { formatKstDateTime } from "@/lib/crm/kst";
 import { formatYmdDot } from "@/lib/crm/ui";
@@ -1728,10 +1728,19 @@ export default function LeadList({
                                   <input
                                     className="crm-input"
                                     type="datetime-local"
-                                    step={3600}
-                                    value={toKstHourLocalInput(row.meeting_at)}
+                                    step={row.status === "통화약속" ? 60 : 3600}
+                                    value={
+                                      row.status === "통화약속"
+                                        ? toKstMinuteLocalInput(row.meeting_at)
+                                        : toKstHourLocalInput(row.meeting_at)
+                                    }
                                     onChange={(e) =>
-                                      void patch(row, { meeting_at: fromKstHourLocalInput(e.target.value) })
+                                      void patch(row, {
+                                        meeting_at:
+                                          row.status === "통화약속"
+                                            ? fromKstMinuteLocalInput(e.target.value)
+                                            : fromKstHourLocalInput(e.target.value),
+                                      })
                                     }
                                     aria-label={row.status === "통화약속" ? "통화 일정" : "대면 일정"}
                                     style={{ display: "block", marginTop: 6, height: 32, fontSize: 12, minWidth: 180 }}
@@ -1885,9 +1894,20 @@ export default function LeadList({
                               <input
                                 className="crm-input"
                                 type="datetime-local"
-                                step={3600}
-                                value={toKstHourLocalInput(row.meeting_at)}
-                                onChange={(e) => void patch(row, { meeting_at: fromKstHourLocalInput(e.target.value) })}
+                                step={row.status === "통화약속" ? 60 : 3600}
+                                value={
+                                  row.status === "통화약속"
+                                    ? toKstMinuteLocalInput(row.meeting_at)
+                                    : toKstHourLocalInput(row.meeting_at)
+                                }
+                                onChange={(e) =>
+                                  void patch(row, {
+                                    meeting_at:
+                                      row.status === "통화약속"
+                                        ? fromKstMinuteLocalInput(e.target.value)
+                                        : fromKstHourLocalInput(e.target.value),
+                                  })
+                                }
                                 aria-label={row.status === "통화약속" ? "통화 일정" : "대면 일정"}
                               />
                             )}

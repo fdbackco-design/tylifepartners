@@ -82,6 +82,32 @@ export function fromKstHourLocalInput(local: string | null | undefined): string 
   return new Date(`${ymd}T${hh}:00:00+09:00`).toISOString();
 }
 
+/** ISO → datetime-local 값 (KST, 분 단위 유지) */
+export function toKstMinuteLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: KST,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}`;
+}
+
+/** datetime-local(KST 시각) → ISO. 분 유지 */
+export function fromKstMinuteLocalInput(local: string | null | undefined): string | null {
+  const v = String(local ?? "").trim();
+  if (!v) return null;
+  const m = v.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const [, ymd, hh, mm] = m;
+  return new Date(`${ymd}T${hh}:${mm}:00+09:00`).toISOString();
+}
+
 /** ISO → KST HH:mm */
 export function formatKstHm(iso: string | null | undefined): string {
   if (!iso) return "";
