@@ -28,16 +28,30 @@ type StaffOpt = { id: string; name: string; parent_id: string | null; rank?: str
 /** 담당자 필터 — 미배정 (URL assignee_ids 센티널, queryLeads와 동일) */
 const UNASSIGNED_ASSIGNEE_FILTER = "__unassigned__";
 
-/** Meta CDN URL 만료 시 목록 썸네일 → 원본 URL 폴백 */
+/** Meta CDN URL 만료 시 강제 갱신 후 프록시 재시도 */
 function onMetaCreativeImgError(
   e: SyntheticEvent<HTMLImageElement>,
-  fallback: string | null | undefined
+  adId: string | null | undefined
 ) {
   const el = e.currentTarget;
-  const next = String(fallback ?? "").trim();
-  if (!next || el.src === next || el.dataset.fallbackTried === "1") return;
-  el.dataset.fallbackTried = "1";
-  el.src = next;
+  const id = String(adId ?? "").trim();
+  if (!id || el.dataset.refreshTried === "1") {
+    el.style.visibility = "hidden";
+    return;
+  }
+  el.dataset.refreshTried = "1";
+  void (async () => {
+    try {
+      await fetch("/api/admin/meta/creative", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ad_id: id }),
+      });
+    } catch {
+      /* ignore */
+    }
+    el.src = `/api/admin/meta/creative-image?ad_id=${encodeURIComponent(id)}&t=${Date.now()}`;
+  })();
 }
 
 /** 소비자·후보자 DB 필터 담당자/팀 목록에서 제외 */
@@ -1484,9 +1498,7 @@ export default function LeadList({
                                       className="crm-thumb crm-thumb-meta"
                                       src={row.meta_creative_preview}
                                       alt={row.meta_ad_name || "광고 소재"}
-                                      onError={(e) =>
-                                        onMetaCreativeImgError(e, row.meta_creative_full)
-                                      }
+                                      onError={(e) => onMetaCreativeImgError(e, row.meta_ad_id)}
                                     />
                                     {row.meta_creative_type === "video" && (
                                       <span className="crm-meta-creative-badge">영상</span>
@@ -1843,9 +1855,7 @@ export default function LeadList({
                                   className="crm-thumb crm-thumb-meta"
                                   src={row.meta_creative_preview}
                                   alt={row.meta_ad_name || "광고 소재"}
-                                  onError={(e) =>
-                                    onMetaCreativeImgError(e, row.meta_creative_full)
-                                  }
+                                  onError={(e) => onMetaCreativeImgError(e, row.meta_ad_id)}
                                 />
                                 {row.meta_creative_type === "video" && (
                                   <span className="crm-meta-creative-badge">영상</span>

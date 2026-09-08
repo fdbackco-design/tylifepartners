@@ -2,7 +2,10 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { isLikelyMetaObjectId } from "@/lib/utm";
 
 const GRAPH_VERSION = "v21.0";
+/** 메타데이터 캐시 (이름·타입 등) */
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** Meta CDN 서명 URL은 수 시간~수일 내 만료 → 짧게 유지하고 프록시에서 재발급 */
+const CDN_URL_TTL_MS = 6 * 60 * 60 * 1000;
 
 export type MetaCreativeCache = {
   ad_id: string;
@@ -65,14 +68,28 @@ export function pickMetaAdId(opts: {
   return null;
 }
 
-/** 목록·확대 모두 image_url 우선 — Meta thumbnail_url은 서명 만료가 더 빨라 깨지는 경우가 많음 */
-function previewUrl(row: MetaCreativeCache): string | null {
+/** 목록·확대용 CDN URL 선택 (프록시 내부) */
+export function pickMetaCreativeMediaUrl(
+  row: Pick<MetaCreativeCache, "image_url" | "thumbnail_url">,
+  full?: boolean
+): string | null {
+  if (full) return row.image_url || row.thumbnail_url || null;
   return row.image_url || row.thumbnail_url || null;
 }
 
-/** 확대 보기용 — 원본 image_url 우선 */
-function fullImageUrl(row: MetaCreativeCache): string | null {
-  return row.image_url || row.thumbnail_url || null;
+function isMetaCdnUrl(url: string | null | undefined): boolean {
+  return /fbcdn\.net|scontent[^/]*\.xx\.fbcdn|facebook\.com\//i.test(String(url ?? ""));
+}
+
+/** 관리자 목록/확대용 — 동일 출처 프록시 (CDN 만료 시 서버에서 재발급) */
+export function metaCreativeImageProxyPath(
+  adId: string,
+  opts?: { full?: boolean; bust?: string | number }
+): string {
+  const q = new URLSearchParams({ ad_id: String(adId).trim() });
+  if (opts?.full) q.set("full", "1");
+  if (opts?.bust != null && String(opts.bust)) q.set("t", String(opts.bust));
+  return `/api/admin/meta/creative-image?${q.toString()}`;
 }
 
 async function graphGet(
@@ -281,18 +298,23 @@ export async function fetchAndCacheMetaAdCreative(adId: string): Promise<MetaCre
 
   const creative = result.data?.creative ?? null;
   const media = extractCreativeMedia(creative);
-  let imageUrl = media.image_url;
-  let thumbUrl = media.thumbnail_url;
+  let imageUrl: string | null = null;
+  let thumbUrl: string | null = null;
   let usedHash = false;
   let usedStory = false;
 
-  if (!imageUrl && media.image_hash) {
+  // image_hash → adimages URL 우선 (카드뉴스 등에서 thumbnail CDN만 쓰면 빨리 만료됨)
+  if (media.image_hash) {
     const fromHash = await resolveImageHashUrl(media.image_hash);
     if (fromHash) {
       imageUrl = fromHash;
+      thumbUrl = fromHash;
       usedHash = true;
-      if (!thumbUrl) thumbUrl = fromHash;
     }
+  }
+  if (!imageUrl) {
+    imageUrl = media.image_url;
+    thumbUrl = media.thumbnail_url || media.image_url;
   }
   if (!imageUrl && !thumbUrl && media.story_id) {
     const storyPic = await resolveStoryPicture(media.story_id);
@@ -341,7 +363,9 @@ function isFresh(row: MetaCreativeCache): boolean {
   if (row.fetch_status === "error") return Date.now() - t < 60 * 60 * 1000; // 오류는 1시간 캐시
   // Lead Ads 등: ok인데 이미지가 비어 있으면 재조회 (이전 얕은 필드 캐시 무효)
   if (row.fetch_status === "ok" && !row.image_url && !row.thumbnail_url) return false;
-  return Date.now() - t < CACHE_TTL_MS;
+  const ttl =
+    isMetaCdnUrl(row.image_url) || isMetaCdnUrl(row.thumbnail_url) ? CDN_URL_TTL_MS : CACHE_TTL_MS;
+  return Date.now() - t < ttl;
 }
 
 function hasPreview(row: MetaCreativeCache): boolean {
@@ -389,8 +413,8 @@ export async function attachMetaCreatives<T extends {
       .in("ad_id", unique);
     for (const row of data ?? []) {
       const c = row as MetaCreativeCache;
-      // 이미지 없는 ok 캐시는 fresh로 치지 않음 → 백그라운드 재조회
-      if (isFresh(c) && hasPreview(c)) map.set(c.ad_id, c);
+      // 만료 CDN이어도 프록시가 재발급하므로 목록에는 표시. 백그라운드에서 갱신.
+      if (hasPreview(c)) map.set(c.ad_id, c);
     }
   }
 
@@ -403,7 +427,7 @@ export async function attachMetaCreatives<T extends {
       for (const row of rows) map.set(row.ad_id, row);
     }
   } else if (missing.length && opts?.cacheOnly) {
-    // 목록은 캐시만 쓰고, 미스·이미지없음 분은 소수만 백그라운드 재조회
+    // 목록은 캐시만 쓰고, 미스·만료분은 소수만 백그라운드 재조회
     void Promise.all(
       missing.slice(0, 12).map((id) =>
         fetchAndCacheMetaAdCreative(id).catch((e) => {
@@ -411,6 +435,23 @@ export async function attachMetaCreatives<T extends {
         })
       )
     );
+  }
+
+  // CDN URL이 남아 있어도 만료됐을 수 있음 → 오래된 캐시는 백그라운드 갱신
+  if (opts?.cacheOnly) {
+    const staleIds = unique.filter((id) => {
+      const c = map.get(id);
+      return Boolean(c && hasPreview(c) && !isFresh(c));
+    });
+    if (staleIds.length) {
+      void Promise.all(
+        staleIds.slice(0, 12).map((id) =>
+          fetchAndCacheMetaAdCreative(id).catch((e) => {
+            console.warn("[meta/ads] background refresh:", e instanceof Error ? e.message : e);
+          })
+        )
+      );
+    }
   }
 
   return items.map((item, idx) => {
@@ -427,13 +468,15 @@ export async function attachMetaCreatives<T extends {
       };
     }
     const c = map.get(adId);
+    const canShow = Boolean(c && hasPreview(c));
     return {
       ...item,
       meta_ad_id: adId,
       meta_ad_name: c?.ad_name ?? null,
       meta_creative_type: c?.creative_type ?? null,
-      meta_creative_preview: c ? previewUrl(c) : null,
-      meta_creative_full: c ? fullImageUrl(c) : null,
+      // 브라우저에는 Meta CDN을 직접 넣지 않음 — 프록시가 만료 URL을 재발급
+      meta_creative_preview: canShow ? metaCreativeImageProxyPath(adId) : null,
+      meta_creative_full: canShow ? metaCreativeImageProxyPath(adId, { full: true }) : null,
       meta_creative_status: c?.fetch_status ?? null,
     };
   });
