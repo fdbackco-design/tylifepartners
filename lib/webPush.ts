@@ -149,6 +149,42 @@ async function loadAdminSubscriptions(): Promise<SubRow[]> {
   return (data ?? []) as SubRow[];
 }
 
+async function loadSubsByRanks(ranks: Array<"admin" | "manager" | "sales">): Promise<SubRow[]> {
+  if (!ranks.length) return [];
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("web_push_subscriptions")
+    .select("id, endpoint, p256dh, auth")
+    .in("rank", ranks);
+  if (error) {
+    if (/web_push_subscriptions|schema cache/i.test(error.message)) return [];
+    console.warn("[webPush] load by ranks:", error.message);
+    return [];
+  }
+  return (data ?? []) as SubRow[];
+}
+
+/** 자료 공유 게시 → 영업·매니저·관리자 웹푸시 */
+export async function notifyStaffResourceShare(opts: {
+  postId: string;
+  title: string;
+  authorName?: string | null;
+  fileCount?: number;
+}): Promise<void> {
+  if (!isWebPushConfigured()) return;
+  const subs = await loadSubsByRanks(["admin", "manager", "sales"]);
+  if (!subs.length) return;
+
+  const author = String(opts.authorName ?? "").trim();
+  const files = opts.fileCount && opts.fileCount > 0 ? ` · 첨부 ${opts.fileCount}개` : "";
+  await sendToSubscriptions(subs, {
+    title: "새 자료가 공유되었습니다",
+    body: `${opts.title}${author ? ` · ${author}` : ""}${files}`,
+    url: `/admin/resources?post=${encodeURIComponent(opts.postId)}`,
+    tag: `resource-${opts.postId}`,
+  });
+}
+
 /** 신규 상담 DB → 관리자(rank=admin) 웹푸시 + 슬랙 채널 */
 export async function notifyAdminsNewLead(opts: {
   kind: "consumers" | "candidates";

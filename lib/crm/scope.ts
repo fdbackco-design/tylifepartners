@@ -88,10 +88,17 @@ export function canAccessAdminPath(rank: SessionUser["rank"], pathname: string):
           "/admin/candidates",
           "/admin/reassign",
           "/admin/calendar",
+          "/admin/resources",
           "/admin/accounts",
           "/admin/password",
         ]
-      : ["/admin/consumers", "/admin/candidates", "/admin/calendar", "/admin/password"];
+      : [
+          "/admin/consumers",
+          "/admin/candidates",
+          "/admin/calendar",
+          "/admin/resources",
+          "/admin/password",
+        ];
 
   return allowed.some((p) => path === p || path.startsWith(`${p}/`));
 }

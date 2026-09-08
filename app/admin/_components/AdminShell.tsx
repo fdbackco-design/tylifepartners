@@ -23,6 +23,7 @@ const PRIMARY_TABS = [
   { href: "/admin/candidates", label: "후보자 DB", ranks: ["admin", "manager", "sales"] as const },
   { href: "/admin/reassign", label: "담당자 변경 필요", ranks: ["admin", "manager"] as const },
   { href: "/admin/calendar", label: "캘린더", ranks: ["admin", "manager", "sales"] as const },
+  { href: "/admin/resources", label: "자료 공유", ranks: ["admin", "manager", "sales"] as const },
 ];
 
 const SECONDARY_TABS = [
