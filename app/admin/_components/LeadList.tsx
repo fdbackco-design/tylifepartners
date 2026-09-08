@@ -2009,6 +2009,7 @@ export default function LeadList({
               </button>
             </div>
             <textarea
+              className="crm-drawer-memo-field"
               value={memoRow.memo ?? ""}
               disabled={!isMemoEditable(memoRow.status)}
               onChange={(e) => {

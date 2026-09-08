@@ -1631,6 +1631,13 @@ main.crm-admin-login {
   resize: vertical;
 }
 
+.crm-drawer textarea.crm-drawer-memo-field {
+  min-height: min(52vh, 520px);
+  height: min(52vh, 520px);
+  max-height: min(70vh, 720px);
+  line-height: 1.55;
+}
+
 .crm-drawer-behavior {
   width: min(560px, 100vw);
 }
