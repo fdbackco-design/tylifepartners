@@ -86,4 +86,15 @@ describe("parseMetaLeadCsv", () => {
     assert.equal(r.job_rank, "팀장 이상");
     assert.equal(r.ad_id, "120253263282510729");
   });
+
+  it("accepts single-character Korean names", () => {
+    const header = ["id", "이름", "phone_number"].join(",");
+    const row = ["12345", "이", "+821012345678"].join(",");
+    const buf = Buffer.from(`${header}\n${row}\n`, "utf8");
+    const parsed = parseMetaLeadCsv(buf);
+    assert.equal(parsed.issues.length, 0, parsed.issues.map((i) => i.message).join("; "));
+    assert.equal(parsed.rows.length, 1);
+    assert.equal(parsed.rows[0].name, "이");
+    assert.equal(parsed.rows[0].phone, "01012345678");
+  });
 });

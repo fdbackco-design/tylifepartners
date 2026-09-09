@@ -2031,6 +2031,15 @@ main.crm-admin-login {
   padding: 10px;
 }
 
+.crm-assignee-popover-portal {
+  position: fixed;
+  z-index: 80;
+  top: auto;
+  left: auto;
+  right: auto;
+  max-width: min(360px, calc(100vw - 16px));
+}
+
 .crm-assignee-popover-list {
   flex: 1 1 auto;
   min-height: 0;
