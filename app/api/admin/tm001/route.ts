@@ -18,6 +18,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const sp = request.nextUrl.searchParams;
+    const limit = Math.min(Math.max(Number(sp.get("limit") || 20), 1), 100);
+    const offset = Math.max(Number(sp.get("offset") || 0), 0);
+
     const supabase = getSupabaseAdmin();
     const { data: staffRows } = await supabase
       .from("staff_users")
@@ -31,25 +34,37 @@ export async function GET(request: NextRequest) {
     }));
     const scoped = visibleAssigneeIdsFromStaff(session, staffLite);
 
-    const { items, regions } = await listTm001Customers({
+    const includeMeta = offset === 0 || sp.get("meta") === "1";
+    const skipRegions = sp.get("skipRegions") === "1";
+    const skipStayTotal = sp.get("skipStayTotal") === "1";
+
+    const listPromise = listTm001Customers({
       q: sp.get("q") || "",
       region: sp.get("region") || "",
       status: sp.get("status") || "",
       visibleAssigneeIds: scoped,
+      limit,
+      offset,
+      includeHistory: session.rank === "admin",
+      includeStayTotal: includeMeta && !skipStayTotal,
+      includeRegions: includeMeta && !skipRegions,
     });
 
-    // sales는 본인만 담당자 목록에, manager/admin은 전체
+    const { items, regions, total, stayTotal } = await listPromise;
+
     const staffOut =
       session.rank === "sales"
         ? (staffRows ?? []).filter((s) => String(s.id) === session.userId)
         : staffRows ?? [];
 
-    const stayTotal = items.reduce((n, c) => n + c.stays.length, 0);
-
     return NextResponse.json({
       ok: true,
       items,
       regions,
+      total,
+      stayTotal,
+      limit,
+      offset,
       staff: staffOut.map((s) => ({
         id: String(s.id),
         name: String(s.name),
@@ -57,7 +72,7 @@ export async function GET(request: NextRequest) {
         rank: String(s.rank),
       })),
       session: { rank: session.rank, userId: session.userId, name: session.name },
-      summary: { customers: items.length, stays: stayTotal },
+      summary: { customers: total, stays: stayTotal },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

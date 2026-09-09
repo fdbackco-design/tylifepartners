@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
 import { CrmAlert, CrmButton, CrmDialog } from "@/app/admin/_components/crm/ui";
 import { appendStatusMemo } from "@/lib/crm/memo";
@@ -180,12 +180,15 @@ export default function Tm001PageClient() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [q, setQ] = useState("");
+  const [qDebounced, setQDebounced] = useState("");
   const [region, setRegion] = useState("");
   const [status, setStatus] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [pageSize, setPageSize] = useState(20);
   const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [stayTotal, setStayTotal] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [savingIds, setSavingIds] = useState<Set<string>>(() => new Set());
   const [drawerSaving, setDrawerSaving] = useState(false);
@@ -200,29 +203,47 @@ export default function Tm001PageClient() {
   const fileRef = useRef<HTMLInputElement>(null);
   const memoCustomerRef = useRef<Tm001Customer | null>(null);
   const memoSavedRef = useRef("");
+  const regionsRef = useRef<string[]>([]);
+  regionsRef.current = regions;
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     window.setTimeout(() => setToast(""), 2800);
   }, []);
 
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setQDebounced(q.trim());
+      setPage(0);
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [q]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const sp = new URLSearchParams();
-      if (q.trim()) sp.set("q", q.trim());
+      if (qDebounced) sp.set("q", qDebounced);
       if (region) sp.set("region", region);
       if (status) sp.set("status", status);
+      sp.set("limit", String(pageSize));
+      sp.set("offset", String(page * pageSize));
+      if (regionsRef.current.length > 0) sp.set("skipRegions", "1");
       const res = await fetch(`/api/admin/tm001?${sp.toString()}`);
       const data = await res.json();
       if (!data.ok) {
         setError(data.message || "목록을 불러오지 못했습니다.");
         setItems([]);
+        setTotal(0);
         return;
       }
       setItems(data.items ?? []);
-      setRegions(data.regions ?? []);
+      setTotal(Number(data.total ?? data.items?.length ?? 0));
+      if (typeof data.stayTotal === "number" && data.stayTotal >= 0) {
+        setStayTotal(data.stayTotal);
+      }
+      if (Array.isArray(data.regions) && data.regions.length) setRegions(data.regions);
       setStaff(data.staff ?? []);
       if (data.session) setSession(data.session);
     } catch {
@@ -230,30 +251,22 @@ export default function Tm001PageClient() {
     } finally {
       setLoading(false);
     }
-  }, [q, region, status]);
+  }, [qDebounced, region, status, page, pageSize]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   useEffect(() => {
-    setPage(0);
-  }, [q, region, status]);
-
-  useEffect(() => {
     memoCustomerRef.current = memoCustomer;
   }, [memoCustomer]);
 
-  const stayTotal = useMemo(() => items.reduce((n, c) => n + c.stays.length, 0), [items]);
-  const pages = Math.max(1, Math.ceil(items.length / pageSize));
-  const pageItems = useMemo(() => {
-    const start = page * pageSize;
-    return items.slice(start, start + pageSize);
-  }, [items, page, pageSize]);
+  const pages = Math.max(1, Math.ceil(total / pageSize) || 1);
+  const pageItems = items;
 
   useEffect(() => {
-    if (page > pages - 1) setPage(Math.max(0, pages - 1));
-  }, [page, pages]);
+    if (total > 0 && page > pages - 1) setPage(Math.max(0, pages - 1));
+  }, [page, pages, total]);
 
   const allExpanded = pageItems.length > 0 && pageItems.every((c) => expanded.has(c.id));
   const allPageSelected = pageItems.length > 0 && pageItems.every((c) => selected.has(c.id));
@@ -589,7 +602,15 @@ export default function Tm001PageClient() {
           />
         </div>
         <div className="crm-toolbar-actions">
-          <select className="crm-select" value={region} onChange={(e) => setRegion(e.target.value)} aria-label="숙박 지역">
+          <select
+            className="crm-select"
+            value={region}
+            onChange={(e) => {
+              setRegion(e.target.value);
+              setPage(0);
+            }}
+            aria-label="숙박 지역"
+          >
             <option value="">숙박 지역 전체</option>
             {regions.map((r) => (
               <option key={r} value={r}>
@@ -597,7 +618,15 @@ export default function Tm001PageClient() {
               </option>
             ))}
           </select>
-          <select className="crm-select" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="상담상태">
+          <select
+            className="crm-select"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(0);
+            }}
+            aria-label="상담상태"
+          >
             <option value="">상담상태 전체</option>
             {TM001_STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -622,7 +651,7 @@ export default function Tm001PageClient() {
 
       <div className="crm-meta-row">
         <span>
-          {loading ? "불러오는 중…" : `결과 ${items.length.toLocaleString()}건 · 숙박 ${stayTotal.toLocaleString()}건`}
+          {loading ? "불러오는 중…" : `결과 ${total.toLocaleString()}건 · 숙박 ${stayTotal.toLocaleString()}건`}
         </span>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {showBulkBar ? (
@@ -708,9 +737,9 @@ export default function Tm001PageClient() {
 
       {!error && (
         <div className="tm001-root">
-          {loading ? (
+          {loading && items.length === 0 ? (
             <div className="crm-empty">로딩 중…</div>
-          ) : items.length === 0 ? (
+          ) : total === 0 && !loading ? (
             <div className="crm-empty">
               <strong>등록된 고객이 없습니다</strong>
               상단에서 핫DB 엑셀을 업로드해 주세요.
