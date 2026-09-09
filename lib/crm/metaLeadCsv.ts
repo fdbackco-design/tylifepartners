@@ -66,6 +66,36 @@ function detectDelimiter(sampleLine: string): "\t" | "," {
   return tabs >= commas ? "\t" : ",";
 }
 
+/** 헤더에 한글 컬럼·phone 이 제대로 보이면 높은 점수 (인코딩 선택용) */
+function scoreCsvDecodedText(text: string): number {
+  const header = (text.split(/\r?\n/)[0] ?? "").replace(/^\uFEFF/, "");
+  if (!header.trim()) return -100;
+  let score = 0;
+  const lower = header.toLowerCase();
+  if (/(^|,|\t)id(,|\t|$)/i.test(header) || lower.includes("leadgen_id")) score += 2;
+  if (lower.includes("phone_number") || header.includes("전화번호")) score += 3;
+  if (header.includes("이름") || lower.includes("full_name") || /(^|,|\t)name(,|\t|$)/i.test(header)) score += 6;
+  if (header.includes("지역") || header.includes("상담가능시간") || header.includes("직급")) score += 3;
+  // 잘못된 인코딩(UTF-8로 CP949를 읽은 경우)에서 흔한 깨짐
+  const bad = (header.match(/\uFFFD/g) ?? []).length;
+  score -= bad * 8;
+  if (/Ã.|Â.|ì.|í./.test(header) && !header.includes("이름")) score -= 4;
+  return score;
+}
+
+function decodeWithTextDecoder(buf: Buffer, encoding: string, fatal: boolean): string | null {
+  try {
+    return new TextDecoder(encoding, { fatal }).decode(buf);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Meta Ads Manager export:
+ * - UTF-16 LE + TAB (구버전/일부 UI)
+ * - UTF-8 또는 CP949(EUC-KR) + 콤마 (Windows Ads Manager 다운로드)
+ */
 function decodeCsvBuffer(buf: Buffer): string {
   if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
     return buf.toString("utf16le");
@@ -79,11 +109,33 @@ function decodeCsvBuffer(buf: Buffer): string {
     }
     return swapped.toString("utf16le");
   }
-  // utf-8 BOM
-  if (buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) {
-    return buf.toString("utf8");
+
+  const body =
+    buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf ? buf.subarray(3) : buf;
+
+  const candidates: string[] = [];
+  const utf8Fatal = decodeWithTextDecoder(body, "utf-8", true);
+  if (utf8Fatal != null) candidates.push(utf8Fatal);
+  const utf8Loose = decodeWithTextDecoder(body, "utf-8", false);
+  if (utf8Loose != null) candidates.push(utf8Loose);
+  // Windows Ads Manager(한국어) 콤마 CSV
+  for (const enc of ["windows-949", "euc-kr", "korean"] as const) {
+    const t = decodeWithTextDecoder(body, enc, true);
+    if (t != null) candidates.push(t);
   }
-  return buf.toString("utf8");
+
+  if (!candidates.length) return body.toString("utf8");
+
+  let best = candidates[0];
+  let bestScore = scoreCsvDecodedText(best);
+  for (let i = 1; i < candidates.length; i += 1) {
+    const s = scoreCsvDecodedText(candidates[i]);
+    if (s > bestScore) {
+      best = candidates[i];
+      bestScore = s;
+    }
+  }
+  return best;
 }
 
 function parseLine(line: string, delimiter: "\t" | ","): string[] {
@@ -170,7 +222,8 @@ export function parseMetaLeadCsv(buffer: Buffer): MetaLeadCsvParseResult {
       issues: [
         {
           rowNumber: 0,
-          message: "필수 컬럼(이름, phone_number/전화번호)을 찾지 못했습니다. Meta Lead CSV인지 확인해 주세요.",
+          message:
+            "필수 컬럼(이름, phone_number/전화번호)을 찾지 못했습니다. Meta Lead CSV인지, 또는 인코딩(UTF-16/UTF-8/CP949)을 확인해 주세요.",
         },
       ],
       headers,
