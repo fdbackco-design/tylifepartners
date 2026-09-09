@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
-import { CrmAlert } from "@/app/admin/_components/crm/ui";
+import { CrmAlert, CrmButton, CrmDialog } from "@/app/admin/_components/crm/ui";
+import { appendStatusMemo } from "@/lib/crm/memo";
+import { canChangeAssignee } from "@/lib/crm/scope";
+import type { SessionUser } from "@/lib/crm/types";
 import {
   TM001_PRODUCTS,
   TM001_STATUSES,
   type Tm001Customer,
   type Tm001Stay,
 } from "@/lib/crm/tm001/types";
-import { appendStatusMemo } from "@/lib/crm/memo";
 import "./tm001.css";
 
 type Staff = { id: string; name: string; parent_id: string | null };
@@ -173,6 +175,7 @@ export default function Tm001PageClient() {
   const [items, setItems] = useState<Tm001Customer[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [session, setSession] = useState<Pick<SessionUser, "rank" | "userId" | "name"> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
@@ -189,10 +192,14 @@ export default function Tm001PageClient() {
   const [bulkAssigneeId, setBulkAssigneeId] = useState<string | null>(null);
   const [bulkPicked, setBulkPicked] = useState(false);
   const [memoCustomer, setMemoCustomer] = useState<Tm001Customer | null>(null);
-  const [memoDraft, setMemoDraft] = useState("");
+  const [memoSaveStatus, setMemoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteSaving, setDeleteSaving] = useState(false);
   const [commentCustomer, setCommentCustomer] = useState<Tm001Customer | null>(null);
   const [commentDraft, setCommentDraft] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const memoCustomerRef = useRef<Tm001Customer | null>(null);
+  const memoSavedRef = useRef("");
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -217,6 +224,7 @@ export default function Tm001PageClient() {
       setItems(data.items ?? []);
       setRegions(data.regions ?? []);
       setStaff(data.staff ?? []);
+      if (data.session) setSession(data.session);
     } catch {
       setError("네트워크 오류");
     } finally {
@@ -231,6 +239,10 @@ export default function Tm001PageClient() {
   useEffect(() => {
     setPage(0);
   }, [q, region, status]);
+
+  useEffect(() => {
+    memoCustomerRef.current = memoCustomer;
+  }, [memoCustomer]);
 
   const stayTotal = useMemo(() => items.reduce((n, c) => n + c.stays.length, 0), [items]);
   const pages = Math.max(1, Math.ceil(items.length / pageSize));
@@ -292,6 +304,13 @@ export default function Tm001PageClient() {
     const prev = items.find((c) => c.id === id);
     if (!prev) return false;
 
+    const isMemoOnly =
+      body.memo !== undefined &&
+      body.status === undefined &&
+      body.product === undefined &&
+      body.assignee_id === undefined &&
+      body.comment_append === undefined;
+
     // 낙관적 반영 — 서버는 해당 1건만 갱신
     const optimistic: Tm001Customer = {
       ...prev,
@@ -315,11 +334,24 @@ export default function Tm001PageClient() {
               ? staff.find((s) => s.id === body.assignee_id)?.name ?? prev.assignee_name
               : null,
             assigned_at: body.assignee_id ? new Date().toISOString() : null,
+            assignee_history: (() => {
+              const nextName = body.assignee_id
+                ? staff.find((s) => s.id === body.assignee_id)?.name
+                : null;
+              if (!nextName) return prev.assignee_history;
+              const base = prev.assignee_history?.length
+                ? [...prev.assignee_history]
+                : prev.assignee_name
+                  ? [prev.assignee_name]
+                  : [];
+              if (!base.length || base[base.length - 1] !== nextName) base.push(nextName);
+              return base;
+            })(),
           }
         : {}),
     };
     setItems((list) => list.map((c) => (c.id === id ? optimistic : c)));
-    setSavingIds((s) => new Set(s).add(id));
+    if (!isMemoOnly) setSavingIds((s) => new Set(s).add(id));
 
     try {
       const res = await fetch(`/api/admin/tm001/${id}`, {
@@ -330,25 +362,118 @@ export default function Tm001PageClient() {
       const data = await res.json();
       if (!data.ok) {
         setItems((list) => list.map((c) => (c.id === id ? prev : c)));
-        showToast(data.message || "저장 실패");
+        if (!isMemoOnly) showToast(data.message || "저장 실패");
         return false;
       }
       setItems((list) =>
-        list.map((c) => (c.id === id ? { ...data.item, stays: c.stays } : c))
+        list.map((c) => {
+          if (c.id !== id) return c;
+          const merged = { ...data.item, stays: c.stays };
+          // 메모 편집 중이면 서버 응답으로 입력값 덮지 않음
+          if (memoCustomerRef.current?.id === id && isMemoOnly) {
+            return { ...merged, memo: memoCustomerRef.current.memo };
+          }
+          return merged;
+        })
       );
-      if (memoCustomer?.id === id) setMemoCustomer({ ...data.item, stays: memoCustomer.stays });
+      if (memoCustomerRef.current?.id === id && !isMemoOnly) {
+        setMemoCustomer({
+          ...data.item,
+          stays: memoCustomerRef.current.stays,
+          memo: memoCustomerRef.current.memo,
+        });
+      }
       if (commentCustomer?.id === id) setCommentCustomer({ ...data.item, stays: commentCustomer.stays });
       return true;
     } catch {
       setItems((list) => list.map((c) => (c.id === id ? prev : c)));
-      showToast("네트워크 오류");
+      if (!isMemoOnly) showToast("네트워크 오류");
       return false;
     } finally {
-      setSavingIds((s) => {
-        const next = new Set(s);
-        next.delete(id);
-        return next;
+      if (!isMemoOnly) {
+        setSavingIds((s) => {
+          const next = new Set(s);
+          next.delete(id);
+          return next;
+        });
+      }
+    }
+  };
+
+  // 메모 자동 저장 (후보자 DB와 동일 — 디바운스)
+  useEffect(() => {
+    if (!memoCustomer) return;
+    const memo = memoCustomer.memo ?? "";
+    if (memo === memoSavedRef.current) {
+      setMemoSaveStatus((s) => (s === "saving" ? "idle" : s));
+      return;
+    }
+    const rowId = memoCustomer.id;
+    setMemoSaveStatus("saving");
+    const t = window.setTimeout(() => {
+      void (async () => {
+        if (memoCustomerRef.current?.id !== rowId || (memoCustomerRef.current.memo ?? "") !== memo) {
+          return;
+        }
+        const ok = await patchCustomer(rowId, { memo });
+        if (memoCustomerRef.current?.id !== rowId || (memoCustomerRef.current.memo ?? "") !== memo) {
+          return;
+        }
+        if (!ok) {
+          setMemoSaveStatus("error");
+          return;
+        }
+        memoSavedRef.current = memo;
+        setMemoSaveStatus("saved");
+      })();
+    }, 700);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memoCustomer?.id, memoCustomer?.memo]);
+
+  const openMemo = (c: Tm001Customer) => {
+    setMemoCustomer(c);
+    memoSavedRef.current = c.memo ?? "";
+    setMemoSaveStatus("idle");
+  };
+
+  const closeMemo = async () => {
+    const row = memoCustomerRef.current;
+    if (row && (row.memo ?? "") !== memoSavedRef.current) {
+      await patchCustomer(row.id, { memo: row.memo ?? "" });
+      memoSavedRef.current = row.memo ?? "";
+    }
+    setMemoCustomer(null);
+    setMemoSaveStatus("idle");
+  };
+
+  const confirmBulkDelete = async () => {
+    if (session?.rank !== "admin" || selected.size === 0) {
+      setDeleteConfirmOpen(false);
+      return;
+    }
+    setDeleteSaving(true);
+    try {
+      const ids = Array.from(selected);
+      const res = await fetch("/api/admin/tm001/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
       });
+      const data = await res.json();
+      if (!data.ok) {
+        showToast(data.message || "삭제 실패");
+        return;
+      }
+      const removed = new Set(ids);
+      setItems((prev) => prev.filter((c) => !removed.has(c.id)));
+      setSelected(new Set());
+      setDeleteConfirmOpen(false);
+      showToast(data.message || `${data.deleted ?? ids.length}건을 삭제했습니다.`);
+    } catch {
+      showToast("네트워크 오류");
+    } finally {
+      setDeleteSaving(false);
     }
   };
 
@@ -409,6 +534,11 @@ export default function Tm001PageClient() {
   };
 
 
+  const canAssign = session ? canChangeAssignee(session as SessionUser) : false;
+  const canUpload = session?.rank === "admin";
+  const canDelete = session?.rank === "admin";
+  const showBulkBar = selected.size > 0 && (canAssign || canDelete);
+
   return (
     <div>
       {toast ? (
@@ -422,19 +552,23 @@ export default function Tm001PageClient() {
           <h1 className="crm-page-title">TM001</h1>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void onUpload(f);
-            }}
-          />
-          <button type="button" className="crm-btn crm-btn-primary" disabled={uploading} onClick={() => fileRef.current?.click()}>
-            {uploading ? "업로드 중…" : "엑셀 업로드"}
-          </button>
+          {canUpload ? (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void onUpload(f);
+                }}
+              />
+              <button type="button" className="crm-btn crm-btn-primary" disabled={uploading} onClick={() => fileRef.current?.click()}>
+                {uploading ? "업로드 중…" : "엑셀 업로드"}
+              </button>
+            </>
+          ) : null}
           <button type="button" className="crm-btn" onClick={() => void load()} disabled={loading}>
             새로고침
           </button>
@@ -491,29 +625,43 @@ export default function Tm001PageClient() {
           {loading ? "불러오는 중…" : `결과 ${items.length.toLocaleString()}건 · 숙박 ${stayTotal.toLocaleString()}건`}
         </span>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          {selected.size > 0 ? (
+          {showBulkBar ? (
             <div className="crm-bulk-bar">
               <span>{selected.size}건 선택</span>
-              <AssigneePicker
-                value={bulkPicked ? bulkAssigneeId : null}
-                staff={staff}
-                placeholder={bulkPicked && bulkAssigneeId == null ? "미배정" : "담당자 선택"}
-                clearLabel="미배정"
-                clearIsSelected={bulkPicked && bulkAssigneeId == null}
-                allowClear
-                onChange={(id) => {
-                  setBulkPicked(true);
-                  setBulkAssigneeId(id);
-                }}
-              />
-              <button
-                type="button"
-                className="crm-btn crm-btn-primary"
-                disabled={!bulkPicked}
-                onClick={() => void onBulkAssign()}
-              >
-                담당자 일괄 변경
-              </button>
+              {canAssign ? (
+                <>
+                  <AssigneePicker
+                    value={bulkPicked ? bulkAssigneeId : null}
+                    staff={staff}
+                    placeholder={bulkPicked && bulkAssigneeId == null ? "미배정" : "담당자 선택"}
+                    clearLabel="미배정"
+                    clearIsSelected={bulkPicked && bulkAssigneeId == null}
+                    allowClear
+                    onChange={(id) => {
+                      setBulkPicked(true);
+                      setBulkAssigneeId(id);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="crm-btn crm-btn-primary"
+                    disabled={!bulkPicked}
+                    onClick={() => void onBulkAssign()}
+                  >
+                    담당자 일괄 변경
+                  </button>
+                </>
+              ) : null}
+              {canDelete ? (
+                <button
+                  type="button"
+                  className="crm-btn"
+                  disabled={deleteSaving}
+                  onClick={() => setDeleteConfirmOpen(true)}
+                >
+                  {deleteSaving ? "삭제 중…" : "삭제"}
+                </button>
+              ) : null}
             </div>
           ) : null}
           <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
@@ -694,8 +842,9 @@ export default function Tm001PageClient() {
                               value={c.assignee_id}
                               staff={staff}
                               unresolvedLabel={c.assignee_name}
+                              history={session?.rank === "admin" ? c.assignee_history : undefined}
                               onChange={(id) => void patchCustomer(c.id, { assignee_id: id })}
-                              disabled={saving}
+                              disabled={saving || !canAssign}
                             />
                           </td>
                           <td>
@@ -752,10 +901,7 @@ export default function Tm001PageClient() {
                             <button
                               type="button"
                               className={`note-button${c.memo?.trim() ? " has-text" : ""}`}
-                              onClick={() => {
-                                setMemoCustomer(c);
-                                setMemoDraft(c.memo || "");
-                              }}
+                              onClick={() => openMemo(c)}
                               aria-label={`${c.name} 메모 ${c.memo?.trim() ? "수정" : "작성"}`}
                             >
                               <span className="note-content">{c.memo?.trim() ? c.memo : "메모 없음"}</span>
@@ -832,7 +978,9 @@ export default function Tm001PageClient() {
                         <AssigneePicker
                           value={c.assignee_id}
                           staff={staff}
-                          disabled={saving}
+                          unresolvedLabel={c.assignee_name}
+                          history={session?.rank === "admin" ? c.assignee_history : undefined}
+                          disabled={saving || !canAssign}
                           onChange={(id) => void patchCustomer(c.id, { assignee_id: id })}
                         />
                       </div>
@@ -882,38 +1030,34 @@ export default function Tm001PageClient() {
 
       {memoCustomer ? (
         <>
-          <button type="button" className="crm-drawer-backdrop" aria-label="닫기" onClick={() => setMemoCustomer(null)} />
+          <button type="button" className="crm-drawer-backdrop" aria-label="닫기" onClick={() => void closeMemo()} />
           <aside className="crm-drawer" role="dialog" aria-label="메모">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div>
                 <strong style={{ fontSize: 16 }}>{memoCustomer.name}</strong>
                 <div style={{ fontSize: 12, color: "var(--crm-muted)" }}>{memoCustomer.phone}</div>
               </div>
-              <button type="button" className="crm-btn" onClick={() => setMemoCustomer(null)}>
+              <button type="button" className="crm-btn" onClick={() => void closeMemo()}>
                 닫기
               </button>
             </div>
             <textarea
               className="crm-drawer-memo-field"
-              value={memoDraft}
-              onChange={(e) => setMemoDraft(e.target.value)}
+              value={memoCustomer.memo ?? ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                setMemoCustomer((prev) => (prev ? { ...prev, memo: value } : prev));
+              }}
               aria-label="메모 내용"
             />
-            <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button
-                type="button"
-                className="crm-btn crm-btn-primary"
-                disabled={drawerSaving}
-                onClick={() => {
-                  setDrawerSaving(true);
-                  void patchCustomer(memoCustomer.id, { memo: memoDraft }).then((ok) => {
-                    setDrawerSaving(false);
-                    if (ok) setMemoCustomer(null);
-                  });
-                }}
-              >
-                {drawerSaving ? "저장 중…" : "저장"}
-              </button>
+            <div style={{ marginTop: 8, fontSize: 12, color: "var(--crm-muted)", minHeight: 18 }}>
+              {memoSaveStatus === "saving"
+                ? "저장 중…"
+                : memoSaveStatus === "saved"
+                  ? "저장됨"
+                  : memoSaveStatus === "error"
+                    ? "저장 실패 — 다시 입력해 주세요"
+                    : "입력하면 자동 저장됩니다"}
             </div>
           </aside>
         </>
@@ -969,6 +1113,28 @@ export default function Tm001PageClient() {
           </aside>
         </>
       ) : null}
+
+      <CrmDialog
+        open={deleteConfirmOpen}
+        onClose={() => {
+          if (!deleteSaving) setDeleteConfirmOpen(false);
+        }}
+        title="삭제 확인"
+        footer={
+          <>
+            <CrmButton variant="secondary" disabled={deleteSaving} onClick={() => setDeleteConfirmOpen(false)}>
+              취소
+            </CrmButton>
+            <CrmButton variant="danger" disabled={deleteSaving} onClick={() => void confirmBulkDelete()}>
+              {deleteSaving ? "삭제 중…" : "삭제"}
+            </CrmButton>
+          </>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
+          선택한 <strong>{selected.size}</strong>건을 삭제할까요? 숙박 내역과 배정 이력도 함께 삭제됩니다.
+        </p>
+      </CrmDialog>
     </div>
   );
 }

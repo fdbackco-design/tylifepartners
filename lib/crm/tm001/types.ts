@@ -67,6 +67,8 @@ export type Tm001Customer = {
   created_at: string;
   updated_at: string;
   stays: Tm001Stay[];
+  /** 담당자 배정 이력 이름 체인 (관리자 표시용) */
+  assignee_history?: string[];
 };
 
 export function isTm001Status(v: unknown): v is Tm001Status {
