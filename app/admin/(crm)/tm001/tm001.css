@@ -140,6 +140,11 @@
 .tm001-root .status-select[data-status="재콜"]{background:var(--amber-soft);border-color:#f0ddb7;color:var(--amber)}
 .tm001-root .status-select[data-status="계약완료"]{background:var(--green-soft);border-color:#bedfd0;color:var(--green)}
 .tm001-root .status-select[data-status="수신거부"],.tm001-root .status-select[data-status="번호오류"]{background:var(--red-soft);border-color:#eec9d0;color:var(--red)}
+.tm001-root .status-cell{position:relative;min-width:0}
+.tm001-root .status-cell.is-saving .status-select{opacity:.65}
+.tm001-root .row-saving{display:block;margin-top:6px;font-size:10px;font-weight:700;color:var(--purple)}
+.tm001-root .tm001-table tr.contact-row.is-saving td{background:#faf8ff}
+.tm001-root .mobile-card.is-saving{outline:2px solid #e4d7f5;outline-offset:-2px}
 .tm001-root .product-field{margin-top:9px;border-top:1px dashed #d5e5dc;padding-top:9px}
 .tm001-root .product-field label{font-size:10px;font-weight:650;display:block;margin-bottom:4px;color:#457566}
 .tm001-root .product-field label span{color:var(--red)}

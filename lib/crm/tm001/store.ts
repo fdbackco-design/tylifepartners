@@ -11,6 +11,7 @@ import {
   type Tm001Stay,
   type Tm001Status,
 } from "@/lib/crm/tm001/types";
+import { appendStatusMemo } from "@/lib/crm/memo";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 type StaffLite = { id: string; name: string };
@@ -71,6 +72,68 @@ export async function nextTm001BatchCode(partnerCode = TM001_PARTNER_CODE): Prom
   return formatBatchCode(max + 1);
 }
 
+function mapCustomerRow(
+  r: Record<string, unknown>,
+  stays: Tm001Stay[],
+  staffById: Map<string, StaffLite>
+): Tm001Customer {
+  const status = isTm001Status(r.status) ? r.status : "미접촉";
+  return {
+    id: String(r.id),
+    partner_code: String(r.partner_code ?? TM001_PARTNER_CODE),
+    partner_name: String(r.partner_name ?? TM001_PARTNER_NAME),
+    batch_code: String(r.batch_code ?? "001"),
+    name: String(r.name ?? ""),
+    phone: String(r.phone ?? ""),
+    normalized_phone: String(r.normalized_phone ?? ""),
+    raw_phone: r.raw_phone != null ? String(r.raw_phone) : null,
+    visit_count: Number(r.visit_count ?? 0),
+    assignee_id: r.assignee_id ? String(r.assignee_id) : null,
+    assignee_name: r.assignee_id ? staffById.get(String(r.assignee_id))?.name ?? null : null,
+    assigned_at: r.assigned_at ? String(r.assigned_at) : null,
+    status,
+    product: r.product != null ? String(r.product) : null,
+    memo: String(r.memo ?? ""),
+    comments: mapComments(r.comments),
+    created_at: String(r.created_at ?? ""),
+    updated_at: String(r.updated_at ?? ""),
+    stays,
+  };
+}
+
+export async function getTm001CustomerById(
+  id: string,
+  opts?: { includeStays?: boolean }
+): Promise<Tm001Customer | null> {
+  const supabase = getSupabaseAdmin();
+  const { data: row, error } = await supabase.from("tm001_customers").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!row) return null;
+
+  let stays: Tm001Stay[] = [];
+  if (opts?.includeStays !== false) {
+    const { data: stayRows, error: stayErr } = await supabase
+      .from("tm001_stays")
+      .select("*")
+      .eq("customer_id", id)
+      .order("sort_order", { ascending: true });
+    if (stayErr) throw new Error(stayErr.message);
+    stays = (stayRows ?? []).map((s) => mapStay(s as Record<string, unknown>));
+  }
+
+  const staffById = new Map<string, StaffLite>();
+  if (row.assignee_id) {
+    const { data: staff } = await supabase
+      .from("staff_users")
+      .select("id, name")
+      .eq("id", String(row.assignee_id))
+      .maybeSingle();
+    if (staff) staffById.set(String(staff.id), { id: String(staff.id), name: String(staff.name) });
+  }
+
+  return mapCustomerRow(row as Record<string, unknown>, stays, staffById);
+}
+
 export async function listTm001Customers(opts?: {
   q?: string;
   region?: string;
@@ -127,28 +190,7 @@ export async function listTm001Customers(opts?: {
   let items: Tm001Customer[] = custRows.map((r) => {
     const stays = staysByCustomer.get(String(r.id)) ?? [];
     for (const s of stays) if (s.region) regionSet.add(s.region);
-    const status = isTm001Status(r.status) ? r.status : "미접촉";
-    return {
-      id: String(r.id),
-      partner_code: String(r.partner_code ?? TM001_PARTNER_CODE),
-      partner_name: String(r.partner_name ?? TM001_PARTNER_NAME),
-      batch_code: String(r.batch_code ?? "001"),
-      name: String(r.name ?? ""),
-      phone: String(r.phone ?? ""),
-      normalized_phone: String(r.normalized_phone ?? ""),
-      raw_phone: r.raw_phone != null ? String(r.raw_phone) : null,
-      visit_count: Number(r.visit_count ?? 0),
-      assignee_id: r.assignee_id ? String(r.assignee_id) : null,
-      assignee_name: r.assignee_id ? staffById.get(String(r.assignee_id))?.name ?? null : null,
-      assigned_at: r.assigned_at ? String(r.assigned_at) : null,
-      status,
-      product: r.product != null ? String(r.product) : null,
-      memo: String(r.memo ?? ""),
-      comments: mapComments(r.comments),
-      created_at: String(r.created_at ?? ""),
-      updated_at: String(r.updated_at ?? ""),
-      stays,
-    };
+    return mapCustomerRow(r, stays, staffById);
   });
 
   const q = String(opts?.q ?? "").trim().toLowerCase();
@@ -392,18 +434,27 @@ export async function patchTm001Customer(
   if (!current) throw new Error("고객을 찾을 수 없습니다.");
 
   const next: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  let nextMemo = String(current.memo ?? "");
 
   if (patch.status != null) {
     if (!isTm001Status(patch.status)) throw new Error("허용되지 않은 상담상태입니다.");
+    const prevStatus = String(current.status ?? "");
     next.status = patch.status;
     if (patch.status !== "계약완료") next.product = null;
+    if (patch.status !== prevStatus) {
+      nextMemo = appendStatusMemo(nextMemo, patch.status);
+      next.memo = nextMemo;
+    }
   }
   if (patch.product !== undefined) {
     if (patch.product == null || patch.product === "") next.product = null;
     else if (!isTm001Product(patch.product)) throw new Error("허용되지 않은 상품입니다.");
     else next.product = patch.product;
   }
-  if (patch.memo !== undefined) next.memo = String(patch.memo ?? "");
+  // 상담상태와 함께 온 메모는 후보자 DB와 같이 상태 자동기록을 유지 (명시 memo만 별도 저장)
+  if (patch.memo !== undefined && patch.status == null) {
+    next.memo = String(patch.memo ?? "");
+  }
   if (patch.comment_append != null && String(patch.comment_append).trim()) {
     const comments = mapComments(current.comments);
     comments.push({
@@ -422,8 +473,7 @@ export async function patchTm001Customer(
   const { error: updErr } = await supabase.from("tm001_customers").update(next).eq("id", id);
   if (updErr) throw new Error(updErr.message);
 
-  const { items } = await listTm001Customers();
-  const found = items.find((c) => c.id === id);
+  const found = await getTm001CustomerById(id, { includeStays: false });
   if (!found) throw new Error("저장 후 조회에 실패했습니다.");
   return found;
 }

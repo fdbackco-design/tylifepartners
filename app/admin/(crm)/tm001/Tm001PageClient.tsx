@@ -9,6 +9,7 @@ import {
   type Tm001Customer,
   type Tm001Stay,
 } from "@/lib/crm/tm001/types";
+import { appendStatusMemo } from "@/lib/crm/memo";
 import "./tm001.css";
 
 type Staff = { id: string; name: string; parent_id: string | null };
@@ -183,6 +184,8 @@ export default function Tm001PageClient() {
   const [pageSize, setPageSize] = useState(20);
   const [page, setPage] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [savingIds, setSavingIds] = useState<Set<string>>(() => new Set());
+  const [drawerSaving, setDrawerSaving] = useState(false);
   const [bulkAssigneeId, setBulkAssigneeId] = useState<string | null>(null);
   const [bulkPicked, setBulkPicked] = useState(false);
   const [memoCustomer, setMemoCustomer] = useState<Tm001Customer | null>(null);
@@ -286,17 +289,67 @@ export default function Tm001PageClient() {
   };
 
   const patchCustomer = async (id: string, body: Record<string, unknown>) => {
-    const res = await fetch(`/api/admin/tm001/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      showToast(data.message || "저장 실패");
-      return;
+    const prev = items.find((c) => c.id === id);
+    if (!prev) return false;
+
+    // 낙관적 반영 — 서버는 해당 1건만 갱신
+    const optimistic: Tm001Customer = {
+      ...prev,
+      ...(typeof body.status === "string"
+        ? {
+            status: body.status as Tm001Customer["status"],
+            product: body.status === "계약완료" ? (body.product != null ? String(body.product) : prev.product) : null,
+            ...(body.status !== prev.status
+              ? { memo: appendStatusMemo(prev.memo, body.status) }
+              : {}),
+          }
+        : {}),
+      ...(body.product !== undefined && body.status === undefined
+        ? { product: body.product ? String(body.product) : null }
+        : {}),
+      ...(body.memo !== undefined && body.status === undefined ? { memo: String(body.memo ?? "") } : {}),
+      ...(body.assignee_id !== undefined
+        ? {
+            assignee_id: body.assignee_id ? String(body.assignee_id) : null,
+            assignee_name: body.assignee_id
+              ? staff.find((s) => s.id === body.assignee_id)?.name ?? prev.assignee_name
+              : null,
+            assigned_at: body.assignee_id ? new Date().toISOString() : null,
+          }
+        : {}),
+    };
+    setItems((list) => list.map((c) => (c.id === id ? optimistic : c)));
+    setSavingIds((s) => new Set(s).add(id));
+
+    try {
+      const res = await fetch(`/api/admin/tm001/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setItems((list) => list.map((c) => (c.id === id ? prev : c)));
+        showToast(data.message || "저장 실패");
+        return false;
+      }
+      setItems((list) =>
+        list.map((c) => (c.id === id ? { ...data.item, stays: c.stays } : c))
+      );
+      if (memoCustomer?.id === id) setMemoCustomer({ ...data.item, stays: memoCustomer.stays });
+      if (commentCustomer?.id === id) setCommentCustomer({ ...data.item, stays: commentCustomer.stays });
+      return true;
+    } catch {
+      setItems((list) => list.map((c) => (c.id === id ? prev : c)));
+      showToast("네트워크 오류");
+      return false;
+    } finally {
+      setSavingIds((s) => {
+        const next = new Set(s);
+        next.delete(id);
+        return next;
+      });
     }
-    setItems((prev) => prev.map((c) => (c.id === id ? data.item : c)));
   };
 
   const onUpload = async (file: File) => {
@@ -591,14 +644,16 @@ export default function Tm001PageClient() {
                   <tbody>
                     {pageItems.map((c) => {
                       const unassigned = !c.assignee_id;
+                      const saving = savingIds.has(c.id);
                       return (
-                        <tr key={c.id} className={`contact-row${unassigned ? " unassigned" : ""}`}>
+                        <tr key={c.id} className={`contact-row${unassigned ? " unassigned" : ""}${saving ? " is-saving" : ""}`}>
                           <td className="check-cell pin-check">
                             <input
                               type="checkbox"
                               checked={selected.has(c.id)}
                               onChange={() => toggleSelect(c.id)}
                               aria-label={`${c.name} 선택`}
+                              disabled={saving}
                             />
                           </td>
                           <td className="pin-partner">
@@ -640,6 +695,7 @@ export default function Tm001PageClient() {
                               staff={staff}
                               unresolvedLabel={c.assignee_name}
                               onChange={(id) => void patchCustomer(c.id, { assignee_id: id })}
+                              disabled={saving}
                             />
                           </td>
                           <td>
@@ -652,39 +708,45 @@ export default function Tm001PageClient() {
                             </span>
                           </td>
                           <td>
-                            <select
-                              className="status-select"
-                              value={c.status}
-                              aria-label={`${c.name} 상담상태`}
-                              onChange={(e) =>
-                                void patchCustomer(c.id, {
-                                  status: e.target.value,
-                                  product: e.target.value === "계약완료" ? c.product : null,
-                                })
-                              }
-                            >
-                              {TM001_STATUSES.map((s) => (
-                                <option key={s} value={s}>
-                                  {s}
-                                </option>
-                              ))}
-                            </select>
-                            {c.status === "계약완료" ? (
+                            <div className={`status-cell${saving ? " is-saving" : ""}`}>
                               <select
                                 className="status-select"
-                                style={{ marginTop: 6 }}
-                                value={c.product ?? ""}
-                                onChange={(e) => void patchCustomer(c.id, { product: e.target.value || null })}
-                                aria-label={`${c.name} 계약 상품`}
+                                value={c.status}
+                                disabled={saving}
+                                aria-busy={saving}
+                                aria-label={`${c.name} 상담상태`}
+                                onChange={(e) =>
+                                  void patchCustomer(c.id, {
+                                    status: e.target.value,
+                                    product: e.target.value === "계약완료" ? c.product : null,
+                                  })
+                                }
                               >
-                                <option value="">상품 선택</option>
-                                {TM001_PRODUCTS.map((p) => (
-                                  <option key={p} value={p}>
-                                    {p}
+                                {TM001_STATUSES.map((s) => (
+                                  <option key={s} value={s}>
+                                    {s}
                                   </option>
                                 ))}
                               </select>
-                            ) : null}
+                              {c.status === "계약완료" ? (
+                                <select
+                                  className="status-select"
+                                  style={{ marginTop: 6 }}
+                                  value={c.product ?? ""}
+                                  disabled={saving}
+                                  onChange={(e) => void patchCustomer(c.id, { product: e.target.value || null })}
+                                  aria-label={`${c.name} 계약 상품`}
+                                >
+                                  <option value="">상품 선택</option>
+                                  {TM001_PRODUCTS.map((p) => (
+                                    <option key={p} value={p}>
+                                      {p}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : null}
+                              {saving ? <span className="row-saving">저장 중…</span> : null}
+                            </div>
                           </td>
                           <td className="memo-cell">
                             <button
@@ -732,11 +794,13 @@ export default function Tm001PageClient() {
               </div>
 
               <div className="mobile-list" aria-label="모바일 고객 목록">
-                {pageItems.map((c) => (
-                  <article key={`m-${c.id}`} className="mobile-card">
+                {pageItems.map((c) => {
+                  const saving = savingIds.has(c.id);
+                  return (
+                  <article key={`m-${c.id}`} className={`mobile-card${saving ? " is-saving" : ""}`}>
                     <div className="m-head">
                       <div className="m-head-left">
-                        <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} aria-label={`${c.name} 선택`} />
+                        <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} aria-label={`${c.name} 선택`} disabled={saving} />
                         <div>
                           <CustomerNameLabel name={c.name} />
                           <div className="phone-wrap">
@@ -765,11 +829,21 @@ export default function Tm001PageClient() {
                     <div className="m-control-grid">
                       <div>
                         <span className="m-label">담당자</span>
-                        <AssigneePicker value={c.assignee_id} staff={staff} onChange={(id) => void patchCustomer(c.id, { assignee_id: id })} />
+                        <AssigneePicker
+                          value={c.assignee_id}
+                          staff={staff}
+                          disabled={saving}
+                          onChange={(id) => void patchCustomer(c.id, { assignee_id: id })}
+                        />
                       </div>
                       <div>
-                        <span className="m-label">상담상태</span>
-                        <select className="status-select" value={c.status} onChange={(e) => void patchCustomer(c.id, { status: e.target.value })}>
+                        <span className="m-label">상담상태{saving ? " · 저장 중…" : ""}</span>
+                        <select
+                          className="status-select"
+                          value={c.status}
+                          disabled={saving}
+                          onChange={(e) => void patchCustomer(c.id, { status: e.target.value })}
+                        >
                           {TM001_STATUSES.map((s) => (
                             <option key={s} value={s}>
                               {s}
@@ -779,7 +853,8 @@ export default function Tm001PageClient() {
                       </div>
                     </div>
                   </article>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="crm-pagination">
@@ -828,11 +903,16 @@ export default function Tm001PageClient() {
               <button
                 type="button"
                 className="crm-btn crm-btn-primary"
+                disabled={drawerSaving}
                 onClick={() => {
-                  void patchCustomer(memoCustomer.id, { memo: memoDraft }).then(() => setMemoCustomer(null));
+                  setDrawerSaving(true);
+                  void patchCustomer(memoCustomer.id, { memo: memoDraft }).then((ok) => {
+                    setDrawerSaving(false);
+                    if (ok) setMemoCustomer(null);
+                  });
                 }}
               >
-                저장
+                {drawerSaving ? "저장 중…" : "저장"}
               </button>
             </div>
           </aside>
@@ -871,15 +951,19 @@ export default function Tm001PageClient() {
               <button
                 type="button"
                 className="crm-btn crm-btn-primary"
-                disabled={!commentDraft.trim()}
+                disabled={!commentDraft.trim() || drawerSaving}
                 onClick={() => {
-                  void patchCustomer(commentCustomer.id, { comment_append: commentDraft }).then(() => {
-                    setCommentCustomer(null);
-                    setCommentDraft("");
+                  setDrawerSaving(true);
+                  void patchCustomer(commentCustomer.id, { comment_append: commentDraft }).then((ok) => {
+                    setDrawerSaving(false);
+                    if (ok) {
+                      setCommentCustomer(null);
+                      setCommentDraft("");
+                    }
                   });
                 }}
               >
-                추가
+                {drawerSaving ? "저장 중…" : "추가"}
               </button>
             </div>
           </aside>
