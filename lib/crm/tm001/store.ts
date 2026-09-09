@@ -11,6 +11,10 @@ import {
   type Tm001Stay,
   type Tm001Status,
 } from "@/lib/crm/tm001/types";
+import { buildAssigneeNameChain } from "@/lib/crm/assigneeHistoryFormat";
+import { appendStatusMemo } from "@/lib/crm/memo";
+import { canChangeAssignee } from "@/lib/crm/scope";
+import type { SessionUser } from "@/lib/crm/types";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 type StaffLite = { id: string; name: string };
@@ -71,22 +75,167 @@ export async function nextTm001BatchCode(partnerCode = TM001_PARTNER_CODE): Prom
   return formatBatchCode(max + 1);
 }
 
+function mapCustomerRow(
+  r: Record<string, unknown>,
+  stays: Tm001Stay[],
+  staffById: Map<string, StaffLite>
+): Tm001Customer {
+  const status = isTm001Status(r.status) ? r.status : "미접촉";
+  return {
+    id: String(r.id),
+    partner_code: String(r.partner_code ?? TM001_PARTNER_CODE),
+    partner_name: String(r.partner_name ?? TM001_PARTNER_NAME),
+    batch_code: String(r.batch_code ?? "001"),
+    name: String(r.name ?? ""),
+    phone: String(r.phone ?? ""),
+    normalized_phone: String(r.normalized_phone ?? ""),
+    raw_phone: r.raw_phone != null ? String(r.raw_phone) : null,
+    visit_count: Number(r.visit_count ?? 0),
+    assignee_id: r.assignee_id ? String(r.assignee_id) : null,
+    assignee_name: r.assignee_id ? staffById.get(String(r.assignee_id))?.name ?? null : null,
+    assigned_at: r.assigned_at ? String(r.assigned_at) : null,
+    status,
+    product: r.product != null ? String(r.product) : null,
+    memo: String(r.memo ?? ""),
+    comments: mapComments(r.comments),
+    created_at: String(r.created_at ?? ""),
+    updated_at: String(r.updated_at ?? ""),
+    stays,
+  };
+}
+
+export async function getTm001CustomerById(
+  id: string,
+  opts?: { includeStays?: boolean; includeHistory?: boolean }
+): Promise<Tm001Customer | null> {
+  const supabase = getSupabaseAdmin();
+  const { data: row, error } = await supabase.from("tm001_customers").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!row) return null;
+
+  let stays: Tm001Stay[] = [];
+  if (opts?.includeStays !== false) {
+    const { data: stayRows, error: stayErr } = await supabase
+      .from("tm001_stays")
+      .select("*")
+      .eq("customer_id", id)
+      .order("sort_order", { ascending: true });
+    if (stayErr) throw new Error(stayErr.message);
+    stays = (stayRows ?? []).map((s) => mapStay(s as Record<string, unknown>));
+  }
+
+  const staffById = new Map<string, StaffLite>();
+  if (row.assignee_id) {
+    const { data: staff } = await supabase
+      .from("staff_users")
+      .select("id, name")
+      .eq("id", String(row.assignee_id))
+      .maybeSingle();
+    if (staff) staffById.set(String(staff.id), { id: String(staff.id), name: String(staff.name) });
+  }
+
+  const item = mapCustomerRow(row as Record<string, unknown>, stays, staffById);
+  if (opts?.includeHistory) {
+    const [withHist] = await attachTm001AssigneeHistories([item], staffById);
+    return withHist ?? item;
+  }
+  return item;
+}
+
+async function attachTm001AssigneeHistories(
+  items: Tm001Customer[],
+  staffById?: Map<string, StaffLite>
+): Promise<Tm001Customer[]> {
+  if (!items.length) return items;
+  const supabase = getSupabaseAdmin();
+  const ids = items.map((i) => i.id);
+  const logs: Array<{
+    customer_id: string;
+    from_assignee_id: string | null;
+    to_assignee_id: string | null;
+    assigned_at: string;
+  }> = [];
+  const IN_CHUNK = 100;
+  for (let i = 0; i < ids.length; i += IN_CHUNK) {
+    const chunk = ids.slice(i, i + IN_CHUNK);
+    const { data, error } = await supabase
+      .from("tm001_assignment_logs")
+      .select("customer_id, from_assignee_id, to_assignee_id, assigned_at")
+      .in("customer_id", chunk)
+      .order("assigned_at", { ascending: true });
+    if (error) {
+      // 마이그레이션 전이면 이력 없이 목록만
+      if (/tm001_assignment_logs|schema cache|does not exist/i.test(error.message)) break;
+      console.error("attachTm001AssigneeHistories:", error.message);
+      break;
+    }
+    for (const row of data ?? []) {
+      logs.push({
+        customer_id: String(row.customer_id),
+        from_assignee_id: row.from_assignee_id ? String(row.from_assignee_id) : null,
+        to_assignee_id: row.to_assignee_id ? String(row.to_assignee_id) : null,
+        assigned_at: String(row.assigned_at),
+      });
+    }
+  }
+
+  const nameById = new Map<string, string>();
+  if (staffById) {
+    for (const [id, s] of Array.from(staffById.entries())) nameById.set(id, s.name);
+  }
+  const missing = new Set<string>();
+  for (const log of logs) {
+    if (log.from_assignee_id && !nameById.has(log.from_assignee_id)) missing.add(log.from_assignee_id);
+    if (log.to_assignee_id && !nameById.has(log.to_assignee_id)) missing.add(log.to_assignee_id);
+  }
+  if (missing.size) {
+    const missingIds = Array.from(missing);
+    for (let i = 0; i < missingIds.length; i += IN_CHUNK) {
+      const chunk = missingIds.slice(i, i + IN_CHUNK);
+      const { data: staff } = await supabase.from("staff_users").select("id, name").in("id", chunk);
+      for (const s of staff ?? []) nameById.set(String(s.id), String(s.name));
+    }
+  }
+  const nameOf = (id: string | null | undefined) => (id ? nameById.get(id) ?? "" : "");
+
+  const byCustomer = new Map<string, typeof logs>();
+  for (const log of logs) {
+    const list = byCustomer.get(log.customer_id) ?? [];
+    list.push(log);
+    byCustomer.set(log.customer_id, list);
+  }
+
+  return items.map((item) => {
+    const chain = buildAssigneeNameChain(byCustomer.get(item.id) ?? [], nameOf);
+    if (!chain.length && item.assignee_name) return { ...item, assignee_history: [item.assignee_name] };
+    return { ...item, assignee_history: chain.length ? chain : undefined };
+  });
+}
+
 export async function listTm001Customers(opts?: {
   q?: string;
   region?: string;
   status?: string;
+  /** admin=all, 그 외 본인+산하 id */
+  visibleAssigneeIds?: string[] | "all";
 }): Promise<{ items: Tm001Customer[]; regions: string[] }> {
   const supabase = getSupabaseAdmin();
+  const scoped = opts?.visibleAssigneeIds ?? "all";
   // PostgREST 기본 max 1000행 — 전체 고객을 range로 수집
   const PAGE = 1000;
   const custRows: Record<string, unknown>[] = [];
   for (let offset = 0; ; offset += PAGE) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("tm001_customers")
       .select("*")
       .eq("partner_code", TM001_PARTNER_CODE)
       .order("updated_at", { ascending: false })
       .range(offset, offset + PAGE - 1);
+    if (scoped !== "all") {
+      if (!scoped.length) break;
+      query = query.in("assignee_id", scoped);
+    }
+    const { data, error } = await query;
     if (error) throw new Error(error.message);
     const chunk = (data ?? []) as Record<string, unknown>[];
     custRows.push(...chunk);
@@ -127,29 +276,10 @@ export async function listTm001Customers(opts?: {
   let items: Tm001Customer[] = custRows.map((r) => {
     const stays = staysByCustomer.get(String(r.id)) ?? [];
     for (const s of stays) if (s.region) regionSet.add(s.region);
-    const status = isTm001Status(r.status) ? r.status : "미접촉";
-    return {
-      id: String(r.id),
-      partner_code: String(r.partner_code ?? TM001_PARTNER_CODE),
-      partner_name: String(r.partner_name ?? TM001_PARTNER_NAME),
-      batch_code: String(r.batch_code ?? "001"),
-      name: String(r.name ?? ""),
-      phone: String(r.phone ?? ""),
-      normalized_phone: String(r.normalized_phone ?? ""),
-      raw_phone: r.raw_phone != null ? String(r.raw_phone) : null,
-      visit_count: Number(r.visit_count ?? 0),
-      assignee_id: r.assignee_id ? String(r.assignee_id) : null,
-      assignee_name: r.assignee_id ? staffById.get(String(r.assignee_id))?.name ?? null : null,
-      assigned_at: r.assigned_at ? String(r.assigned_at) : null,
-      status,
-      product: r.product != null ? String(r.product) : null,
-      memo: String(r.memo ?? ""),
-      comments: mapComments(r.comments),
-      created_at: String(r.created_at ?? ""),
-      updated_at: String(r.updated_at ?? ""),
-      stays,
-    };
+    return mapCustomerRow(r, stays, staffById);
   });
+
+  items = await attachTm001AssigneeHistories(items, staffById);
 
   const q = String(opts?.q ?? "").trim().toLowerCase();
   const region = String(opts?.region ?? "").trim();
@@ -171,6 +301,15 @@ export async function listTm001Customers(opts?: {
   }
 
   return { items, regions: Array.from(regionSet).sort((a, b) => a.localeCompare(b, "ko")) };
+}
+
+export function isTm001CustomerVisible(
+  customer: { assignee_id?: string | null },
+  scoped: string[] | "all"
+): boolean {
+  if (scoped === "all") return true;
+  const aid = customer.assignee_id ? String(customer.assignee_id) : "";
+  return Boolean(aid && scoped.includes(aid));
 }
 
 function mergeDuplicateMemo(memo: string, currentBatch: string, otherBatches: string[]): string {
@@ -384,7 +523,8 @@ export async function patchTm001Customer(
     comment_append?: string;
     comment_by?: string;
     assignee_id?: string | null;
-  }
+  },
+  session: SessionUser
 ): Promise<Tm001Customer> {
   const supabase = getSupabaseAdmin();
   const { data: current, error: findErr } = await supabase.from("tm001_customers").select("*").eq("id", id).maybeSingle();
@@ -392,18 +532,27 @@ export async function patchTm001Customer(
   if (!current) throw new Error("고객을 찾을 수 없습니다.");
 
   const next: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  let nextMemo = String(current.memo ?? "");
 
   if (patch.status != null) {
     if (!isTm001Status(patch.status)) throw new Error("허용되지 않은 상담상태입니다.");
+    const prevStatus = String(current.status ?? "");
     next.status = patch.status;
     if (patch.status !== "계약완료") next.product = null;
+    if (patch.status !== prevStatus) {
+      nextMemo = appendStatusMemo(nextMemo, patch.status);
+      next.memo = nextMemo;
+    }
   }
   if (patch.product !== undefined) {
     if (patch.product == null || patch.product === "") next.product = null;
     else if (!isTm001Product(patch.product)) throw new Error("허용되지 않은 상품입니다.");
     else next.product = patch.product;
   }
-  if (patch.memo !== undefined) next.memo = String(patch.memo ?? "");
+  // 상담상태와 함께 온 메모는 후보자 DB와 같이 상태 자동기록을 유지 (명시 memo만 별도 저장)
+  if (patch.memo !== undefined && patch.status == null) {
+    next.memo = String(patch.memo ?? "");
+  }
   if (patch.comment_append != null && String(patch.comment_append).trim()) {
     const comments = mapComments(current.comments);
     comments.push({
@@ -414,41 +563,124 @@ export async function patchTm001Customer(
     });
     next.comments = comments;
   }
+
+  const curAssignee = current.assignee_id ? String(current.assignee_id) : null;
   if (patch.assignee_id !== undefined) {
-    next.assignee_id = patch.assignee_id;
-    next.assigned_at = patch.assignee_id ? new Date().toISOString() : null;
+    if (!canChangeAssignee(session)) {
+      throw new Error("담당자를 변경할 권한이 없습니다.");
+    }
+    const nextAssignee = patch.assignee_id ? String(patch.assignee_id) : null;
+    if (nextAssignee !== curAssignee) {
+      const nowIso = new Date().toISOString();
+      next.assignee_id = nextAssignee;
+      next.assigned_at = nextAssignee ? nowIso : null;
+      const { error: logErr } = await supabase.from("tm001_assignment_logs").insert({
+        customer_id: id,
+        from_assignee_id: curAssignee,
+        to_assignee_id: nextAssignee,
+        assigned_at: nowIso,
+        changed_by: session.userId || null,
+        changed_by_name: session.name,
+        reason: "manual",
+      });
+      if (logErr) throw new Error(logErr.message);
+    }
   }
 
   const { error: updErr } = await supabase.from("tm001_customers").update(next).eq("id", id);
   if (updErr) throw new Error(updErr.message);
 
-  const { items } = await listTm001Customers();
-  const found = items.find((c) => c.id === id);
+  const found = await getTm001CustomerById(id, { includeStays: false, includeHistory: true });
   if (!found) throw new Error("저장 후 조회에 실패했습니다.");
   return found;
 }
 
 export async function bulkAssignTm001(
   ids: string[],
-  assigneeId: string | null
+  assigneeId: string | null,
+  session: SessionUser
 ): Promise<{ updated: number }> {
+  if (!canChangeAssignee(session)) {
+    throw new Error("담당자를 변경할 권한이 없습니다.");
+  }
   const supabase = getSupabaseAdmin();
   const unique = Array.from(new Set(ids.filter(Boolean)));
   if (!unique.length) return { updated: 0 };
-  const patch = {
-    assignee_id: assigneeId,
-    assigned_at: assigneeId ? new Date().toISOString() : null,
-    updated_at: new Date().toISOString(),
-  };
+  const nextAssignee = assigneeId ? String(assigneeId) : null;
+  const nowIso = new Date().toISOString();
   const IN_CHUNK = 100;
   let updated = 0;
+
   for (let i = 0; i < unique.length; i += IN_CHUNK) {
     const chunk = unique.slice(i, i + IN_CHUNK);
-    const { error, count } = await supabase.from("tm001_customers").update(patch).in("id", chunk);
+    const { data: rows, error: loadErr } = await supabase
+      .from("tm001_customers")
+      .select("id, assignee_id")
+      .in("id", chunk);
+    if (loadErr) throw new Error(loadErr.message);
+
+    const toUpdate: string[] = [];
+    const logs: Array<Record<string, unknown>> = [];
+    for (const row of rows ?? []) {
+      const id = String(row.id);
+      const from = row.assignee_id ? String(row.assignee_id) : null;
+      if (from === nextAssignee) continue;
+      toUpdate.push(id);
+      logs.push({
+        customer_id: id,
+        from_assignee_id: from,
+        to_assignee_id: nextAssignee,
+        assigned_at: nowIso,
+        changed_by: session.userId || null,
+        changed_by_name: session.name,
+        reason: "manual",
+      });
+    }
+    if (!toUpdate.length) continue;
+
+    if (logs.length) {
+      const { error: logErr } = await supabase.from("tm001_assignment_logs").insert(logs);
+      if (logErr) throw new Error(logErr.message);
+    }
+
+    const { error, count } = await supabase
+      .from("tm001_customers")
+      .update({
+        assignee_id: nextAssignee,
+        assigned_at: nextAssignee ? nowIso : null,
+        updated_at: nowIso,
+      })
+      .in("id", toUpdate);
     if (error) throw new Error(error.message);
-    updated += count ?? chunk.length;
+    updated += count ?? toUpdate.length;
   }
   return { updated };
+}
+
+/** 관리자 전용 — 선택 고객 삭제 (숙박·배정이력 CASCADE) */
+export async function deleteTm001Customers(
+  ids: string[],
+  session: SessionUser
+): Promise<{ deleted: number }> {
+  if (session.rank !== "admin") {
+    throw new Error("관리자만 삭제할 수 있습니다.");
+  }
+  const unique = Array.from(new Set(ids.filter(Boolean)));
+  if (!unique.length) return { deleted: 0 };
+  if (unique.length > 200) {
+    throw new Error("한 번에 200건까지 삭제할 수 있습니다.");
+  }
+
+  const supabase = getSupabaseAdmin();
+  const IN_CHUNK = 100;
+  let deleted = 0;
+  for (let i = 0; i < unique.length; i += IN_CHUNK) {
+    const chunk = unique.slice(i, i + IN_CHUNK);
+    const { error, count } = await supabase.from("tm001_customers").delete().in("id", chunk);
+    if (error) throw new Error(error.message);
+    deleted += count ?? chunk.length;
+  }
+  return { deleted };
 }
 
 export type { Tm001Status };

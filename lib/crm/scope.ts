@@ -86,6 +86,7 @@ export function canAccessAdminPath(rank: SessionUser["rank"], pathname: string):
       ? [
           "/admin/consumers",
           "/admin/candidates",
+          "/admin/tm001",
           "/admin/reassign",
           "/admin/calendar",
           "/admin/resources",
@@ -95,6 +96,7 @@ export function canAccessAdminPath(rank: SessionUser["rank"], pathname: string):
       : [
           "/admin/consumers",
           "/admin/candidates",
+          "/admin/tm001",
           "/admin/calendar",
           "/admin/resources",
           "/admin/password",
