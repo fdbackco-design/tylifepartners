@@ -246,8 +246,8 @@ export function parseMetaLeadCsv(buffer: Buffer): MetaLeadCsvParseResult {
     const metaLeadId = stripMetaPrefix(get(col.id));
     if (!metaLeadId && !name && !phone) continue;
 
-    if (!name || name.length < 2) {
-      issues.push({ rowNumber, message: "이름이 없거나 너무 짧습니다.", rawName, rawPhone });
+    if (!name) {
+      issues.push({ rowNumber, message: "이름이 없습니다.", rawName, rawPhone });
       continue;
     }
     if (phone.length < 10 || phone.length > 11) {
