@@ -218,40 +218,73 @@ export async function listTm001Customers(opts?: {
   status?: string;
   /** admin=all, 그 외 본인+산하 id */
   visibleAssigneeIds?: string[] | "all";
-}): Promise<{ items: Tm001Customer[]; regions: string[] }> {
-  const supabase = getSupabaseAdmin();
+  limit?: number;
+  offset?: number;
+  includeHistory?: boolean;
+  /** false면 숙박 총건 재집계 생략(페이지 이동 시) */
+  includeStayTotal?: boolean;
+  /** false면 지역 목록 생략(페이지 이동 시) */
+  includeRegions?: boolean;
+}): Promise<{ items: Tm001Customer[]; regions: string[]; total: number; stayTotal: number }> {
   const scoped = opts?.visibleAssigneeIds ?? "all";
-  // PostgREST 기본 max 1000행 — 전체 고객을 range로 수집
-  const PAGE = 1000;
-  const custRows: Record<string, unknown>[] = [];
-  for (let offset = 0; ; offset += PAGE) {
-    let query = supabase
-      .from("tm001_customers")
-      .select("*")
-      .eq("partner_code", TM001_PARTNER_CODE)
-      .order("updated_at", { ascending: false })
-      .range(offset, offset + PAGE - 1);
-    if (scoped !== "all") {
-      if (!scoped.length) break;
-      query = query.in("assignee_id", scoped);
-    }
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    const chunk = (data ?? []) as Record<string, unknown>[];
-    custRows.push(...chunk);
-    if (chunk.length < PAGE) break;
+  const limit = Math.min(Math.max(Number(opts?.limit) || 20, 1), 100);
+  const offset = Math.max(Number(opts?.offset) || 0, 0);
+  const q = String(opts?.q ?? "").trim();
+  const region = String(opts?.region ?? "").trim();
+  const status = String(opts?.status ?? "").trim();
+  const includeStayTotal = opts?.includeStayTotal !== false;
+  const includeRegions = opts?.includeRegions !== false;
+
+  if (scoped !== "all" && !scoped.length) {
+    return { items: [], regions: [], total: 0, stayTotal: 0 };
   }
 
+  const viaRpc = await listTm001CustomersViaRpc({
+    q,
+    region,
+    status,
+    scoped,
+    limit,
+    offset,
+    includeStayTotal,
+    includeRegions,
+    includeHistory: Boolean(opts?.includeHistory),
+  });
+  if (viaRpc) return viaRpc;
+
+  return listTm001CustomersFallback({
+    q,
+    region,
+    status,
+    scoped,
+    limit,
+    offset,
+    includeStayTotal,
+    includeRegions,
+    includeHistory: Boolean(opts?.includeHistory),
+  });
+}
+
+function escapeIlike(raw: string): string {
+  return raw.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+async function hydrateTm001Page(opts: {
+  custRows: Record<string, unknown>[];
+  includeHistory: boolean;
+}): Promise<Tm001Customer[]> {
+  const supabase = getSupabaseAdmin();
+  const custRows = opts.custRows;
   const ids = custRows.map((r) => String(r.id));
   const staysByCustomer = new Map<string, Tm001Stay[]>();
-  // PostgREST URL 길이 제한 — UUID 대량 .in() 시 Bad Request 방지
-  const IN_CHUNK = 100;
-  for (let i = 0; i < ids.length; i += IN_CHUNK) {
-    const chunk = ids.slice(i, i + IN_CHUNK);
+
+  if (ids.length) {
     const { data: stayRows, error: stayErr } = await supabase
       .from("tm001_stays")
-      .select("*")
-      .in("customer_id", chunk)
+      .select(
+        "id, customer_id, batch_id, hotel_name, region, detail, stay_type, room, raw_room, raw_room_type, url, site_name, confidence, needs_review, sort_order, created_at"
+      )
+      .in("customer_id", ids)
       .order("sort_order", { ascending: true });
     if (stayErr) throw new Error(stayErr.message);
     for (const s of stayRows ?? []) {
@@ -266,41 +299,299 @@ export async function listTm001Customers(opts?: {
     new Set(custRows.map((r) => r.assignee_id).filter(Boolean).map(String))
   );
   const staffById = new Map<string, StaffLite>();
-  for (let i = 0; i < assigneeIds.length; i += IN_CHUNK) {
-    const chunk = assigneeIds.slice(i, i + IN_CHUNK);
-    const { data: staff } = await supabase.from("staff_users").select("id, name").in("id", chunk);
+  if (assigneeIds.length) {
+    const { data: staff } = await supabase.from("staff_users").select("id, name").in("id", assigneeIds);
     for (const s of staff ?? []) staffById.set(String(s.id), { id: String(s.id), name: String(s.name) });
   }
 
-  const regionSet = new Set<string>();
-  let items: Tm001Customer[] = custRows.map((r) => {
-    const stays = staysByCustomer.get(String(r.id)) ?? [];
-    for (const s of stays) if (s.region) regionSet.add(s.region);
-    return mapCustomerRow(r, stays, staffById);
+  let items: Tm001Customer[] = custRows.map((r) =>
+    mapCustomerRow(r, staysByCustomer.get(String(r.id)) ?? [], staffById)
+  );
+
+  if (opts.includeHistory) {
+    items = await attachTm001AssigneeHistories(items, staffById);
+  } else {
+    items = items.map((c) => (c.assignee_name ? { ...c, assignee_history: [c.assignee_name] } : c));
+  }
+  return items;
+}
+
+async function listTm001CustomersViaRpc(opts: {
+  q: string;
+  region: string;
+  status: string;
+  scoped: string[] | "all";
+  limit: number;
+  offset: number;
+  includeStayTotal: boolean;
+  includeRegions: boolean;
+  includeHistory: boolean;
+}): Promise<{ items: Tm001Customer[]; regions: string[]; total: number; stayTotal: number } | null> {
+  const supabase = getSupabaseAdmin();
+  const regionsPromise = opts.includeRegions ? listTm001Regions() : Promise.resolve([] as string[]);
+
+  const { data, error } = await supabase.rpc("tm001_list_customers", {
+    p_partner_code: TM001_PARTNER_CODE,
+    p_q: opts.q || null,
+    p_region: opts.region || null,
+    p_status: opts.status || null,
+    p_assignee_ids: opts.scoped === "all" ? null : opts.scoped,
+    p_limit: opts.limit,
+    p_offset: opts.offset,
+    p_include_stay_total: opts.includeStayTotal,
   });
 
-  items = await attachTm001AssigneeHistories(items, staffById);
+  if (error) {
+    if (/tm001_list_customers|schema cache|does not exist|function/i.test(error.message)) {
+      return null;
+    }
+    throw new Error(error.message);
+  }
 
-  const q = String(opts?.q ?? "").trim().toLowerCase();
-  const region = String(opts?.region ?? "").trim();
-  const status = String(opts?.status ?? "").trim();
+  const payload = (data ?? {}) as {
+    total?: number;
+    stay_total?: number;
+    items?: Record<string, unknown>[];
+  };
+  const custRows = Array.isArray(payload.items) ? payload.items : [];
+  const [items, regions] = await Promise.all([
+    hydrateTm001Page({ custRows, includeHistory: opts.includeHistory }),
+    regionsPromise,
+  ]);
+
+  return {
+    items,
+    regions,
+    total: Number(payload.total ?? 0),
+    stayTotal: opts.includeStayTotal ? Number(payload.stay_total ?? 0) : -1,
+  };
+}
+
+/** RPC 미적용 환경용 — 전표 스캔/대량 id 재조회 없이 서버 페이징 */
+async function listTm001CustomersFallback(opts: {
+  q: string;
+  region: string;
+  status: string;
+  scoped: string[] | "all";
+  limit: number;
+  offset: number;
+  includeStayTotal: boolean;
+  includeRegions: boolean;
+  includeHistory: boolean;
+}): Promise<{ items: Tm001Customer[]; regions: string[]; total: number; stayTotal: number }> {
+  const supabase = getSupabaseAdmin();
+  const { q, region, status, scoped, limit, offset } = opts;
+  const CUSTOMER_COLS =
+    "id, partner_code, partner_name, batch_code, name, phone, normalized_phone, raw_phone, visit_count, assignee_id, assigned_at, status, product, memo, comments, created_at, updated_at";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyBase = (query: any, withStaysInner: boolean) => {
+    let next = query.eq("partner_code", TM001_PARTNER_CODE);
+    if (scoped !== "all") next = next.in("assignee_id", scoped);
+    if (status) next = next.eq("status", status);
+    if (region) {
+      if (withStaysInner) next = next.eq("tm001_stays.region", region);
+      else next = next.eq("stays.region", region);
+    }
+    return next;
+  };
+
+  let total = 0;
+  let stayTotal = -1;
+  let custRows: Record<string, unknown>[] = [];
 
   if (q) {
-    items = items.filter((c) => {
-      const hay = [c.name, c.phone, c.normalized_phone, c.partner_name, c.batch_code, ...c.stays.flatMap((s) => [s.hotel_name, s.region, s.detail, s.room])]
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q);
+    const pattern = `%${escapeIlike(q)}%`;
+    const orFilter = `name.ilike."${pattern}",phone.ilike."${pattern}",normalized_phone.ilike."${pattern}"`;
+    // 고객 필드 검색(페이징) + 숙소명 검색(상위 매칭 id)을 병렬로
+    let nameCountQ = supabase
+      .from("tm001_customers")
+      .select("id", { count: "exact", head: true })
+      .eq("partner_code", TM001_PARTNER_CODE)
+      .or(orFilter);
+    if (scoped !== "all") nameCountQ = nameCountQ.in("assignee_id", scoped);
+    if (status) nameCountQ = nameCountQ.eq("status", status);
+
+    let nameListQ = supabase
+      .from("tm001_customers")
+      .select(CUSTOMER_COLS)
+      .eq("partner_code", TM001_PARTNER_CODE)
+      .or(orFilter)
+      .order("updated_at", { ascending: false })
+      .range(0, Math.max(offset + limit - 1, limit - 1));
+    if (scoped !== "all") nameListQ = nameListQ.in("assignee_id", scoped);
+    if (status) nameListQ = nameListQ.eq("status", status);
+
+    const hotelQ = supabase
+      .from("tm001_stays")
+      .select("customer_id")
+      .ilike("hotel_name", pattern)
+      .limit(300);
+
+    const [nameCountRes, nameListRes, hotelRes] = await Promise.all([nameCountQ, nameListQ, hotelQ]);
+    if (nameCountRes.error) throw new Error(nameCountRes.error.message);
+    if (nameListRes.error) throw new Error(nameListRes.error.message);
+    if (hotelRes.error) throw new Error(hotelRes.error.message);
+
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const row of (nameListRes.data ?? []) as Record<string, unknown>[]) {
+      byId.set(String(row.id), row);
+    }
+
+    const hotelIds = Array.from(
+      new Set((hotelRes.data ?? []).map((r) => String(r.customer_id)).filter(Boolean))
+    ).filter((id) => !byId.has(id));
+
+    if (hotelIds.length) {
+      for (let i = 0; i < hotelIds.length; i += 100) {
+        const chunk = hotelIds.slice(i, i + 100);
+        let hq = supabase
+          .from("tm001_customers")
+          .select(CUSTOMER_COLS)
+          .eq("partner_code", TM001_PARTNER_CODE)
+          .in("id", chunk);
+        if (scoped !== "all") hq = hq.in("assignee_id", scoped);
+        if (status) hq = hq.eq("status", status);
+        const { data, error } = await hq;
+        if (error) throw new Error(error.message);
+        for (const row of (data ?? []) as Record<string, unknown>[]) {
+          byId.set(String(row.id), row);
+        }
+      }
+    }
+
+    let merged = Array.from(byId.values());
+    if (region) {
+      const regionOk = new Set<string>();
+      const { data: regionHits, error: regionErr } = await supabase
+        .from("tm001_stays")
+        .select("customer_id")
+        .eq("region", region)
+        .in(
+          "customer_id",
+          merged.map((r) => String(r.id)).slice(0, 200)
+        );
+      if (regionErr) throw new Error(regionErr.message);
+      for (const r of regionHits ?? []) if (r.customer_id) regionOk.add(String(r.customer_id));
+      // merged가 200 넘으면 추가 청크
+      if (merged.length > 200) {
+        for (let i = 200; i < merged.length; i += 100) {
+          const chunk = merged.slice(i, i + 100).map((r) => String(r.id));
+          const { data, error } = await supabase
+            .from("tm001_stays")
+            .select("customer_id")
+            .eq("region", region)
+            .in("customer_id", chunk);
+          if (error) throw new Error(error.message);
+          for (const r of data ?? []) if (r.customer_id) regionOk.add(String(r.customer_id));
+        }
+      }
+      merged = merged.filter((r) => regionOk.has(String(r.id)));
+    }
+
+    merged.sort((a, b) => String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? "")));
+    const hotelOnlyApprox = hotelIds.length;
+    total = region ? merged.length : (nameCountRes.count ?? 0) + hotelOnlyApprox;
+    custRows = merged.slice(offset, offset + limit);
+    if (opts.includeStayTotal) {
+      stayTotal = merged.reduce((n, r) => n + Number(r.visit_count ?? 0), 0);
+    }
+  } else if (region) {
+    // inner join으로 지역 필터 + 서버 페이징
+    const selectWithInner = `${CUSTOMER_COLS}, tm001_stays!inner(id)`;
+    let countQ = supabase
+      .from("tm001_customers")
+      .select("id, tm001_stays!inner(id)", { count: "exact", head: true });
+    countQ = applyBase(countQ, true);
+
+    let listQ = supabase
+      .from("tm001_customers")
+      .select(selectWithInner)
+      .order("updated_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+    listQ = applyBase(listQ, true);
+
+    const [countRes, listRes] = await Promise.all([countQ, listQ]);
+    if (countRes.error) throw new Error(countRes.error.message);
+    if (listRes.error) throw new Error(listRes.error.message);
+    total = countRes.count ?? 0;
+    custRows = ((listRes.data ?? []) as Record<string, unknown>[]).map((row) => {
+      const { tm001_stays: _s, ...rest } = row as Record<string, unknown> & { tm001_stays?: unknown };
+      return rest;
     });
-  }
-  if (region) {
-    items = items.filter((c) => c.stays.some((s) => s.region === region));
-  }
-  if (status) {
-    items = items.filter((c) => c.status === status);
+    if (opts.includeStayTotal) {
+      stayTotal = custRows.reduce((n, r) => n + Number(r.visit_count ?? 0), 0);
+    }
+  } else {
+    let countQ = supabase
+      .from("tm001_customers")
+      .select("id", { count: "exact", head: true })
+      .eq("partner_code", TM001_PARTNER_CODE);
+    if (scoped !== "all") countQ = countQ.in("assignee_id", scoped);
+    if (status) countQ = countQ.eq("status", status);
+
+    let listQ = supabase
+      .from("tm001_customers")
+      .select(CUSTOMER_COLS)
+      .eq("partner_code", TM001_PARTNER_CODE)
+      .order("updated_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (scoped !== "all") listQ = listQ.in("assignee_id", scoped);
+    if (status) listQ = listQ.eq("status", status);
+
+    const [countRes, listRes, stayCountRes] = await Promise.all([
+      countQ,
+      listQ,
+      opts.includeStayTotal && !status && scoped === "all"
+        ? supabase.from("tm001_stays").select("id", { count: "exact", head: true })
+        : Promise.resolve({ count: null as number | null, error: null }),
+    ]);
+    if (countRes.error) throw new Error(countRes.error.message);
+    if (listRes.error) throw new Error(listRes.error.message);
+    total = countRes.count ?? 0;
+    custRows = (listRes.data ?? []) as Record<string, unknown>[];
+    if (opts.includeStayTotal) {
+      if (!stayCountRes.error && stayCountRes.count != null) stayTotal = stayCountRes.count;
+      else stayTotal = custRows.reduce((n, r) => n + Number(r.visit_count ?? 0), 0);
+    }
   }
 
-  return { items, regions: Array.from(regionSet).sort((a, b) => a.localeCompare(b, "ko")) };
+  const [items, regions] = await Promise.all([
+    hydrateTm001Page({ custRows, includeHistory: opts.includeHistory }),
+    opts.includeRegions ? listTm001Regions() : Promise.resolve([] as string[]),
+  ]);
+
+  return { items, regions, total, stayTotal };
+}
+
+async function listTm001Regions(): Promise<string[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.rpc("tm001_list_regions");
+  if (!error && Array.isArray(data)) {
+    return (data as string[]).map((r) => String(r).trim()).filter(Boolean);
+  }
+
+  // RPC 없을 때: 페이지 스캔 대신 상한만 (드롭다운용)
+  const set = new Set<string>();
+  const PAGE = 1000;
+  for (let off = 0; off < 5000; off += PAGE) {
+    const { data: rows, error: scanErr } = await supabase
+      .from("tm001_stays")
+      .select("region")
+      .neq("region", "")
+      .range(off, off + PAGE - 1);
+    if (scanErr) {
+      console.warn("listTm001Regions:", scanErr.message);
+      break;
+    }
+    const chunk = rows ?? [];
+    for (const r of chunk) {
+      const v = String(r.region || "").trim();
+      if (v) set.add(v);
+    }
+    if (chunk.length < PAGE) break;
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
 }
 
 export function isTm001CustomerVisible(

@@ -623,10 +623,6 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
         />
         {msg ? <CrmAlert tone="success">{msg}</CrmAlert> : null}
         {error ? <CrmAlert tone="danger">{error}</CrmAlert> : null}
-        <CrmAlert tone="info">
-          템플릿 에디터 대신 목록의 <strong>ZIP 재배포</strong>로 소스를 갱신하세요. 스크롤 히트맵은 페이지의
-          섹션 마커를 자동 측정합니다. 상담 신청폼 필드 설정은 아래에서 변경할 수 있습니다.
-        </CrmAlert>
         <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
           <CrmBadge>{item.published ? "공개" : "비공개"}</CrmBadge>
           <CrmBadge>코드 ZIP</CrmBadge>
