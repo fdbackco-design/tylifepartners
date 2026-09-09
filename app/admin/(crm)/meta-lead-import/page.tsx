@@ -119,7 +119,7 @@ export default function MetaLeadImportPage() {
     <div>
       <CrmPageHeader
         title="Meta Lead CSV → 후보자 DB"
-        description="Meta Ads Manager에서 받은 Lead CSV(utf-16/탭 구분 포함)를 후보자 DB에 올립니다. 웹훅 자동화 전 수동 반영용입니다."
+        description="Meta Ads Manager Lead CSV(UTF-16 탭 / UTF-8·CP949 콤마)를 후보자 DB에 올립니다. 웹훅 누락분 수동 반영용입니다."
       />
 
       <div className="crm-toolbar" style={{ marginTop: 16 }}>
