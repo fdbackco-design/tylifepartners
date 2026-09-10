@@ -102,7 +102,7 @@ export default function DashboardPage() {
   );
 
   return (
-    <div>
+    <div className="crm-dash-page">
       <h1 className="crm-page-title">대시보드</h1>
       <p className="crm-page-desc">영업자별 1차컨택률을 일자 구간으로 조회합니다.</p>
       <div className="crm-toolbar">
@@ -190,24 +190,20 @@ export default function DashboardPage() {
                   <thead>
                     <tr>
                       <th scope="col">영업자</th>
-                      <th scope="col" className="crm-dash-num">
-                        완료/전체
-                      </th>
-                      <th scope="col" className="crm-dash-num">
-                        미완료
+                      <th scope="col" className="crm-dash-progress-col">
+                        Progress
                       </th>
                       <th scope="col" className="crm-dash-num">
                         완료율
                       </th>
-                      <th scope="col" className="crm-dash-progress-col">
-                        Progress
+                      <th scope="col" className="crm-dash-num">
+                        완료/전체
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {chartRows.map((r) => {
                       const rate = r.first_contact_rate ?? 0;
-                      const pending = Math.max(0, r.assigned - r.first_contact);
                       const tone = rateTone(r.first_contact_rate);
                       const badge = toneLabel(tone);
                       return (
@@ -218,15 +214,6 @@ export default function DashboardPage() {
                               {r.rank === "manager" ? <span className="crm-dash-rank-tag">매니저</span> : null}
                               {badge ? <span className={`crm-dash-tone-tag crm-dash-tone-tag-${tone}`}>{badge}</span> : null}
                             </span>
-                          </td>
-                          <td className="crm-dash-num">
-                            {r.first_contact.toLocaleString()}/{r.assigned.toLocaleString()}
-                          </td>
-                          <td className={`crm-dash-num${pending > 0 ? " crm-dash-pending" : ""}`}>
-                            {pending.toLocaleString()}
-                          </td>
-                          <td className={`crm-dash-num crm-dash-rate crm-dash-rate-${tone}`}>
-                            {r.first_contact_rate == null ? "-" : `${rate}%`}
                           </td>
                           <td className="crm-dash-progress-col">
                             <div
@@ -242,6 +229,12 @@ export default function DashboardPage() {
                                 style={{ width: `${Math.min(100, Math.max(0, rate))}%` }}
                               />
                             </div>
+                          </td>
+                          <td className={`crm-dash-num crm-dash-rate crm-dash-rate-${tone}`}>
+                            {r.first_contact_rate == null ? "-" : `${rate}%`}
+                          </td>
+                          <td className="crm-dash-num">
+                            {r.first_contact.toLocaleString()}/{r.assigned.toLocaleString()}
                           </td>
                         </tr>
                       );

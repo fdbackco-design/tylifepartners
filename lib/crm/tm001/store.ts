@@ -277,21 +277,32 @@ async function hydrateTm001Page(opts: {
   const custRows = opts.custRows;
   const ids = custRows.map((r) => String(r.id));
   const staysByCustomer = new Map<string, Tm001Stay[]>();
+  const IN_CHUNK = 80;
 
   if (ids.length) {
-    const { data: stayRows, error: stayErr } = await supabase
-      .from("tm001_stays")
-      .select(
-        "id, customer_id, batch_id, hotel_name, region, detail, stay_type, room, raw_room, raw_room_type, url, site_name, confidence, needs_review, sort_order, created_at"
-      )
-      .in("customer_id", ids)
-      .order("sort_order", { ascending: true });
-    if (stayErr) throw new Error(stayErr.message);
-    for (const s of stayRows ?? []) {
-      const stay = mapStay(s as Record<string, unknown>);
-      const list = staysByCustomer.get(stay.customer_id) ?? [];
-      list.push(stay);
-      staysByCustomer.set(stay.customer_id, list);
+    for (let i = 0; i < ids.length; i += IN_CHUNK) {
+      const chunk = ids.slice(i, i + IN_CHUNK);
+      // 고객당 숙박이 여러 건일 수 있어 청크 내에서도 range 페이징
+      const PAGE = 1000;
+      for (let off = 0; ; off += PAGE) {
+        const { data: stayRows, error: stayErr } = await supabase
+          .from("tm001_stays")
+          .select(
+            "id, customer_id, batch_id, hotel_name, region, detail, stay_type, room, raw_room, raw_room_type, url, site_name, confidence, needs_review, sort_order, created_at"
+          )
+          .in("customer_id", chunk)
+          .order("sort_order", { ascending: true })
+          .range(off, off + PAGE - 1);
+        if (stayErr) throw new Error(stayErr.message);
+        const rows = stayRows ?? [];
+        for (const s of rows) {
+          const stay = mapStay(s as Record<string, unknown>);
+          const list = staysByCustomer.get(stay.customer_id) ?? [];
+          list.push(stay);
+          staysByCustomer.set(stay.customer_id, list);
+        }
+        if (rows.length < PAGE) break;
+      }
     }
   }
 
@@ -300,8 +311,11 @@ async function hydrateTm001Page(opts: {
   );
   const staffById = new Map<string, StaffLite>();
   if (assigneeIds.length) {
-    const { data: staff } = await supabase.from("staff_users").select("id, name").in("id", assigneeIds);
-    for (const s of staff ?? []) staffById.set(String(s.id), { id: String(s.id), name: String(s.name) });
+    for (let i = 0; i < assigneeIds.length; i += IN_CHUNK) {
+      const chunk = assigneeIds.slice(i, i + IN_CHUNK);
+      const { data: staff } = await supabase.from("staff_users").select("id, name").in("id", chunk);
+      for (const s of staff ?? []) staffById.set(String(s.id), { id: String(s.id), name: String(s.name) });
+    }
   }
 
   let items: Tm001Customer[] = custRows.map((r) =>
