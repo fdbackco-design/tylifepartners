@@ -197,7 +197,7 @@ export default function DashboardPage() {
                         완료율
                       </th>
                       <th scope="col" className="crm-dash-num">
-                        완료/전체
+                        컨택완료/전체
                       </th>
                     </tr>
                   </thead>
@@ -211,7 +211,6 @@ export default function DashboardPage() {
                           <td>
                             <span className="crm-dash-bar-name">
                               {r.staff_name}
-                              {r.rank === "manager" ? <span className="crm-dash-rank-tag">매니저</span> : null}
                               {badge ? <span className={`crm-dash-tone-tag crm-dash-tone-tag-${tone}`}>{badge}</span> : null}
                             </span>
                           </td>
