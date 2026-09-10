@@ -841,7 +841,7 @@ export default function Tm001PageClient() {
                     <col style={{ width: 127 }} />
                     <col style={{ width: 103 }} />
                     <col style={{ width: 139 }} />
-                    <col style={{ width: 151 }} />
+                    <col className="status-col" style={{ width: 188 }} />
                     <col style={{ width: 160 }} />
                     <col style={{ width: 160 }} />
                   </colgroup>
@@ -884,7 +884,7 @@ export default function Tm001PageClient() {
                       <th rowSpan={2} scope="col">
                         관리자상태
                       </th>
-                      <th rowSpan={2} scope="col">
+                      <th rowSpan={2} scope="col" className="status-col">
                         상담상태
                       </th>
                       <th rowSpan={2} scope="col" className="memo-col">
@@ -908,6 +908,7 @@ export default function Tm001PageClient() {
                         <tr
                           key={c.id}
                           data-tm001-id={c.id}
+                          data-row-status={c.status}
                           className={`contact-row${unassigned ? " unassigned" : ""}${saving ? " is-saving" : ""}${selected.has(c.id) ? " selected" : ""}`}
                         >
                           <td className="check-cell pin-check">
@@ -921,7 +922,6 @@ export default function Tm001PageClient() {
                           </td>
                           <td className="pin-partner">
                             <strong className="partner-name">{c.partner_name}</strong>
-                            <span className="code-badge">코드 {c.partner_code}</span>
                           </td>
                           <td className="pin-batch">
                             <span className="batch-badge">{c.batch_code}</span>
@@ -934,9 +934,6 @@ export default function Tm001PageClient() {
                                 복사
                               </button>
                             </div>
-                            <span className={`merge-badge${c.stays.length <= 1 ? " simple" : ""}`}>
-                              {c.stays.length > 1 ? `숙박 내역 ${c.stays.length}건 통합` : `숙박 내역 ${c.stays.length}건`}
-                            </span>
                             {c.memo?.startsWith("[중복]") ? (
                               <span className="merge-badge" style={{ color: "var(--amber)", marginTop: 6 }}>
                                 다른 차수 중복
@@ -972,7 +969,7 @@ export default function Tm001PageClient() {
                               {unassigned ? "담당자 지정 필요" : "배정완료"}
                             </span>
                           </td>
-                          <td>
+                          <td className="status-col">
                             <div className={`status-cell${saving ? " is-saving" : ""}`}>
                               <select
                                 className="status-select"
@@ -995,7 +992,7 @@ export default function Tm001PageClient() {
                               </select>
                               {isTm001ScheduledStatus(c.status) ? (
                                 <input
-                                  className="status-select"
+                                  className="status-meeting"
                                   type="datetime-local"
                                   step={60}
                                   value={toKstMinuteLocalInput(c.meeting_at)}
@@ -1006,13 +1003,11 @@ export default function Tm001PageClient() {
                                     })
                                   }
                                   aria-label={`${c.name} 재콜 일정`}
-                                  style={{ marginTop: 6, display: "block", minWidth: 180 }}
                                 />
                               ) : null}
                               {c.status === "계약완료" ? (
                                 <select
                                   className="status-select"
-                                  style={{ marginTop: 6 }}
                                   value={c.product ?? ""}
                                   disabled={saving}
                                   onChange={(e) => void patchCustomer(c.id, { product: e.target.value || null })}
@@ -1078,6 +1073,7 @@ export default function Tm001PageClient() {
                   <article
                     key={`m-${c.id}`}
                     data-tm001-id={c.id}
+                    data-row-status={c.status}
                     className={`mobile-card${saving ? " is-saving" : ""}${selected.has(c.id) ? " selected" : ""}`}
                   >
                     <div className="m-head">
@@ -1091,9 +1087,6 @@ export default function Tm001PageClient() {
                               복사
                             </button>
                           </div>
-                          <span className={`merge-badge${c.stays.length <= 1 ? " simple" : ""}`}>
-                            숙박 내역 {c.stays.length}건{c.stays.length > 1 ? " 통합" : ""}
-                          </span>
                         </div>
                       </div>
                       <div>
@@ -1137,7 +1130,7 @@ export default function Tm001PageClient() {
                         </select>
                         {isTm001ScheduledStatus(c.status) ? (
                           <input
-                            className="status-select"
+                            className="status-meeting"
                             type="datetime-local"
                             step={60}
                             value={toKstMinuteLocalInput(c.meeting_at)}
@@ -1148,7 +1141,7 @@ export default function Tm001PageClient() {
                               })
                             }
                             aria-label={`${c.name} 재콜 일정`}
-                            style={{ marginTop: 6, display: "block", width: "100%" }}
+                            style={{ marginTop: 6 }}
                           />
                         ) : null}
                       </div>
