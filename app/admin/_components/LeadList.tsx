@@ -244,8 +244,11 @@ export default function LeadList({
   const pendingOpenCommentIdRef = useRef<string | null>(
     takePendingOpenComment() ?? searchParams.get("open_comment")
   );
+  const pendingOpenIdRef = useRef<string | null>(searchParams.get("open_id"));
+  const urlSearchOverrideRef = useRef<string | null>(null);
   const openCommentDeepLinkHandledIdRef = useRef<string | null>(null);
   const openCommentHandlerRef = useRef<(row: LeadRow) => Promise<void>>(async () => {});
+  const openMemoHandlerRef = useRef<(row: LeadRow) => Promise<void>>(async () => {});
 
   const queueOpenCommentDeepLink = useCallback((leadId: string | null | undefined, force = false) => {
     const id = String(leadId ?? "").trim();
@@ -277,8 +280,12 @@ export default function LeadList({
 
   // Sync filters to URL
   useEffect(() => {
+    if (urlSearchOverrideRef.current && search === urlSearchOverrideRef.current) {
+      urlSearchOverrideRef.current = null;
+    }
     const sp = new URLSearchParams();
-    if (search) sp.set("search", search);
+    const searchQs = search || urlSearchOverrideRef.current || "";
+    if (searchQs) sp.set("search", searchQs);
     if (dateFrom) sp.set("date_from", dateFrom);
     if (dateTo) sp.set("date_to", dateTo);
     if (assigneeIds.length) sp.set("assignee_ids", assigneeIds.join(","));
@@ -301,6 +308,13 @@ export default function LeadList({
       openCommentDeepLinkHandledIdRef.current !== pendingComment
     ) {
       sp.set("open_comment", pendingComment);
+    }
+    const pendingOpenId = pendingOpenIdRef.current || searchParams.get("open_id");
+    if (
+      pendingOpenId &&
+      openCommentDeepLinkHandledIdRef.current !== `open_id:${pendingOpenId}`
+    ) {
+      sp.set("open_id", pendingOpenId);
     }
     const qs = sp.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
@@ -627,6 +641,8 @@ export default function LeadList({
     }
   };
 
+  openMemoHandlerRef.current = openMemo;
+
   useEffect(() => {
     memoRowRef.current = memoRow;
   }, [memoRow]);
@@ -734,7 +750,7 @@ export default function LeadList({
   openCommentHandlerRef.current = openComment;
 
   useEffect(() => {
-    const leadId = searchParams.get("open_id");
+    const leadId = pendingOpenIdRef.current ?? searchParams.get("open_id");
     if (!leadId || openCommentDeepLinkHandledIdRef.current === `open_id:${leadId}` || loading) return;
 
     void (async () => {
@@ -750,21 +766,49 @@ export default function LeadList({
           const res = await fetch(`/api/admin/leads/${leadId}?category=${cat}`);
           const data = await res.json();
           if (!data.ok || !data.item) continue;
+          const item = data.item as LeadRow;
           openCommentDeepLinkHandledIdRef.current = `open_id:${leadId}`;
-          setSelectedId(data.item.id);
-          await openMemo(data.item as LeadRow);
+          pendingOpenIdRef.current = null;
 
-          const sp = new URLSearchParams(window.location.search);
-          if (sp.has("open_id")) {
-            sp.delete("open_id");
-            const qs = sp.toString();
-            router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+          const phone = String(item.phone || "").trim();
+          if (phone) {
+            urlSearchOverrideRef.current = phone;
+            setSearchInput(phone);
+            setPage(0);
           }
+          setAssigneeIds([]);
+          setTeamIds([]);
+          setRegions([]);
+          setStatuses([]);
+          setAdminStatuses([]);
+          setJobRanks([]);
+          setAgeGroups([]);
+          setJobs([]);
+          setEntryPages([]);
+          setDateFrom("");
+          setDateTo("");
+
+          setItems((prev) => {
+            if (prev.some((r) => r.id === item.id)) {
+              return prev.map((r) => (r.id === item.id ? item : r));
+            }
+            return [item, ...prev];
+          });
+          setSelectedId(item.id);
+          await openMemoHandlerRef.current(item);
+
+          window.setTimeout(() => {
+            document
+              .querySelector(`[data-lead-id="${CSS.escape(item.id)}"]`)
+              ?.scrollIntoView({ block: "center", behavior: "smooth" });
+          }, 120);
           return;
         } catch {
           // 다음 category 시도
         }
       }
+      openCommentDeepLinkHandledIdRef.current = `open_id:${leadId}`;
+      pendingOpenIdRef.current = null;
     })();
   }, [loading, category, searchParams, pathname, router]);
 
@@ -1568,6 +1612,7 @@ export default function LeadList({
                   return (
                     <tr
                       key={row.id}
+                      data-lead-id={row.id}
                       className={selectedId === row.id ? "is-selected" : undefined}
                       style={{ background: rowBackground(row.status, row.admin_status?.key) }}
                       onClick={() => setSelectedId(row.id)}
@@ -1872,6 +1917,7 @@ export default function LeadList({
                     return (
                       <tr
                         key={row.id}
+                        data-lead-id={row.id}
                         className={selectedId === row.id ? "is-selected" : undefined}
                         style={{ background: rowBackground(row.status, row.admin_status?.key) }}
                         onClick={() => setSelectedId(row.id)}
