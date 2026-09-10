@@ -548,6 +548,7 @@ export default function Tm001PageClient() {
 
 
   const canAssign = session ? canChangeTm001Assignee(session as SessionUser) : false;
+  const canClearAssignee = session?.rank === "admin" || session?.rank === "tm_admin";
   const canUpload = session?.rank === "admin";
   const canDelete = session?.rank === "admin";
   const showAssigneeHistory = session?.rank === "admin" || session?.rank === "tm_admin";
@@ -666,7 +667,7 @@ export default function Tm001PageClient() {
                     placeholder={bulkPicked && bulkAssigneeId == null ? "미배정" : "담당자 선택"}
                     clearLabel="미배정"
                     clearIsSelected={bulkPicked && bulkAssigneeId == null}
-                    allowClear
+                    allowClear={canClearAssignee}
                     onChange={(id) => {
                       setBulkPicked(true);
                       setBulkAssigneeId(id);
@@ -705,7 +706,7 @@ export default function Tm001PageClient() {
               }}
               aria-label="페이지당 표시 개수"
             >
-              {[20, 30, 50, 100].map((n) => (
+              {[20, 30, 50, 100, 500, 1000].map((n) => (
                 <option key={n} value={n}>
                   {n}개
                 </option>
@@ -875,6 +876,7 @@ export default function Tm001PageClient() {
                               history={showAssigneeHistory ? c.assignee_history : undefined}
                               onChange={(id) => void patchCustomer(c.id, { assignee_id: id })}
                               disabled={saving || !canAssign}
+                              allowClear={canClearAssignee}
                             />
                           </td>
                           <td>
@@ -1011,6 +1013,7 @@ export default function Tm001PageClient() {
                           unresolvedLabel={c.assignee_name}
                           history={showAssigneeHistory ? c.assignee_history : undefined}
                           disabled={saving || !canAssign}
+                          allowClear={canClearAssignee}
                           onChange={(id) => void patchCustomer(c.id, { assignee_id: id })}
                         />
                       </div>

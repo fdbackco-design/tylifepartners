@@ -4,6 +4,7 @@ import {
   canAccessAdminPath,
   canAccessCrmLeads,
   canAccessTm001,
+  canAssignTm001To,
   canChangeTm001Assignee,
   canExportLeads,
   canSeeMetaAdSpend,
@@ -105,5 +106,47 @@ describe("tm_admin scope", () => {
     assert.equal(canAccessCrmLeads(tm), false);
     assert.equal(canChangeTm001Assignee(tm), true);
     assert.equal(tm001VisibleAssigneeIdsFromStaff(tm, []), "all");
+  });
+});
+
+describe("tm001 manager/sales scope", () => {
+  const staff = [
+    { id: "mgr", parent_id: null },
+    { id: "s1", parent_id: "mgr" },
+    { id: "s2", parent_id: "mgr" },
+    { id: "other", parent_id: null },
+  ];
+
+  it("limits list and assign targets to self + descendants", () => {
+    const manager: SessionUser = {
+      rank: "manager",
+      userId: "mgr",
+      name: "매니저",
+      loginId: "m",
+      region: null,
+      parentId: null,
+    };
+    const scoped = tm001VisibleAssigneeIdsFromStaff(manager, staff);
+    assert.ok(scoped !== "all");
+    assert.deepEqual((scoped as string[]).sort(), ["mgr", "s1", "s2"]);
+    assert.equal(canAssignTm001To(manager, "s1", scoped), true);
+    assert.equal(canAssignTm001To(manager, "other", scoped), false);
+    assert.equal(canAssignTm001To(manager, null, scoped), false);
+  });
+
+  it("sales can only assign to self", () => {
+    const sales: SessionUser = {
+      rank: "sales",
+      userId: "s1",
+      name: "영업",
+      loginId: "s",
+      region: null,
+      parentId: "mgr",
+    };
+    const scoped = tm001VisibleAssigneeIdsFromStaff(sales, staff);
+    assert.deepEqual(scoped, ["s1"]);
+    assert.equal(canChangeTm001Assignee(sales), true);
+    assert.equal(canAssignTm001To(sales, "s1", scoped), true);
+    assert.equal(canAssignTm001To(sales, "s2", scoped), false);
   });
 });

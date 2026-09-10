@@ -49,7 +49,7 @@ export function visibleAssigneeIdsFromStaff(
   return descendantAssigneeIds(session.userId, staff);
 }
 
-/** TM001 목록 스코프 — admin·TM관리자는 전체 */
+/** TM001 목록 스코프 — admin·TM관리자는 전체, 그 외 본인+산하 */
 export function tm001VisibleAssigneeIdsFromStaff(
   session: SessionUser,
   staff: Array<{ id: string; parent_id: string | null }>
@@ -63,6 +63,24 @@ export async function tm001VisibleAssigneeIds(session: SessionUser): Promise<str
   return visibleAssigneeIds(session);
 }
 
+/** TM001 담당자 변경 — TM001 접근 가능 직급 (대상은 스코프로 제한) */
+export function canChangeTm001Assignee(session: SessionUser): boolean {
+  return canAccessTm001(session);
+}
+
+/** 미배정(null) 포함 배정 가능 여부 */
+export function canAssignTm001To(
+  session: SessionUser,
+  assigneeId: string | null,
+  scoped: string[] | "all"
+): boolean {
+  if (assigneeId == null) {
+    return session.rank === "admin" || session.rank === "tm_admin";
+  }
+  if (scoped === "all") return true;
+  return scoped.includes(assigneeId);
+}
+
 export function canManageAccounts(session: SessionUser): boolean {
   return session.rank === "admin" || session.rank === "manager";
 }
@@ -73,11 +91,6 @@ export function canSeeAdminStatus(session: SessionUser): boolean {
 
 export function canChangeAssignee(session: SessionUser): boolean {
   return session.rank === "admin" || session.rank === "manager";
-}
-
-/** TM001 담당자 변경 — admin·manager·TM관리자 */
-export function canChangeTm001Assignee(session: SessionUser): boolean {
-  return session.rank === "admin" || session.rank === "manager" || session.rank === "tm_admin";
 }
 
 export function canAccessTm001(session: Pick<SessionUser, "rank">): boolean {

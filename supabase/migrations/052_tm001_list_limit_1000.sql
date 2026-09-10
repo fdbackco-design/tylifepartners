@@ -1,43 +1,4 @@
--- TM001 목록 검색/필터 가속: 인덱스 + RPC
-
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
-CREATE INDEX IF NOT EXISTS idx_tm001_customers_partner_updated
-  ON public.tm001_customers (partner_code, updated_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_tm001_customers_partner_status_updated
-  ON public.tm001_customers (partner_code, status, updated_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_tm001_customers_name_trgm
-  ON public.tm001_customers USING gin (name gin_trgm_ops);
-
-CREATE INDEX IF NOT EXISTS idx_tm001_customers_phone_trgm
-  ON public.tm001_customers USING gin (phone gin_trgm_ops);
-
-CREATE INDEX IF NOT EXISTS idx_tm001_customers_norm_phone_trgm
-  ON public.tm001_customers USING gin (normalized_phone gin_trgm_ops);
-
-CREATE INDEX IF NOT EXISTS idx_tm001_stays_region_customer
-  ON public.tm001_stays (region, customer_id);
-
-CREATE INDEX IF NOT EXISTS idx_tm001_stays_hotel_trgm
-  ON public.tm001_stays USING gin (hotel_name gin_trgm_ops);
-
-CREATE OR REPLACE FUNCTION public.tm001_list_regions()
-RETURNS text[]
-LANGUAGE sql
-STABLE
-AS $$
-  SELECT coalesce(
-    array_agg(r ORDER BY r),
-    ARRAY[]::text[]
-  )
-  FROM (
-    SELECT DISTINCT trim(region) AS r
-    FROM public.tm001_stays
-    WHERE region IS NOT NULL AND trim(region) <> ''
-  ) t;
-$$;
+-- TM001 목록 RPC limit 상한 1000으로 상향 (UI 500/1000 표시 단위)
 
 CREATE OR REPLACE FUNCTION public.tm001_list_customers(
   p_partner_code text DEFAULT 'TM001',
@@ -136,6 +97,3 @@ BEGIN
   );
 END;
 $$;
-
-COMMENT ON FUNCTION public.tm001_list_customers IS 'TM001 고객 목록 검색/필터/페이징';
-COMMENT ON FUNCTION public.tm001_list_regions IS 'TM001 숙박 지역 distinct 목록';
