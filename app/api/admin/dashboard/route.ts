@@ -1,23 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { kstYmd, startOfKstDayIso, startOfNextKstDayIso } from "@/lib/crm/kst";
-import { loadHiddenLeadIdMaps, type HiddenLeadMaps } from "@/lib/crm/leadListHide";
+import { loadHiddenLeadIdMaps } from "@/lib/crm/leadListHide";
 import { getTtlCache, setTtlCache } from "@/lib/crm/ttlCache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const CONTACT_STATUSES = ["1차컨택", "부재(메신저완료)", "상담완료", "통화약속", "대면확정", "가입완료"] as const;
+const CONTACT_STATUS_SET = new Set<string>(CONTACT_STATUSES);
 const DASHBOARD_CACHE_TTL_MS = 30_000;
 const PAGE_SIZE = 1000;
 
 function notInIdsFilter(ids: Set<string>): string | null {
   if (!ids.size) return null;
   return `(${Array.from(ids).join(",")})`;
-}
-
-function isHiddenLead(hidden: HiddenLeadMaps, leadTable: string | null | undefined, leadId: string): boolean {
-  if (!leadId) return false;
-  if (leadTable === "tylife_b2b") return hidden.tylife_b2b.has(leadId);
-  return hidden.leads.has(leadId);
 }
 
 async function countExact(
@@ -33,7 +28,7 @@ async function countExact(
   return count ?? 0;
 }
 
-/** 기간 내 배정 건: 인원별 건수 + 리드 id 집합(1차컨택 로그 필터용) */
+/** 기간 내 배정 건수 + 그중 컨택 이후 상태 건수 */
 async function loadAssignedInPeriod(opts: {
   table: "leads" | "tylife_b2b";
   rangeStart: string;
@@ -41,16 +36,15 @@ async function loadAssignedInPeriod(opts: {
   hiddenFilter: string | null;
 }): Promise<{
   counts: Map<string, number>;
-  /** lead_id → 배정 담당자 id */
-  assigneeByLeadId: Map<string, string>;
+  contactCounts: Map<string, number>;
 }> {
   const supabase = getSupabaseAdmin();
   const counts = new Map<string, number>();
-  const assigneeByLeadId = new Map<string, string>();
+  const contactCounts = new Map<string, number>();
   for (let from = 0; ; from += PAGE_SIZE) {
     let q = supabase
       .from(opts.table)
-      .select("id, assignee_id")
+      .select("id, assignee_id, status")
       .gte("assigned_at", opts.rangeStart)
       .lt("assigned_at", opts.rangeEnd)
       .not("assignee_id", "is", null)
@@ -63,56 +57,16 @@ async function loadAssignedInPeriod(opts: {
     }
     const rows = data ?? [];
     for (const row of rows) {
-      const leadId = String(row.id ?? "");
       const assigneeId = String(row.assignee_id ?? "");
-      if (!leadId || !assigneeId) continue;
+      if (!assigneeId) continue;
       counts.set(assigneeId, (counts.get(assigneeId) ?? 0) + 1);
-      assigneeByLeadId.set(leadId, assigneeId);
+      if (CONTACT_STATUS_SET.has(String(row.status ?? ""))) {
+        contactCounts.set(assigneeId, (contactCounts.get(assigneeId) ?? 0) + 1);
+      }
     }
     if (rows.length < PAGE_SIZE) break;
   }
-  return { counts, assigneeByLeadId };
-}
-
-/**
- * 기간 중 assigned_at이 있는 리드에 대해
- * lead_status_logs.to_status = '1차컨택' 로그 건수를 담당자별로 집계
- */
-async function loadFirstContactCountsForAssigned(opts: {
-  assigneeByLeadId: Map<string, string>;
-  leadTable: "leads" | "tylife_b2b";
-  hidden: HiddenLeadMaps;
-}): Promise<Map<string, number>> {
-  const counts = new Map<string, number>();
-  const leadIds = Array.from(opts.assigneeByLeadId.keys());
-  if (!leadIds.length) return counts;
-
-  const supabase = getSupabaseAdmin();
-  const IN_CHUNK = 100;
-  for (let i = 0; i < leadIds.length; i += IN_CHUNK) {
-    const chunk = leadIds.slice(i, i + IN_CHUNK);
-    const { data, error } = await supabase
-      .from("lead_status_logs")
-      .select("lead_id, lead_table, assignee_id")
-      .eq("to_status", "1차컨택")
-      .in("lead_id", chunk);
-    if (error) {
-      console.warn("[dashboard] status logs:", error.message);
-      break;
-    }
-    for (const row of data ?? []) {
-      const leadId = String(row.lead_id ?? "");
-      if (!leadId || !opts.assigneeByLeadId.has(leadId)) continue;
-      if (isHiddenLead(opts.hidden, row.lead_table, leadId)) continue;
-      // 동일 lead_id가 양 테이블에 있을 수 있어 테이블이 맞을 때만 집계
-      const logTable = row.lead_table ? String(row.lead_table) : "leads";
-      if (logTable !== opts.leadTable) continue;
-      const assigneeId = opts.assigneeByLeadId.get(leadId);
-      if (!assigneeId) continue;
-      counts.set(assigneeId, (counts.get(assigneeId) ?? 0) + 1);
-    }
-  }
-  return counts;
+  return { counts, contactCounts };
 }
 
 function mergeCounts(into: Map<string, number>, from: Map<string, number>) {
@@ -129,7 +83,7 @@ export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
   const from = sp.get("date_from") || kstYmd();
   const to = sp.get("date_to") || from;
-  const cacheKey = `dashboard:v2:${from}:${to}`;
+  const cacheKey = `dashboard:v3:${from}:${to}`;
   const cached = getTtlCache<Record<string, unknown>>(cacheKey);
   if (cached) return NextResponse.json(cached);
 
@@ -196,19 +150,6 @@ export async function GET(request: NextRequest) {
     }),
   ]);
 
-  const [contactLeads, contactB2b] = await Promise.all([
-    loadFirstContactCountsForAssigned({
-      assigneeByLeadId: assignedLeads.assigneeByLeadId,
-      leadTable: "leads",
-      hidden: hiddenLeads,
-    }),
-    loadFirstContactCountsForAssigned({
-      assigneeByLeadId: assignedB2b.assigneeByLeadId,
-      leadTable: "tylife_b2b",
-      hidden: hiddenLeads,
-    }),
-  ]);
-
   const people = staffRes.data ?? [];
   const contacted = contactedLeads + contactedB2b;
   const inbound = inboundLeads + inboundB2b;
@@ -218,8 +159,8 @@ export async function GET(request: NextRequest) {
   mergeCounts(assignedCounts, assignedB2b.counts);
 
   const contactByPerson = new Map<string, number>();
-  mergeCounts(contactByPerson, contactLeads);
-  mergeCounts(contactByPerson, contactB2b);
+  mergeCounts(contactByPerson, assignedLeads.contactCounts);
+  mergeCounts(contactByPerson, assignedB2b.contactCounts);
 
   const by_person = people.map((p) => {
     const assigned = assignedCounts.get(p.id) ?? 0;
