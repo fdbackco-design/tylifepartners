@@ -24,6 +24,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     const body = (await request.json()) as {
       status?: string;
       product?: string | null;
+      meeting_at?: string | null;
       memo?: string;
       comment_append?: string;
       assignee_id?: string | null;
@@ -45,6 +46,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       {
         status: body.status,
         product: body.product,
+        meeting_at: body.meeting_at,
         memo: body.memo,
         comment_append: body.comment_append,
         comment_by: session.name,
@@ -59,5 +61,31 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     const status = /권한/.test(msg) ? 403 : 400;
     console.error("PATCH /api/admin/tm001/[id]:", msg);
     return NextResponse.json({ ok: false, message: msg }, { status });
+  }
+}
+
+/** GET /api/admin/tm001/[id] */
+export async function GET(_request: NextRequest, ctx: Ctx) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
+  if (!canAccessTm001(session)) {
+    return NextResponse.json({ ok: false, message: "접근 권한이 없습니다." }, { status: 403 });
+  }
+
+  const { id } = await ctx.params;
+  if (!id) return NextResponse.json({ ok: false, message: "id가 필요합니다." }, { status: 400 });
+
+  try {
+    const scoped = await tm001VisibleAssigneeIds(session);
+    const item = await getTm001CustomerById(id, { includeStays: true, includeHistory: true });
+    if (!item) return NextResponse.json({ ok: false, message: "고객을 찾을 수 없습니다." }, { status: 404 });
+    if (!isTm001CustomerVisible(item, scoped)) {
+      return NextResponse.json({ ok: false, message: "해당 고객을 볼 권한이 없습니다." }, { status: 403 });
+    }
+    return NextResponse.json({ ok: true, item });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("GET /api/admin/tm001/[id]:", msg);
+    return NextResponse.json({ ok: false, message: msg }, { status: 500 });
   }
 }

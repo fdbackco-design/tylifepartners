@@ -128,11 +128,63 @@ async function fetchLeadMeetings(
     });
   };
 
-  const [a, b] = await Promise.all([
+  const [a, b, c] = await Promise.all([
     fetchTable("leads", "consumers"),
     fetchTable("tylife_b2b", "candidates"),
+    fetchTm001Meetings(staffById, start, nextMonth),
   ]);
-  return [...a, ...b];
+  return [...a, ...b, ...c];
+}
+
+async function fetchTm001Meetings(
+  staffById: Map<string, StaffLite>,
+  start: string,
+  nextMonth: string
+): Promise<CalendarEventRow[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("tm001_customers")
+    .select("id, name, phone, status, assignee_id, meeting_at")
+    .eq("status", "재콜")
+    .gte("meeting_at", startOfKstDayIso(start))
+    .lt("meeting_at", startOfKstDayIso(nextMonth))
+    .not("meeting_at", "is", null)
+    .order("meeting_at", { ascending: true });
+  if (error) {
+    // 마이그레이션 전이면 무시
+    if (/meeting_at|schema cache|does not exist/i.test(error.message)) return [];
+    console.error("calendar tm001 meetings", error);
+    return [];
+  }
+  return (data ?? []).map((r) => {
+    const date = r.meeting_at ? kstYmd(new Date(r.meeting_at)) : "";
+    const assignee = r.assignee_id ? staffById.get(String(r.assignee_id)) : null;
+    return {
+      id: `lead:tm001:${r.id}`,
+      title: String(r.name ?? ""),
+      body: `${r.name}\n${r.phone || ""}\n담당: ${assignee?.name || "미배정"}\nTM001 재콜`,
+      event_date: date,
+      event_type: "call" as const,
+      all_day: false,
+      start_at: r.meeting_at ? String(r.meeting_at) : null,
+      end_at: null,
+      visibility: "all" as const,
+      viewer_ids: [],
+      created_by: null,
+      created_by_rank: "admin" as const,
+      created_by_name: "",
+      team_root_id: null,
+      created_at: "",
+      updated_at: "",
+      source: "lead_meeting" as const,
+      lead_category: "tm001" as const,
+      lead_name: String(r.name ?? ""),
+      lead_phone: String(r.phone ?? ""),
+      assignee_id: r.assignee_id ? String(r.assignee_id) : null,
+      assignee_name: assignee?.name ?? "",
+      read_only: true,
+    };
+  });
 }
 
 function canViewLeadMeeting(

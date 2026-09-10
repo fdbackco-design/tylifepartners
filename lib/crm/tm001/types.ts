@@ -62,6 +62,8 @@ export type Tm001Customer = {
   assigned_at: string | null;
   status: Tm001Status;
   product: string | null;
+  /** 재콜 예약 시각 (ISO) */
+  meeting_at: string | null;
   memo: string;
   comments: Tm001Comment[];
   created_at: string;
@@ -73,6 +75,10 @@ export type Tm001Customer = {
 
 export function isTm001Status(v: unknown): v is Tm001Status {
   return typeof v === "string" && (TM001_STATUSES as readonly string[]).includes(v);
+}
+
+export function isTm001ScheduledStatus(status: string): boolean {
+  return status === "재콜";
 }
 
 export function isTm001Product(v: unknown): v is Tm001Product {

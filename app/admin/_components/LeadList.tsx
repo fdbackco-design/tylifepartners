@@ -734,6 +734,41 @@ export default function LeadList({
   openCommentHandlerRef.current = openComment;
 
   useEffect(() => {
+    const leadId = searchParams.get("open_id");
+    if (!leadId || openCommentDeepLinkHandledIdRef.current === `open_id:${leadId}` || loading) return;
+
+    void (async () => {
+      const categories: LeadCategory[] =
+        category === "candidates"
+          ? ["candidates"]
+          : category === "consumers"
+            ? ["consumers"]
+            : ["consumers", "candidates"];
+
+      for (const cat of categories) {
+        try {
+          const res = await fetch(`/api/admin/leads/${leadId}?category=${cat}`);
+          const data = await res.json();
+          if (!data.ok || !data.item) continue;
+          openCommentDeepLinkHandledIdRef.current = `open_id:${leadId}`;
+          setSelectedId(data.item.id);
+          await openMemo(data.item as LeadRow);
+
+          const sp = new URLSearchParams(window.location.search);
+          if (sp.has("open_id")) {
+            sp.delete("open_id");
+            const qs = sp.toString();
+            router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+          }
+          return;
+        } catch {
+          // 다음 category 시도
+        }
+      }
+    })();
+  }, [loading, category, searchParams, pathname, router]);
+
+  useEffect(() => {
     const leadId = pendingOpenCommentIdRef.current ?? searchParams.get("open_comment");
     if (!leadId || openCommentDeepLinkHandledIdRef.current === leadId || loading) return;
 

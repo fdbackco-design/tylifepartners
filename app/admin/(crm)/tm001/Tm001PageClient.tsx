@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
 import { CrmAlert, CrmButton, CrmDialog } from "@/app/admin/_components/crm/ui";
+import { fromKstMinuteLocalInput, toKstMinuteLocalInput } from "@/lib/crm/kst";
 import { appendStatusMemo } from "@/lib/crm/memo";
 import { canChangeTm001Assignee } from "@/lib/crm/scope";
 import type { SessionUser } from "@/lib/crm/types";
 import {
   TM001_PRODUCTS,
   TM001_STATUSES,
+  isTm001ScheduledStatus,
   type Tm001Customer,
   type Tm001Stay,
 } from "@/lib/crm/tm001/types";
@@ -172,6 +175,9 @@ function CustomerNameLabel({ name }: { name: string }) {
 }
 
 export default function Tm001PageClient() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [items, setItems] = useState<Tm001Customer[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -203,6 +209,7 @@ export default function Tm001PageClient() {
   const fileRef = useRef<HTMLInputElement>(null);
   const memoCustomerRef = useRef<Tm001Customer | null>(null);
   const memoSavedRef = useRef("");
+  const openIdHandledRef = useRef<string | null>(null);
   const regionsRef = useRef<string[]>([]);
   regionsRef.current = regions;
 
@@ -321,8 +328,18 @@ export default function Tm001PageClient() {
       body.memo !== undefined &&
       body.status === undefined &&
       body.product === undefined &&
+      body.meeting_at === undefined &&
       body.assignee_id === undefined &&
       body.comment_append === undefined;
+
+    const nextStatus =
+      typeof body.status === "string" ? body.status : prev.status;
+    const meetingFromBody =
+      body.meeting_at !== undefined
+        ? body.meeting_at
+          ? String(body.meeting_at)
+          : null
+        : undefined;
 
     // 낙관적 반영 — 서버는 해당 1건만 갱신
     const optimistic: Tm001Customer = {
@@ -339,6 +356,11 @@ export default function Tm001PageClient() {
       ...(body.product !== undefined && body.status === undefined
         ? { product: body.product ? String(body.product) : null }
         : {}),
+      ...(meetingFromBody !== undefined
+        ? { meeting_at: meetingFromBody }
+        : !isTm001ScheduledStatus(nextStatus)
+          ? { meeting_at: null }
+          : {}),
       ...(body.memo !== undefined && body.status === undefined ? { memo: String(body.memo ?? "") } : {}),
       ...(body.assignee_id !== undefined
         ? {
@@ -449,6 +471,43 @@ export default function Tm001PageClient() {
     memoSavedRef.current = c.memo ?? "";
     setMemoSaveStatus("idle");
   };
+
+  useEffect(() => {
+    const openId = searchParams.get("open_id");
+    if (!openId || openIdHandledRef.current === openId || loading) return;
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/admin/tm001/${encodeURIComponent(openId)}`);
+        const data = await res.json();
+        if (!data.ok || !data.item) {
+          openIdHandledRef.current = openId;
+          showToast(data.message || "고객을 찾을 수 없습니다.");
+          return;
+        }
+        openIdHandledRef.current = openId;
+        const item = data.item as Tm001Customer;
+        setItems((list) => {
+          if (list.some((c) => c.id === item.id)) {
+            return list.map((c) => (c.id === item.id ? { ...item, stays: c.stays.length ? c.stays : item.stays } : c));
+          }
+          return [item, ...list];
+        });
+        setSelected(new Set([item.id]));
+        openMemo(item);
+
+        const sp = new URLSearchParams(window.location.search);
+        if (sp.has("open_id")) {
+          sp.delete("open_id");
+          const qs = sp.toString();
+          router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+        }
+      } catch {
+        openIdHandledRef.current = openId;
+        showToast("고객을 불러오지 못했습니다.");
+      }
+    })();
+  }, [loading, searchParams, pathname, router, showToast]);
 
   const closeMemo = async () => {
     const row = memoCustomerRef.current;
@@ -909,6 +968,22 @@ export default function Tm001PageClient() {
                                   </option>
                                 ))}
                               </select>
+                              {isTm001ScheduledStatus(c.status) ? (
+                                <input
+                                  className="status-select"
+                                  type="datetime-local"
+                                  step={60}
+                                  value={toKstMinuteLocalInput(c.meeting_at)}
+                                  disabled={saving}
+                                  onChange={(e) =>
+                                    void patchCustomer(c.id, {
+                                      meeting_at: fromKstMinuteLocalInput(e.target.value),
+                                    })
+                                  }
+                                  aria-label={`${c.name} 재콜 일정`}
+                                  style={{ marginTop: 6, display: "block", minWidth: 180 }}
+                                />
+                              ) : null}
                               {c.status === "계약완료" ? (
                                 <select
                                   className="status-select"
@@ -1031,6 +1106,22 @@ export default function Tm001PageClient() {
                             </option>
                           ))}
                         </select>
+                        {isTm001ScheduledStatus(c.status) ? (
+                          <input
+                            className="status-select"
+                            type="datetime-local"
+                            step={60}
+                            value={toKstMinuteLocalInput(c.meeting_at)}
+                            disabled={saving}
+                            onChange={(e) =>
+                              void patchCustomer(c.id, {
+                                meeting_at: fromKstMinuteLocalInput(e.target.value),
+                              })
+                            }
+                            aria-label={`${c.name} 재콜 일정`}
+                            style={{ marginTop: 6, display: "block", width: "100%" }}
+                          />
+                        ) : null}
                       </div>
                     </div>
                   </article>
