@@ -1463,7 +1463,7 @@ export default function LeadList({
               }}
               aria-label="페이지당 표시 개수"
             >
-              {[20, 30, 50, 100].map((n) => (
+              {(category === "candidates" ? [20, 30, 50, 100, 500, 1000] : [20, 30, 50, 100]).map((n) => (
                 <option key={n} value={n}>
                   {n}개
                 </option>

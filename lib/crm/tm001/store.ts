@@ -13,7 +13,7 @@ import {
 } from "@/lib/crm/tm001/types";
 import { buildAssigneeNameChain } from "@/lib/crm/assigneeHistoryFormat";
 import { appendStatusMemo } from "@/lib/crm/memo";
-import { canChangeTm001Assignee } from "@/lib/crm/scope";
+import { canAssignTm001To, canChangeTm001Assignee, tm001VisibleAssigneeIds } from "@/lib/crm/scope";
 import type { SessionUser } from "@/lib/crm/types";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -227,7 +227,7 @@ export async function listTm001Customers(opts?: {
   includeRegions?: boolean;
 }): Promise<{ items: Tm001Customer[]; regions: string[]; total: number; stayTotal: number }> {
   const scoped = opts?.visibleAssigneeIds ?? "all";
-  const limit = Math.min(Math.max(Number(opts?.limit) || 20, 1), 100);
+  const limit = Math.min(Math.max(Number(opts?.limit) || 20, 1), 1000);
   const offset = Math.max(Number(opts?.offset) || 0, 0);
   const q = String(opts?.q ?? "").trim();
   const region = String(opts?.region ?? "").trim();
@@ -861,6 +861,10 @@ export async function patchTm001Customer(
       throw new Error("담당자를 변경할 권한이 없습니다.");
     }
     const nextAssignee = patch.assignee_id ? String(patch.assignee_id) : null;
+    const scoped = await tm001VisibleAssigneeIds(session);
+    if (!canAssignTm001To(session, nextAssignee, scoped)) {
+      throw new Error("본인 또는 산하 담당자에게만 배정할 수 있습니다.");
+    }
     if (nextAssignee !== curAssignee) {
       const nowIso = new Date().toISOString();
       next.assignee_id = nextAssignee;
@@ -894,10 +898,14 @@ export async function bulkAssignTm001(
   if (!canChangeTm001Assignee(session)) {
     throw new Error("담당자를 변경할 권한이 없습니다.");
   }
+  const scoped = await tm001VisibleAssigneeIds(session);
+  const nextAssignee = assigneeId ? String(assigneeId) : null;
+  if (!canAssignTm001To(session, nextAssignee, scoped)) {
+    throw new Error("본인 또는 산하 담당자에게만 배정할 수 있습니다.");
+  }
   const supabase = getSupabaseAdmin();
   const unique = Array.from(new Set(ids.filter(Boolean)));
   if (!unique.length) return { updated: 0 };
-  const nextAssignee = assigneeId ? String(assigneeId) : null;
   const nowIso = new Date().toISOString();
   const IN_CHUNK = 100;
   let updated = 0;
@@ -915,6 +923,9 @@ export async function bulkAssignTm001(
     for (const row of rows ?? []) {
       const id = String(row.id);
       const from = row.assignee_id ? String(row.assignee_id) : null;
+      if (scoped !== "all") {
+        if (!from || !scoped.includes(from)) continue;
+      }
       if (from === nextAssignee) continue;
       toUpdate.push(id);
       logs.push({

@@ -20,7 +20,24 @@ type Summary = {
   rate: number | null;
 };
 
-type SortMode = "rate_desc" | "rate_asc";
+type SortMode = "rate_desc" | "rate_asc" | "pending_desc";
+
+type RateTone = "ok" | "warn" | "alert" | "zero";
+
+function rateTone(rate: number | null): RateTone {
+  if (rate == null) return "ok";
+  if (rate <= 0) return "zero";
+  if (rate < 70) return "alert";
+  if (rate < 90) return "warn";
+  return "ok";
+}
+
+function toneLabel(tone: RateTone): string | null {
+  if (tone === "zero") return "미컨택";
+  if (tone === "alert") return "관리 필요";
+  if (tone === "warn") return "주의";
+  return null;
+}
 
 export default function DashboardPage() {
   const t = todayYmdLocal();
@@ -30,7 +47,7 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<Summary>({ inbound: 0, contacted: 0, rate: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [sortMode, setSortMode] = useState<SortMode>("rate_desc");
+  const [sortMode, setSortMode] = useState<SortMode>("pending_desc");
 
   useEffect(() => {
     let cancelled = false;
@@ -60,21 +77,27 @@ export default function DashboardPage() {
     };
   }, [from, to]);
 
-
   const chartRows = useMemo(() => {
     const list = rows.filter((r) => r.assigned > 0);
     list.sort((a, b) => {
       const ar = a.first_contact_rate ?? -1;
       const br = b.first_contact_rate ?? -1;
-      if (ar !== br) return sortMode === "rate_desc" ? br - ar : ar - br;
+      const ap = Math.max(0, a.assigned - a.first_contact);
+      const bp = Math.max(0, b.assigned - b.first_contact);
+      if (sortMode === "pending_desc") {
+        if (ap !== bp) return bp - ap;
+        if (ar !== br) return ar - br;
+      } else if (ar !== br) {
+        return sortMode === "rate_desc" ? br - ar : ar - br;
+      }
       if (a.assigned !== b.assigned) return b.assigned - a.assigned;
       return a.staff_name.localeCompare(b.staff_name, "ko");
     });
     return list;
   }, [rows, sortMode]);
 
-  const maxRate = useMemo(
-    () => Math.max(100, ...chartRows.map((r) => r.first_contact_rate ?? 0)),
+  const attentionCount = useMemo(
+    () => chartRows.filter((r) => rateTone(r.first_contact_rate) !== "ok").length,
     [chartRows]
   );
 
@@ -120,16 +143,25 @@ export default function DashboardPage() {
             />
           </div>
 
-          <section className="crm-dash-chart" aria-label="영업자별 1차 컨택률 그래프">
+          <section className="crm-dash-chart" aria-label="영업자별 1차 컨택률">
             <div className="crm-dash-chart-head">
-              <h2 className="crm-dash-chart-title">영업자별 1차 컨택률</h2>
+              <div>
+                <h2 className="crm-dash-chart-title">영업자별 1차 컨택률</h2>
+                {chartRows.length > 0 ? (
+                  <p className="crm-dash-chart-sub">
+                    {attentionCount > 0
+                      ? `주의·관리 필요 ${attentionCount}명 · 전체 ${chartRows.length}명`
+                      : `전체 ${chartRows.length}명 · 이상 없음`}
+                  </p>
+                ) : null}
+              </div>
               <div className="crm-dash-sort" role="group" aria-label="정렬">
                 <button
                   type="button"
-                  className={`crm-btn${sortMode === "rate_desc" ? " crm-btn-primary" : ""}`}
-                  onClick={() => setSortMode("rate_desc")}
+                  className={`crm-btn${sortMode === "pending_desc" ? " crm-btn-primary" : ""}`}
+                  onClick={() => setSortMode("pending_desc")}
                 >
-                  높은 순
+                  미완료 많은 순
                 </button>
                 <button
                   type="button"
@@ -137,6 +169,13 @@ export default function DashboardPage() {
                   onClick={() => setSortMode("rate_asc")}
                 >
                   낮은 순
+                </button>
+                <button
+                  type="button"
+                  className={`crm-btn${sortMode === "rate_desc" ? " crm-btn-primary" : ""}`}
+                  onClick={() => setSortMode("rate_desc")}
+                >
+                  높은 순
                 </button>
               </div>
             </div>
@@ -146,33 +185,70 @@ export default function DashboardPage() {
                 배정 건수가 있는 영업자가 없습니다.
               </div>
             ) : (
-              <ul className="crm-dash-bars">
-                {chartRows.map((r) => {
-                  const rate = r.first_contact_rate ?? 0;
-                  const widthPct = Math.min(100, (rate / maxRate) * 100);
-                  return (
-                    <li key={r.staff_id} className="crm-dash-bar-row">
-                      <div className="crm-dash-bar-meta">
-                        <span className="crm-dash-bar-stats">
-                          <span className="crm-dash-bar-name">
-                            {r.staff_name}
-                            {r.rank === "manager" && (
-                              <span className="crm-dash-rank-tag">매니저</span>
-                            )}
-                          </span>
-                          <strong>{rate}%</strong>
-                          <span>
-                            {r.first_contact.toLocaleString()} / {r.assigned.toLocaleString()}
-                          </span>
-                        </span>
-                      </div>
-                      <div className="crm-dash-bar-track" aria-hidden>
-                        <div className="crm-dash-bar-fill" style={{ width: `${widthPct}%` }} />
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="crm-dash-table-wrap">
+                <table className="crm-dash-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">영업자</th>
+                      <th scope="col" className="crm-dash-num">
+                        완료/전체
+                      </th>
+                      <th scope="col" className="crm-dash-num">
+                        미완료
+                      </th>
+                      <th scope="col" className="crm-dash-num">
+                        완료율
+                      </th>
+                      <th scope="col" className="crm-dash-progress-col">
+                        Progress
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {chartRows.map((r) => {
+                      const rate = r.first_contact_rate ?? 0;
+                      const pending = Math.max(0, r.assigned - r.first_contact);
+                      const tone = rateTone(r.first_contact_rate);
+                      const badge = toneLabel(tone);
+                      return (
+                        <tr key={r.staff_id} className={`crm-dash-row crm-dash-row-${tone}`}>
+                          <td>
+                            <span className="crm-dash-bar-name">
+                              {r.staff_name}
+                              {r.rank === "manager" ? <span className="crm-dash-rank-tag">매니저</span> : null}
+                              {badge ? <span className={`crm-dash-tone-tag crm-dash-tone-tag-${tone}`}>{badge}</span> : null}
+                            </span>
+                          </td>
+                          <td className="crm-dash-num">
+                            {r.first_contact.toLocaleString()}/{r.assigned.toLocaleString()}
+                          </td>
+                          <td className={`crm-dash-num${pending > 0 ? " crm-dash-pending" : ""}`}>
+                            {pending.toLocaleString()}
+                          </td>
+                          <td className={`crm-dash-num crm-dash-rate crm-dash-rate-${tone}`}>
+                            {r.first_contact_rate == null ? "-" : `${rate}%`}
+                          </td>
+                          <td className="crm-dash-progress-col">
+                            <div
+                              className="crm-dash-mini-track"
+                              role="progressbar"
+                              aria-valuenow={rate}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-label={`${r.staff_name} 완료율 ${rate}%`}
+                            >
+                              <div
+                                className={`crm-dash-mini-fill crm-dash-mini-fill-${tone}`}
+                                style={{ width: `${Math.min(100, Math.max(0, rate))}%` }}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
         </>

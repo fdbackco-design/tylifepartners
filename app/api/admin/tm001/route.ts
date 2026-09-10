@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const sp = request.nextUrl.searchParams;
-    const limit = Math.min(Math.max(Number(sp.get("limit") || 20), 1), 100);
+    const limit = Math.min(Math.max(Number(sp.get("limit") || 20), 1), 1000);
     const offset = Math.max(Number(sp.get("offset") || 0), 0);
 
     const supabase = getSupabaseAdmin();
@@ -47,9 +47,9 @@ export async function GET(request: NextRequest) {
     });
 
     const staffOut =
-      session.rank === "sales"
-        ? (staffRows ?? []).filter((s) => String(s.id) === session.userId)
-        : staffRows ?? [];
+      scoped === "all"
+        ? staffRows ?? []
+        : (staffRows ?? []).filter((s) => scoped.includes(String(s.id)));
 
     return NextResponse.json({
       ok: true,
