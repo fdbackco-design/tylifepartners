@@ -72,17 +72,25 @@
 .tm001-root .selection-button{border-color:#ded1f0;color:var(--purple);background:#fcfaff}
 .tm001-root .region-message{font-size:11px;color:var(--purple);background:#f8f5fc;border-top:1px solid #f0eaf8;padding:8px 20px}
 .tm001-root .table-scroll{overflow-x:auto;scrollbar-width:thin;scrollbar-color:#cfc9dc #f5f4f8;width:100%;position:relative}
-.tm001-root .tm001-table{border-collapse:separate;border-spacing:0;width:100%;min-width:1780px;table-layout:fixed;font-size:12px}
+.tm001-root .tm001-table{border-collapse:separate;border-spacing:0;width:100%;min-width:1817px;table-layout:fixed;font-size:12px}
 .tm001-root .tm001-table th{background:#f8f9fc;color:#727d91;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 12px;text-align:left;line-height:1.3;font-weight:650;font-size:11px;white-space:nowrap}
 .tm001-root .tm001-table th.group-head{text-align:center;color:#60547a;background:#f5f1fa;padding:9px 10px;border-left:1px solid #e8e0f1;border-right:1px solid #e8e0f1;letter-spacing:.005em}
 .tm001-root .tm001-table .sub-head th{background:#faf8fd;border-top:0;padding:7px 12px;font-size:10px;color:#81758e}
 .tm001-root .tm001-table td{border-bottom:1px solid var(--line);padding:20px 12px;vertical-align:top;background:#fff}
+.tm001-root .tm001-table tr.contact-row[data-row-status="관심"] td{background:#fff0f5}
+.tm001-root .tm001-table tr.contact-row[data-row-status="재콜"] td{background:#fff8e1}
+.tm001-root .tm001-table tr.contact-row[data-row-status="유효통화"] td{background:#eaf7ef}
+.tm001-root .tm001-table tr.contact-row[data-row-status="부재"] td{background:#ffe8eb}
 .tm001-root .tm001-table tr.contact-row.unassigned td{background:#fffafb}
+.tm001-root .tm001-table tr.contact-row.unassigned[data-row-status="관심"] td{background:#fff0f5}
+.tm001-root .tm001-table tr.contact-row.unassigned[data-row-status="재콜"] td{background:#fff8e1}
+.tm001-root .tm001-table tr.contact-row.unassigned[data-row-status="유효통화"] td{background:#eaf7ef}
+.tm001-root .tm001-table tr.contact-row.unassigned[data-row-status="부재"] td{background:#ffe8eb}
 .tm001-root .tm001-table tr.contact-row.is-complete td{background:#fbfefd}
 .tm001-root .tm001-table tr.contact-row.selected td{background:#f9f5ff}
 .tm001-root .tm001-table tr:last-child td{border-bottom:0}
 .tm001-root .tm001-table .check-cell{padding-left:14px;padding-right:8px;text-align:center}
-.tm001-root .tm001-table .classification{padding:0;border-left:1px solid var(--line);border-right:1px solid var(--line);background:#fff!important}
+.tm001-root .tm001-table .classification{padding:0;border-left:1px solid var(--line);border-right:1px solid var(--line)}
 .tm001-root .tm001-table .pin-check{position:sticky;left:0;z-index:2}
 .tm001-root .tm001-table .pin-partner{position:sticky;left:var(--pin-partner-left,39px);z-index:2}
 .tm001-root .tm001-table .pin-batch{position:sticky;left:var(--pin-batch-left,170px);z-index:2}
@@ -135,16 +143,47 @@
 .tm001-root .date-value{font-size:10px;color:#7b879a;line-height:1.8;font-variant-numeric:tabular-nums;letter-spacing:0}
 .tm001-root .date-value small{font-size:10px;display:block;color:#a0a8b6}
 .tm001-root .muted-value{font-size:11px;color:#a0a8b6;line-height:1.6}
-.tm001-root .status-select{width:100%;min-height:35px;border:1px solid #dee3ed;border-radius:7px;background:#fff;font-size:11px;padding:7px 25px 7px 8px;appearance:auto;color:#63718b;font-weight:650}
+.tm001-root .status-select{width:100%;min-height:35px;border:1px solid #dee3ed;border-radius:7px;background:#fff;font-size:11px;padding:7px 25px 7px 8px;appearance:auto;color:#63718b;font-weight:650;box-sizing:border-box;max-width:100%}
 .tm001-root .status-select[data-status="관심"],.tm001-root .status-select[data-status="유효통화"]{background:#f7f4fc;border-color:#e0d6ef;color:var(--purple)}
 .tm001-root .status-select[data-status="재콜"]{background:var(--amber-soft);border-color:#f0ddb7;color:var(--amber)}
 .tm001-root .status-select[data-status="계약완료"]{background:var(--green-soft);border-color:#bedfd0;color:var(--green)}
 .tm001-root .status-select[data-status="수신거부"],.tm001-root .status-select[data-status="번호오류"]{background:var(--red-soft);border-color:#eec9d0;color:var(--red)}
-.tm001-root .status-cell{position:relative;min-width:0}
+.tm001-root .status-cell{position:relative;min-width:0;max-width:100%;overflow:hidden;display:flex;flex-direction:column;gap:6px}
 .tm001-root .status-cell.is-saving .status-select{opacity:.65}
+.tm001-root .status-meeting{width:100%;max-width:100%;min-width:0;min-height:35px;border:1px solid #f0ddb7;border-radius:7px;background:var(--amber-soft);font-size:10px;padding:6px 6px;appearance:auto;color:var(--amber);font-weight:650;box-sizing:border-box;display:block}
+.tm001-root .tm001-table td.status-col,
+.tm001-root .tm001-table th.status-col{overflow:hidden}
 .tm001-root .row-saving{display:block;margin-top:6px;font-size:10px;font-weight:700;color:var(--purple)}
 .tm001-root .tm001-table tr.contact-row.is-saving td{background:#faf8ff}
+.tm001-root .tm001-table tr.contact-row.is-saving[data-row-status="관심"] td{background:#fff0f5}
+.tm001-root .tm001-table tr.contact-row.is-saving[data-row-status="재콜"] td{background:#fff8e1}
+.tm001-root .tm001-table tr.contact-row.is-saving[data-row-status="유효통화"] td{background:#eaf7ef}
+.tm001-root .tm001-table tr.contact-row.is-saving[data-row-status="부재"] td{background:#ffe8eb}
 .tm001-root .mobile-card.is-saving{outline:2px solid #e4d7f5;outline-offset:-2px}
+.tm001-root .mobile-card[data-row-status="관심"]{background:#fff0f5}
+.tm001-root .mobile-card[data-row-status="재콜"]{background:#fff8e1}
+.tm001-root .mobile-card[data-row-status="유효통화"]{background:#eaf7ef}
+.tm001-root .mobile-card[data-row-status="부재"]{background:#ffe8eb}
+.tm001-root .mobile-card[data-row-status="관심"] .m-head,
+.tm001-root .mobile-card[data-row-status="재콜"] .m-head,
+.tm001-root .mobile-card[data-row-status="유효통화"] .m-head,
+.tm001-root .mobile-card[data-row-status="부재"] .m-head{background:transparent}
+.tm001-root .tm001-table tr.contact-row[data-row-status="관심"] .stay-toggle,
+.tm001-root .tm001-table tr.contact-row[data-row-status="재콜"] .stay-toggle,
+.tm001-root .tm001-table tr.contact-row[data-row-status="유효통화"] .stay-toggle,
+.tm001-root .tm001-table tr.contact-row[data-row-status="부재"] .stay-toggle,
+.tm001-root .tm001-table tr.contact-row[data-row-status="관심"] .stay-row,
+.tm001-root .tm001-table tr.contact-row[data-row-status="재콜"] .stay-row,
+.tm001-root .tm001-table tr.contact-row[data-row-status="유효통화"] .stay-row,
+.tm001-root .tm001-table tr.contact-row[data-row-status="부재"] .stay-row,
+.tm001-root .mobile-card[data-row-status="관심"] .stay-toggle,
+.tm001-root .mobile-card[data-row-status="재콜"] .stay-toggle,
+.tm001-root .mobile-card[data-row-status="유효통화"] .stay-toggle,
+.tm001-root .mobile-card[data-row-status="부재"] .stay-toggle,
+.tm001-root .mobile-card[data-row-status="관심"] .stay-row,
+.tm001-root .mobile-card[data-row-status="재콜"] .stay-row,
+.tm001-root .mobile-card[data-row-status="유효통화"] .stay-row,
+.tm001-root .mobile-card[data-row-status="부재"] .stay-row{background:transparent}
 .tm001-root .product-field{margin-top:9px;border-top:1px dashed #d5e5dc;padding-top:9px}
 .tm001-root .product-field label{font-size:10px;font-weight:650;display:block;margin-bottom:4px;color:#457566}
 .tm001-root .product-field label span{color:var(--red)}
@@ -375,7 +414,7 @@
 .tm001-root .stay-cell{padding:5px;font-size:8px}
 .tm001-root .hotel-title{font-size:8px}
 .tm001-root .hotel-meta{font-size:7px}
-.tm001-root .status-select,.tm001-root .assignee{padding:4px;font-size:8px}
+.tm001-root .status-select,.tm001-root .status-meeting,.tm001-root .assignee{padding:4px;font-size:8px}
 .tm001-root .partner-name,.tm001-root .customer-name{font-size:9px}
 .tm001-root .phone{font-size:8px}
 .tm001-root .state-pill{font-size:7px;white-space:normal}
