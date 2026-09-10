@@ -80,12 +80,10 @@
 .tm001-root .tm001-table tr.contact-row[data-row-status="관심"] td{background:#fff0f5}
 .tm001-root .tm001-table tr.contact-row[data-row-status="재콜"] td{background:#fff8e1}
 .tm001-root .tm001-table tr.contact-row[data-row-status="유효통화"] td{background:#eaf7ef}
-.tm001-root .tm001-table tr.contact-row[data-row-status="부재"] td{background:#ffe8eb}
 .tm001-root .tm001-table tr.contact-row.unassigned td{background:#fffafb}
 .tm001-root .tm001-table tr.contact-row.unassigned[data-row-status="관심"] td{background:#fff0f5}
 .tm001-root .tm001-table tr.contact-row.unassigned[data-row-status="재콜"] td{background:#fff8e1}
 .tm001-root .tm001-table tr.contact-row.unassigned[data-row-status="유효통화"] td{background:#eaf7ef}
-.tm001-root .tm001-table tr.contact-row.unassigned[data-row-status="부재"] td{background:#ffe8eb}
 .tm001-root .tm001-table tr.contact-row.is-complete td{background:#fbfefd}
 .tm001-root .tm001-table tr.contact-row.selected td{background:#f9f5ff}
 .tm001-root .tm001-table tr:last-child td{border-bottom:0}
@@ -158,32 +156,25 @@
 .tm001-root .tm001-table tr.contact-row.is-saving[data-row-status="관심"] td{background:#fff0f5}
 .tm001-root .tm001-table tr.contact-row.is-saving[data-row-status="재콜"] td{background:#fff8e1}
 .tm001-root .tm001-table tr.contact-row.is-saving[data-row-status="유효통화"] td{background:#eaf7ef}
-.tm001-root .tm001-table tr.contact-row.is-saving[data-row-status="부재"] td{background:#ffe8eb}
 .tm001-root .mobile-card.is-saving{outline:2px solid #e4d7f5;outline-offset:-2px}
 .tm001-root .mobile-card[data-row-status="관심"]{background:#fff0f5}
 .tm001-root .mobile-card[data-row-status="재콜"]{background:#fff8e1}
 .tm001-root .mobile-card[data-row-status="유효통화"]{background:#eaf7ef}
-.tm001-root .mobile-card[data-row-status="부재"]{background:#ffe8eb}
 .tm001-root .mobile-card[data-row-status="관심"] .m-head,
 .tm001-root .mobile-card[data-row-status="재콜"] .m-head,
-.tm001-root .mobile-card[data-row-status="유효통화"] .m-head,
-.tm001-root .mobile-card[data-row-status="부재"] .m-head{background:transparent}
+.tm001-root .mobile-card[data-row-status="유효통화"] .m-head{background:transparent}
 .tm001-root .tm001-table tr.contact-row[data-row-status="관심"] .stay-toggle,
 .tm001-root .tm001-table tr.contact-row[data-row-status="재콜"] .stay-toggle,
 .tm001-root .tm001-table tr.contact-row[data-row-status="유효통화"] .stay-toggle,
-.tm001-root .tm001-table tr.contact-row[data-row-status="부재"] .stay-toggle,
 .tm001-root .tm001-table tr.contact-row[data-row-status="관심"] .stay-row,
 .tm001-root .tm001-table tr.contact-row[data-row-status="재콜"] .stay-row,
 .tm001-root .tm001-table tr.contact-row[data-row-status="유효통화"] .stay-row,
-.tm001-root .tm001-table tr.contact-row[data-row-status="부재"] .stay-row,
 .tm001-root .mobile-card[data-row-status="관심"] .stay-toggle,
 .tm001-root .mobile-card[data-row-status="재콜"] .stay-toggle,
 .tm001-root .mobile-card[data-row-status="유효통화"] .stay-toggle,
-.tm001-root .mobile-card[data-row-status="부재"] .stay-toggle,
 .tm001-root .mobile-card[data-row-status="관심"] .stay-row,
 .tm001-root .mobile-card[data-row-status="재콜"] .stay-row,
-.tm001-root .mobile-card[data-row-status="유효통화"] .stay-row,
-.tm001-root .mobile-card[data-row-status="부재"] .stay-row{background:transparent}
+.tm001-root .mobile-card[data-row-status="유효통화"] .stay-row{background:transparent}
 .tm001-root .product-field{margin-top:9px;border-top:1px dashed #d5e5dc;padding-top:9px}
 .tm001-root .product-field label{font-size:10px;font-weight:650;display:block;margin-bottom:4px;color:#457566}
 .tm001-root .product-field label span{color:var(--red)}
