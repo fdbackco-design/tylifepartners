@@ -33,19 +33,24 @@ async function countExact(
   return count ?? 0;
 }
 
-/** assignee_id만 페이지 단위로 모아 인원별 배정 건수 */
-async function loadAssignedCounts(opts: {
+/** 기간 내 배정 건: 인원별 건수 + 리드 id 집합(1차컨택 로그 필터용) */
+async function loadAssignedInPeriod(opts: {
   table: "leads" | "tylife_b2b";
   rangeStart: string;
   rangeEnd: string;
   hiddenFilter: string | null;
-}): Promise<Map<string, number>> {
+}): Promise<{
+  counts: Map<string, number>;
+  /** lead_id → 배정 담당자 id */
+  assigneeByLeadId: Map<string, string>;
+}> {
   const supabase = getSupabaseAdmin();
   const counts = new Map<string, number>();
+  const assigneeByLeadId = new Map<string, string>();
   for (let from = 0; ; from += PAGE_SIZE) {
     let q = supabase
       .from(opts.table)
-      .select("assignee_id")
+      .select("id, assignee_id")
       .gte("assigned_at", opts.rangeStart)
       .lt("assigned_at", opts.rangeEnd)
       .not("assignee_id", "is", null)
@@ -58,53 +63,56 @@ async function loadAssignedCounts(opts: {
     }
     const rows = data ?? [];
     for (const row of rows) {
-      const id = String(row.assignee_id ?? "");
-      if (!id) continue;
-      counts.set(id, (counts.get(id) ?? 0) + 1);
+      const leadId = String(row.id ?? "");
+      const assigneeId = String(row.assignee_id ?? "");
+      if (!leadId || !assigneeId) continue;
+      counts.set(assigneeId, (counts.get(assigneeId) ?? 0) + 1);
+      assigneeByLeadId.set(leadId, assigneeId);
     }
     if (rows.length < PAGE_SIZE) break;
   }
-  return counts;
+  return { counts, assigneeByLeadId };
 }
 
-type StatusLogRow = {
-  assignee_id: string | null;
-  lead_id: string | null;
-  lead_table: string | null;
-};
-
-async function loadFirstContactLogs(opts: {
-  rangeStart: string;
-  rangeEnd: string;
+/**
+ * 기간 중 assigned_at이 있는 리드에 대해
+ * lead_status_logs.to_status = '1차컨택' 로그 건수를 담당자별로 집계
+ */
+async function loadFirstContactCountsForAssigned(opts: {
+  assigneeByLeadId: Map<string, string>;
+  leadTable: "leads" | "tylife_b2b";
   hidden: HiddenLeadMaps;
-}): Promise<StatusLogRow[]> {
+}): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  const leadIds = Array.from(opts.assigneeByLeadId.keys());
+  if (!leadIds.length) return counts;
+
   const supabase = getSupabaseAdmin();
-  const out: StatusLogRow[] = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
+  const IN_CHUNK = 100;
+  for (let i = 0; i < leadIds.length; i += IN_CHUNK) {
+    const chunk = leadIds.slice(i, i + IN_CHUNK);
     const { data, error } = await supabase
       .from("lead_status_logs")
-      .select("assignee_id, lead_id, lead_table")
+      .select("lead_id, lead_table, assignee_id")
       .eq("to_status", "1차컨택")
-      .gte("changed_at", opts.rangeStart)
-      .lt("changed_at", opts.rangeEnd)
-      .range(from, from + PAGE_SIZE - 1);
+      .in("lead_id", chunk);
     if (error) {
       console.warn("[dashboard] status logs:", error.message);
       break;
     }
-    const rows = data ?? [];
-    for (const row of rows) {
+    for (const row of data ?? []) {
       const leadId = String(row.lead_id ?? "");
+      if (!leadId || !opts.assigneeByLeadId.has(leadId)) continue;
       if (isHiddenLead(opts.hidden, row.lead_table, leadId)) continue;
-      out.push({
-        assignee_id: row.assignee_id ? String(row.assignee_id) : null,
-        lead_id: leadId || null,
-        lead_table: row.lead_table ? String(row.lead_table) : null,
-      });
+      // 동일 lead_id가 양 테이블에 있을 수 있어 테이블이 맞을 때만 집계
+      const logTable = row.lead_table ? String(row.lead_table) : "leads";
+      if (logTable !== opts.leadTable) continue;
+      const assigneeId = opts.assigneeByLeadId.get(leadId);
+      if (!assigneeId) continue;
+      counts.set(assigneeId, (counts.get(assigneeId) ?? 0) + 1);
     }
-    if (rows.length < PAGE_SIZE) break;
   }
-  return out;
+  return counts;
 }
 
 function mergeCounts(into: Map<string, number>, from: Map<string, number>) {
@@ -121,7 +129,7 @@ export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
   const from = sp.get("date_from") || kstYmd();
   const to = sp.get("date_to") || from;
-  const cacheKey = `dashboard:${from}:${to}`;
+  const cacheKey = `dashboard:v2:${from}:${to}`;
   const cached = getTtlCache<Record<string, unknown>>(cacheKey);
   if (cached) return NextResponse.json(cached);
 
@@ -140,7 +148,6 @@ export async function GET(request: NextRequest) {
 
   const [
     staffRes,
-    logs,
     contactedLeads,
     contactedB2b,
     inboundLeads,
@@ -149,13 +156,12 @@ export async function GET(request: NextRequest) {
     assignedB2b,
   ] = await Promise.all([
     supabase.from("staff_users").select("id, name, rank").eq("is_active", true),
-    loadFirstContactLogs({ rangeStart, rangeEnd, hidden: hiddenLeads }),
     countExact("leads", (q) =>
       applyHidden(
         "leads",
         q
-          .gte("assigned_at", rangeStart)
-          .lt("assigned_at", rangeEnd)
+          .gte("created_at", rangeStart)
+          .lt("created_at", rangeEnd)
           .in("status", [...CONTACT_STATUSES])
           .or("merge_status.eq.active,merge_status.is.null")
       )
@@ -164,8 +170,8 @@ export async function GET(request: NextRequest) {
       applyHidden(
         "tylife_b2b",
         q
-          .gte("assigned_at", rangeStart)
-          .lt("assigned_at", rangeEnd)
+          .gte("created_at", rangeStart)
+          .lt("created_at", rangeEnd)
           .in("status", [...CONTACT_STATUSES])
           .or("merge_status.eq.active,merge_status.is.null")
       )
@@ -176,17 +182,30 @@ export async function GET(request: NextRequest) {
     countExact("tylife_b2b", (q) =>
       applyHidden("tylife_b2b", q.gte("created_at", rangeStart).lt("created_at", rangeEnd))
     ),
-    loadAssignedCounts({
+    loadAssignedInPeriod({
       table: "leads",
       rangeStart,
       rangeEnd,
       hiddenFilter: hiddenLeadsFilter,
     }),
-    loadAssignedCounts({
+    loadAssignedInPeriod({
       table: "tylife_b2b",
       rangeStart,
       rangeEnd,
       hiddenFilter: hiddenCandidatesFilter,
+    }),
+  ]);
+
+  const [contactLeads, contactB2b] = await Promise.all([
+    loadFirstContactCountsForAssigned({
+      assigneeByLeadId: assignedLeads.assigneeByLeadId,
+      leadTable: "leads",
+      hidden: hiddenLeads,
+    }),
+    loadFirstContactCountsForAssigned({
+      assigneeByLeadId: assignedB2b.assigneeByLeadId,
+      leadTable: "tylife_b2b",
+      hidden: hiddenLeads,
     }),
   ]);
 
@@ -195,15 +214,12 @@ export async function GET(request: NextRequest) {
   const inbound = inboundLeads + inboundB2b;
 
   const assignedCounts = new Map<string, number>();
-  mergeCounts(assignedCounts, assignedLeads);
-  mergeCounts(assignedCounts, assignedB2b);
+  mergeCounts(assignedCounts, assignedLeads.counts);
+  mergeCounts(assignedCounts, assignedB2b.counts);
 
   const contactByPerson = new Map<string, number>();
-  for (const log of logs) {
-    const id = log.assignee_id;
-    if (!id) continue;
-    contactByPerson.set(id, (contactByPerson.get(id) ?? 0) + 1);
-  }
+  mergeCounts(contactByPerson, contactLeads);
+  mergeCounts(contactByPerson, contactB2b);
 
   const by_person = people.map((p) => {
     const assigned = assignedCounts.get(p.id) ?? 0;
