@@ -250,6 +250,7 @@ export function parseEventDate(v: unknown): string | null {
 export function staffRankLabel(rank: StaffRank): string {
   if (rank === "admin") return "관리자";
   if (rank === "manager") return "매니저";
+  if (rank === "tm_admin") return "TM관리자";
   return "영업자";
 }
 

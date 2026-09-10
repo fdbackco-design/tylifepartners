@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { parseLeadQuery, queryLeads } from "@/lib/crm/queryLeads";
-import { canSeeAdminStatus, canSeeMetaAdSpend } from "@/lib/crm/scope";
+import { canAccessCrmLeads, canSeeAdminStatus, canSeeMetaAdSpend } from "@/lib/crm/scope";
 import { allowedStatusesFor } from "@/lib/crm/status";
 import { LEAD_STATUSES } from "@/lib/crm/types";
 import { getTodayDbCostForList } from "@/lib/meta/insights";
@@ -10,6 +10,9 @@ export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
+  }
+  if (!canAccessCrmLeads(session)) {
+    return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
   }
 
   try {

@@ -57,6 +57,8 @@ export async function getSession(): Promise<SessionUser | null> {
       rank = "admin";
     } else if (rankRaw === "manager") {
       rank = "manager";
+    } else if (rankRaw === "tm_admin") {
+      rank = "tm_admin";
     } else if (rankRaw === "sales") {
       rank = "sales";
     } else if (!userId) {

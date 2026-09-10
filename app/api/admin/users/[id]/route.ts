@@ -38,9 +38,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ ok: false, message: "직급 변경은 관리자만 가능합니다." }, { status: 403 });
     }
     const rank = String(body.rank).trim();
-    if (rank !== "admin" && rank !== "manager" && rank !== "sales") {
+    if (rank !== "admin" && rank !== "manager" && rank !== "sales" && rank !== "tm_admin") {
       return NextResponse.json(
-        { ok: false, message: "직급은 관리자·매니저·영업자만 가능합니다." },
+        { ok: false, message: "직급은 관리자·매니저·영업자·TM관리자만 가능합니다." },
         { status: 400 }
       );
     }
@@ -53,7 +53,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   // 직급 전환 시 소속 관계 정리
-  if (nextRank === "manager" || nextRank === "admin") {
+  if (nextRank === "manager" || nextRank === "admin" || nextRank === "tm_admin") {
     patch.parent_id = null;
   } else if (nextRank === "sales" && body.parent_id !== undefined && session.rank === "admin") {
     const parentId = body.parent_id ? String(body.parent_id) : null;

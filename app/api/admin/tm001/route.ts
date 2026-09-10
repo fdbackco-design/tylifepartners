@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { listTm001Customers } from "@/lib/crm/tm001/store";
-import { visibleAssigneeIdsFromStaff } from "@/lib/crm/scope";
+import { canAccessTm001, tm001VisibleAssigneeIdsFromStaff } from "@/lib/crm/scope";
 import { getSupabaseAdmin } from "@/lib/supabase";
-
-function canAccessTm001(rank: string | undefined): boolean {
-  return rank === "admin" || rank === "manager" || rank === "sales";
-}
 
 /** GET /api/admin/tm001 */
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
-  if (!canAccessTm001(session.rank)) {
+  if (!canAccessTm001(session)) {
     return NextResponse.json({ ok: false, message: "접근 권한이 없습니다." }, { status: 403 });
   }
 
@@ -32,25 +28,23 @@ export async function GET(request: NextRequest) {
       id: String(s.id),
       parent_id: s.parent_id ? String(s.parent_id) : null,
     }));
-    const scoped = visibleAssigneeIdsFromStaff(session, staffLite);
+    const scoped = tm001VisibleAssigneeIdsFromStaff(session, staffLite);
 
     const includeMeta = offset === 0 || sp.get("meta") === "1";
     const skipRegions = sp.get("skipRegions") === "1";
     const skipStayTotal = sp.get("skipStayTotal") === "1";
 
-    const listPromise = listTm001Customers({
+    const { items, regions, total, stayTotal } = await listTm001Customers({
       q: sp.get("q") || "",
       region: sp.get("region") || "",
       status: sp.get("status") || "",
       visibleAssigneeIds: scoped,
       limit,
       offset,
-      includeHistory: session.rank === "admin",
+      includeHistory: session.rank === "admin" || session.rank === "tm_admin",
       includeStayTotal: includeMeta && !skipStayTotal,
       includeRegions: includeMeta && !skipRegions,
     });
-
-    const { items, regions, total, stayTotal } = await listPromise;
 
     const staffOut =
       session.rank === "sales"

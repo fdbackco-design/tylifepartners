@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
 import { CrmAlert, CrmButton, CrmDialog } from "@/app/admin/_components/crm/ui";
 import { appendStatusMemo } from "@/lib/crm/memo";
-import { canChangeAssignee } from "@/lib/crm/scope";
+import { canChangeTm001Assignee } from "@/lib/crm/scope";
 import type { SessionUser } from "@/lib/crm/types";
 import {
   TM001_PRODUCTS,
@@ -547,9 +547,10 @@ export default function Tm001PageClient() {
   };
 
 
-  const canAssign = session ? canChangeAssignee(session as SessionUser) : false;
+  const canAssign = session ? canChangeTm001Assignee(session as SessionUser) : false;
   const canUpload = session?.rank === "admin";
   const canDelete = session?.rank === "admin";
+  const showAssigneeHistory = session?.rank === "admin" || session?.rank === "tm_admin";
   const showBulkBar = selected.size > 0 && (canAssign || canDelete);
 
   return (
@@ -871,7 +872,7 @@ export default function Tm001PageClient() {
                               value={c.assignee_id}
                               staff={staff}
                               unresolvedLabel={c.assignee_name}
-                              history={session?.rank === "admin" ? c.assignee_history : undefined}
+                              history={showAssigneeHistory ? c.assignee_history : undefined}
                               onChange={(id) => void patchCustomer(c.id, { assignee_id: id })}
                               disabled={saving || !canAssign}
                             />
@@ -1008,7 +1009,7 @@ export default function Tm001PageClient() {
                           value={c.assignee_id}
                           staff={staff}
                           unresolvedLabel={c.assignee_name}
-                          history={session?.rank === "admin" ? c.assignee_history : undefined}
+                          history={showAssigneeHistory ? c.assignee_history : undefined}
                           disabled={saving || !canAssign}
                           onChange={(id) => void patchCustomer(c.id, { assignee_id: id })}
                         />

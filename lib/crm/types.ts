@@ -1,5 +1,13 @@
-export const STAFF_RANKS = ["admin", "manager", "sales"] as const;
+export const STAFF_RANKS = ["admin", "manager", "sales", "tm_admin"] as const;
 export type StaffRank = (typeof STAFF_RANKS)[number];
+
+/** UI 표시용 직급 라벨 */
+export function staffRankLabel(rank: string): string {
+  if (rank === "admin") return "관리자";
+  if (rank === "manager") return "매니저";
+  if (rank === "tm_admin") return "TM관리자";
+  return "영업자";
+}
 
 export const LEAD_STATUSES = [
   "배정전",

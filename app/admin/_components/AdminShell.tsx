@@ -16,19 +16,20 @@ import {
   stashPendingOpenComment,
 } from "@/lib/crm/pushDeepLink";
 import type { SessionUser } from "@/lib/crm/types";
+import { staffRankLabel } from "@/lib/crm/types";
 
 const PRIMARY_TABS = [
   { href: "/admin/dashboard", label: "대시보드", ranks: ["admin"] as const },
   { href: "/admin/consumers", label: "소비자 DB", ranks: ["admin", "manager", "sales"] as const },
   { href: "/admin/candidates", label: "후보자 DB", ranks: ["admin", "manager", "sales"] as const },
-  { href: "/admin/tm001", label: "TM001", ranks: ["admin", "manager", "sales"] as const },
+  { href: "/admin/tm001", label: "TM001", ranks: ["admin", "manager", "sales", "tm_admin"] as const },
   { href: "/admin/reassign", label: "담당자 변경 필요", ranks: ["admin", "manager"] as const },
   { href: "/admin/calendar", label: "캘린더", ranks: ["admin", "manager", "sales"] as const },
   { href: "/admin/resources", label: "자료 공유", ranks: ["admin", "manager", "sales"] as const },
 ];
 
 const SECONDARY_TABS = [
-  { href: "/admin/password", label: "비밀번호 변경", ranks: ["admin", "manager", "sales"] as const },
+  { href: "/admin/password", label: "비밀번호 변경", ranks: ["admin", "manager", "sales", "tm_admin"] as const },
   { href: "/admin/accounts", label: "계정 관리", ranks: ["admin", "manager"] as const },
   { href: "/admin/audit-logs", label: "활동 로그", ranks: ["admin"] as const },
   { href: "/admin/assignment", label: "자동 분배 설정", ranks: ["admin"] as const },
@@ -216,7 +217,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     );
   }
 
-  const rankLabel = user.rank === "admin" ? "관리자" : user.rank === "manager" ? "매니저" : "영업자";
+  const rankLabel = staffRankLabel(user.rank);
   const home = defaultAdminHome(user.rank);
 
   return (

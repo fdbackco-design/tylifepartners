@@ -7,7 +7,7 @@ import type { LeadCategory } from "@/lib/crm/types";
 export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
-  if (session.rank === "sales") {
+  if (session.rank === "sales" || session.rank === "tm_admin") {
     return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
   }
 

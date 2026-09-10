@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { canExportLeads, canSeeMetaAdSpend, descendantAssigneeIds } from "@/lib/crm/scope";
+import {
+  canAccessAdminPath,
+  canAccessCrmLeads,
+  canAccessTm001,
+  canChangeTm001Assignee,
+  canExportLeads,
+  canSeeMetaAdSpend,
+  defaultAdminHome,
+  descendantAssigneeIds,
+  tm001VisibleAssigneeIdsFromStaff,
+} from "@/lib/crm/scope";
 import type { SessionUser } from "@/lib/crm/types";
 
 describe("descendantAssigneeIds", () => {
@@ -50,6 +60,7 @@ describe("canSeeMetaAdSpend", () => {
     assert.equal(canSeeMetaAdSpend({ ...base, rank: "admin" }), true);
     assert.equal(canSeeMetaAdSpend({ ...base, rank: "manager" }), false);
     assert.equal(canSeeMetaAdSpend({ ...base, rank: "sales" }), false);
+    assert.equal(canSeeMetaAdSpend({ ...base, rank: "tm_admin" }), false);
   });
 });
 
@@ -67,5 +78,32 @@ describe("canExportLeads", () => {
     assert.equal(canExportLeads({ ...base, rank: "admin" }), true);
     assert.equal(canExportLeads({ ...base, rank: "manager" }), false);
     assert.equal(canExportLeads({ ...base, rank: "sales" }), false);
+    assert.equal(canExportLeads({ ...base, rank: "tm_admin" }), false);
+  });
+});
+
+describe("tm_admin scope", () => {
+  const tm: SessionUser = {
+    rank: "tm_admin",
+    userId: "tm1",
+    name: "TM",
+    loginId: "tm",
+    region: null,
+    parentId: null,
+  };
+
+  it("homes to tm001 and only allows tm001/password paths", () => {
+    assert.equal(defaultAdminHome("tm_admin"), "/admin/tm001");
+    assert.equal(canAccessAdminPath("tm_admin", "/admin/tm001"), true);
+    assert.equal(canAccessAdminPath("tm_admin", "/admin/password"), true);
+    assert.equal(canAccessAdminPath("tm_admin", "/admin/consumers"), false);
+    assert.equal(canAccessAdminPath("tm_admin", "/admin/dashboard"), false);
+  });
+
+  it("can access TM001 fully but not CRM leads", () => {
+    assert.equal(canAccessTm001(tm), true);
+    assert.equal(canAccessCrmLeads(tm), false);
+    assert.equal(canChangeTm001Assignee(tm), true);
+    assert.equal(tm001VisibleAssigneeIdsFromStaff(tm, []), "all");
   });
 });
