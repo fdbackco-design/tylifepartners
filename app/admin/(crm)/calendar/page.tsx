@@ -257,14 +257,18 @@ function CalendarPageInner() {
     if (ev.read_only || ev.source === "lead_meeting") {
       const parts = String(ev.id || "").split(":");
       if (parts[0] === "lead" && parts.length >= 3) {
-        const kind = parts[1];
+        const kind = ev.lead_category || parts[1];
         const leadId = parts.slice(2).join(":");
+        const qs = new URLSearchParams();
+        qs.set("open_id", leadId);
+        const phone = String(ev.lead_phone || "").trim();
+        if (phone) qs.set("search", phone);
         const href =
           kind === "tm001"
-            ? `/admin/tm001?open_id=${encodeURIComponent(leadId)}`
+            ? `/admin/tm001?${qs.toString()}`
             : kind === "candidates"
-              ? `/admin/candidates?open_id=${encodeURIComponent(leadId)}`
-              : `/admin/consumers?open_id=${encodeURIComponent(leadId)}`;
+              ? `/admin/candidates?${qs.toString()}`
+              : `/admin/consumers?${qs.toString()}`;
         router.push(href);
         return;
       }

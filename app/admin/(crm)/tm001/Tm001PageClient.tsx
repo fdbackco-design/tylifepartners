@@ -185,8 +185,10 @@ export default function Tm001PageClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
-  const [q, setQ] = useState("");
-  const [qDebounced, setQDebounced] = useState("");
+  const [q, setQ] = useState(() => searchParams.get("q") || searchParams.get("search") || "");
+  const [qDebounced, setQDebounced] = useState(() =>
+    (searchParams.get("q") || searchParams.get("search") || "").trim()
+  );
   const [region, setRegion] = useState("");
   const [status, setStatus] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -210,6 +212,7 @@ export default function Tm001PageClient() {
   const memoCustomerRef = useRef<Tm001Customer | null>(null);
   const memoSavedRef = useRef("");
   const openIdHandledRef = useRef<string | null>(null);
+  const pendingOpenIdRef = useRef<string | null>(searchParams.get("open_id"));
   const regionsRef = useRef<string[]>([]);
   regionsRef.current = regions;
 
@@ -473,7 +476,7 @@ export default function Tm001PageClient() {
   };
 
   useEffect(() => {
-    const openId = searchParams.get("open_id");
+    const openId = pendingOpenIdRef.current ?? searchParams.get("open_id");
     if (!openId || openIdHandledRef.current === openId || loading) return;
 
     void (async () => {
@@ -482,11 +485,21 @@ export default function Tm001PageClient() {
         const data = await res.json();
         if (!data.ok || !data.item) {
           openIdHandledRef.current = openId;
+          pendingOpenIdRef.current = null;
           showToast(data.message || "고객을 찾을 수 없습니다.");
           return;
         }
         openIdHandledRef.current = openId;
+        pendingOpenIdRef.current = null;
         const item = data.item as Tm001Customer;
+        const phone = String(item.phone || "").trim();
+        if (phone) {
+          setQ(phone);
+          setQDebounced(phone);
+          setPage(0);
+        }
+        setRegion("");
+        setStatus("");
         setItems((list) => {
           if (list.some((c) => c.id === item.id)) {
             return list.map((c) => (c.id === item.id ? { ...item, stays: c.stays.length ? c.stays : item.stays } : c));
@@ -496,14 +509,22 @@ export default function Tm001PageClient() {
         setSelected(new Set([item.id]));
         openMemo(item);
 
+        window.setTimeout(() => {
+          document
+            .querySelector(`[data-tm001-id="${CSS.escape(item.id)}"]`)
+            ?.scrollIntoView({ block: "center", behavior: "smooth" });
+        }, 120);
+
         const sp = new URLSearchParams(window.location.search);
         if (sp.has("open_id")) {
           sp.delete("open_id");
+          if (phone && !sp.get("search") && !sp.get("q")) sp.set("q", phone);
           const qs = sp.toString();
           router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
         }
       } catch {
         openIdHandledRef.current = openId;
+        pendingOpenIdRef.current = null;
         showToast("고객을 불러오지 못했습니다.");
       }
     })();
@@ -884,7 +905,11 @@ export default function Tm001PageClient() {
                       const unassigned = !c.assignee_id;
                       const saving = savingIds.has(c.id);
                       return (
-                        <tr key={c.id} className={`contact-row${unassigned ? " unassigned" : ""}${saving ? " is-saving" : ""}`}>
+                        <tr
+                          key={c.id}
+                          data-tm001-id={c.id}
+                          className={`contact-row${unassigned ? " unassigned" : ""}${saving ? " is-saving" : ""}${selected.has(c.id) ? " selected" : ""}`}
+                        >
                           <td className="check-cell pin-check">
                             <input
                               type="checkbox"
@@ -1050,7 +1075,11 @@ export default function Tm001PageClient() {
                 {pageItems.map((c) => {
                   const saving = savingIds.has(c.id);
                   return (
-                  <article key={`m-${c.id}`} className={`mobile-card${saving ? " is-saving" : ""}`}>
+                  <article
+                    key={`m-${c.id}`}
+                    data-tm001-id={c.id}
+                    className={`mobile-card${saving ? " is-saving" : ""}${selected.has(c.id) ? " selected" : ""}`}
+                  >
                     <div className="m-head">
                       <div className="m-head-left">
                         <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} aria-label={`${c.name} 선택`} disabled={saving} />
