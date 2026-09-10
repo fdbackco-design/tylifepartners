@@ -255,8 +255,21 @@ function CalendarPageInner() {
 
   const openEdit = (ev: CalendarEventRow) => {
     if (ev.read_only || ev.source === "lead_meeting") {
+      const parts = String(ev.id || "").split(":");
+      if (parts[0] === "lead" && parts.length >= 3) {
+        const kind = parts[1];
+        const leadId = parts.slice(2).join(":");
+        const href =
+          kind === "tm001"
+            ? `/admin/tm001?open_id=${encodeURIComponent(leadId)}`
+            : kind === "candidates"
+              ? `/admin/candidates?open_id=${encodeURIComponent(leadId)}`
+              : `/admin/consumers?open_id=${encodeURIComponent(leadId)}`;
+        router.push(href);
+        return;
+      }
       setModal({ mode: "day", date: ev.event_date });
-      showToast("고객 일정(대면·통화약속)은 고객 DB에서 수정해 주세요.");
+      showToast("고객 일정을 열 수 없습니다.");
       return;
     }
     if (!canEdit) {

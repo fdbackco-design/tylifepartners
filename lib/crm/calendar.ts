@@ -66,7 +66,7 @@ export type CalendarEventRow = {
   updated_at: string;
   /** lead 대면일·통화약속 가상 일정 */
   source?: "calendar" | "lead_meeting";
-  lead_category?: "consumers" | "candidates";
+  lead_category?: "consumers" | "candidates" | "tm001";
   lead_name?: string;
   lead_phone?: string;
   assignee_id?: string | null;

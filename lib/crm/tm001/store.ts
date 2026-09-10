@@ -5,6 +5,7 @@ import {
   formatBatchCode,
   formatMergedCustomerName,
   isTm001Product,
+  isTm001ScheduledStatus,
   isTm001Status,
   type Tm001Comment,
   type Tm001Customer,
@@ -96,6 +97,7 @@ function mapCustomerRow(
     assigned_at: r.assigned_at ? String(r.assigned_at) : null,
     status,
     product: r.product != null ? String(r.product) : null,
+    meeting_at: r.meeting_at ? String(r.meeting_at) : null,
     memo: String(r.memo ?? ""),
     comments: mapComments(r.comments),
     created_at: String(r.created_at ?? ""),
@@ -396,7 +398,7 @@ async function listTm001CustomersFallback(opts: {
   const supabase = getSupabaseAdmin();
   const { q, region, status, scoped, limit, offset } = opts;
   const CUSTOMER_COLS =
-    "id, partner_code, partner_name, batch_code, name, phone, normalized_phone, raw_phone, visit_count, assignee_id, assigned_at, status, product, memo, comments, created_at, updated_at";
+    "id, partner_code, partner_name, batch_code, name, phone, normalized_phone, raw_phone, visit_count, assignee_id, assigned_at, status, product, meeting_at, memo, comments, created_at, updated_at";
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const applyBase = (query: any, withStaysInner: boolean) => {
@@ -824,6 +826,7 @@ export async function patchTm001Customer(
   patch: {
     status?: string;
     product?: string | null;
+    meeting_at?: string | null;
     memo?: string;
     comment_append?: string;
     comment_by?: string;
@@ -838,6 +841,8 @@ export async function patchTm001Customer(
 
   const next: Record<string, unknown> = { updated_at: new Date().toISOString() };
   let nextMemo = String(current.memo ?? "");
+  const nextStatus =
+    patch.status != null && isTm001Status(patch.status) ? patch.status : String(current.status ?? "");
 
   if (patch.status != null) {
     if (!isTm001Status(patch.status)) throw new Error("허용되지 않은 상담상태입니다.");
@@ -848,11 +853,26 @@ export async function patchTm001Customer(
       nextMemo = appendStatusMemo(nextMemo, patch.status);
       next.memo = nextMemo;
     }
+    if (!isTm001ScheduledStatus(patch.status) && patch.meeting_at === undefined) {
+      next.meeting_at = null;
+    }
   }
   if (patch.product !== undefined) {
     if (patch.product == null || patch.product === "") next.product = null;
     else if (!isTm001Product(patch.product)) throw new Error("허용되지 않은 상품입니다.");
     else next.product = patch.product;
+  }
+  if (patch.meeting_at !== undefined) {
+    if (patch.meeting_at == null || patch.meeting_at === "") {
+      next.meeting_at = null;
+    } else {
+      if (!isTm001ScheduledStatus(nextStatus)) {
+        throw new Error("재콜 상태에서만 일정을 지정할 수 있습니다.");
+      }
+      const t = Date.parse(String(patch.meeting_at));
+      if (!Number.isFinite(t)) throw new Error("일정 형식이 올바르지 않습니다.");
+      next.meeting_at = new Date(t).toISOString();
+    }
   }
   // 상담상태와 함께 온 메모는 후보자 DB와 같이 상태 자동기록을 유지 (명시 memo만 별도 저장)
   if (patch.memo !== undefined && patch.status == null) {
