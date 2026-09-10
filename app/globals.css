@@ -536,6 +536,11 @@ main.crm-admin-login {
   line-height: 1.45;
 }
 
+.crm-dash-page {
+  max-width: 880px;
+  width: 100%;
+}
+
 .crm-dash-chart {
   margin-top: 16px;
   padding: 16px;
@@ -695,11 +700,6 @@ main.crm-admin-login {
 .crm-dash-progress-col {
   width: 160px;
   min-width: 140px;
-}
-
-.crm-dash-pending {
-  font-weight: 700;
-  color: #b45309;
 }
 
 .crm-dash-row-warn {
