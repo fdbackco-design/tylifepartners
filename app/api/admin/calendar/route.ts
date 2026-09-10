@@ -15,7 +15,7 @@ import {
   type CalendarVisibility,
 } from "@/lib/crm/calendar";
 import { addDaysYmd, kstYmd, startOfKstDayIso } from "@/lib/crm/kst";
-import { visibleAssigneeIds } from "@/lib/crm/scope";
+import { visibleAssigneeIds, canAccessCrmLeads } from "@/lib/crm/scope";
 import { getSession } from "@/lib/adminSession";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { notifyCalendarEventCreated } from "@/lib/webPush";
@@ -152,6 +152,9 @@ function canViewLeadMeeting(
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
+  if (!canAccessCrmLeads(session)) {
+    return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
+  }
 
   const month = request.nextUrl.searchParams.get("month") || kstYmd().slice(0, 7);
   if (!/^\d{4}-\d{2}$/.test(month)) {

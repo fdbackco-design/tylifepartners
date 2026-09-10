@@ -58,6 +58,7 @@ const ACTION_OPTIONS = [
 function rankLabel(rank: string) {
   if (rank === "admin") return "관리자";
   if (rank === "manager") return "매니저";
+  if (rank === "tm_admin") return "TM관리자";
   if (rank === "sales") return "영업자";
   return rank || "-";
 }

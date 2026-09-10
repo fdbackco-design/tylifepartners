@@ -5,7 +5,7 @@ import { appendStatusMemo } from "@/lib/crm/memo";
 import { changeLeadAssignee } from "@/lib/crm/assignLead";
 import { attachAssigneeHistories } from "@/lib/crm/assigneeHistory";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
-import { visibleAssigneeIds, canEditAdminComment } from "@/lib/crm/scope";
+import { visibleAssigneeIds, canEditAdminComment, canAccessCrmLeads } from "@/lib/crm/scope";
 import {
   allowedStatusesFor,
   isLeadStatus,
@@ -41,6 +41,9 @@ function categoryOf(request: NextRequest): LeadCategory {
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
+  if (!canAccessCrmLeads(session)) {
+    return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
+  }
   const { id } = await params;
   const category = categoryOf(request);
   const table = tableForCategory(category);
@@ -107,6 +110,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
+  if (!canAccessCrmLeads(session)) {
+    return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
+  }
 
   const { id } = await params;
   const category = categoryOf(request);

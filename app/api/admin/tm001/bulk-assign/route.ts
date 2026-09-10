@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { bulkAssignTm001 } from "@/lib/crm/tm001/store";
-import { canChangeAssignee } from "@/lib/crm/scope";
+import { canChangeTm001Assignee } from "@/lib/crm/scope";
 
 /** POST /api/admin/tm001/bulk-assign */
 export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
-  if (!canChangeAssignee(session)) {
+  if (!canChangeTm001Assignee(session)) {
     return NextResponse.json({ ok: false, message: "담당자를 변경할 권한이 없습니다." }, { status: 403 });
   }
 

@@ -25,7 +25,7 @@ export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
 
-  if (session.rank === "sales") {
+  if (!session || !canManageAccounts(session)) {
     return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
   }
 
@@ -128,16 +128,16 @@ export async function POST(request: NextRequest) {
       rank = "sales";
       parentId = session.userId;
     } else if (session.rank === "admin") {
-      if (rank !== "admin" && rank !== "manager" && rank !== "sales") {
+      if (rank !== "admin" && rank !== "manager" && rank !== "sales" && rank !== "tm_admin") {
         return NextResponse.json(
-          { ok: false, message: "직급은 관리자·매니저·영업자만 가능합니다." },
+          { ok: false, message: "직급은 관리자·매니저·영업자·TM관리자만 가능합니다." },
           { status: 400 }
         );
       }
     } else {
       return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
     }
-    if (rank === "manager" || rank === "admin") parentId = null;
+    if (rank === "manager" || rank === "admin" || rank === "tm_admin") parentId = null;
 
     const loginId = credentialsFromPhone(phone);
     if (loginId.length < 8) {

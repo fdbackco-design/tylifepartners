@@ -67,7 +67,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: false, message: "아이디 또는 비밀번호가 올바르지 않습니다." }, { status: 401 });
       }
       const rank =
-        user.rank === "admin" ? "admin" : user.rank === "manager" ? "manager" : "sales";
+        user.rank === "admin"
+          ? "admin"
+          : user.rank === "manager"
+            ? "manager"
+            : user.rank === "tm_admin"
+              ? "tm_admin"
+              : "sales";
       token = await createSession({
         rank,
         userId: user.id,

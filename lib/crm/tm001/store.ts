@@ -13,7 +13,7 @@ import {
 } from "@/lib/crm/tm001/types";
 import { buildAssigneeNameChain } from "@/lib/crm/assigneeHistoryFormat";
 import { appendStatusMemo } from "@/lib/crm/memo";
-import { canChangeAssignee } from "@/lib/crm/scope";
+import { canChangeTm001Assignee } from "@/lib/crm/scope";
 import type { SessionUser } from "@/lib/crm/types";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -857,7 +857,7 @@ export async function patchTm001Customer(
 
   const curAssignee = current.assignee_id ? String(current.assignee_id) : null;
   if (patch.assignee_id !== undefined) {
-    if (!canChangeAssignee(session)) {
+    if (!canChangeTm001Assignee(session)) {
       throw new Error("담당자를 변경할 권한이 없습니다.");
     }
     const nextAssignee = patch.assignee_id ? String(patch.assignee_id) : null;
@@ -891,7 +891,7 @@ export async function bulkAssignTm001(
   assigneeId: string | null,
   session: SessionUser
 ): Promise<{ updated: number }> {
-  if (!canChangeAssignee(session)) {
+  if (!canChangeTm001Assignee(session)) {
     throw new Error("담당자를 변경할 권한이 없습니다.");
   }
   const supabase = getSupabaseAdmin();

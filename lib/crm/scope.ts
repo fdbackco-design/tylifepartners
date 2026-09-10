@@ -49,6 +49,20 @@ export function visibleAssigneeIdsFromStaff(
   return descendantAssigneeIds(session.userId, staff);
 }
 
+/** TM001 목록 스코프 — admin·TM관리자는 전체 */
+export function tm001VisibleAssigneeIdsFromStaff(
+  session: SessionUser,
+  staff: Array<{ id: string; parent_id: string | null }>
+): string[] | "all" {
+  if (session.rank === "admin" || session.rank === "tm_admin") return "all";
+  return visibleAssigneeIdsFromStaff(session, staff);
+}
+
+export async function tm001VisibleAssigneeIds(session: SessionUser): Promise<string[] | "all"> {
+  if (session.rank === "admin" || session.rank === "tm_admin") return "all";
+  return visibleAssigneeIds(session);
+}
+
 export function canManageAccounts(session: SessionUser): boolean {
   return session.rank === "admin" || session.rank === "manager";
 }
@@ -59,6 +73,20 @@ export function canSeeAdminStatus(session: SessionUser): boolean {
 
 export function canChangeAssignee(session: SessionUser): boolean {
   return session.rank === "admin" || session.rank === "manager";
+}
+
+/** TM001 담당자 변경 — admin·manager·TM관리자 */
+export function canChangeTm001Assignee(session: SessionUser): boolean {
+  return session.rank === "admin" || session.rank === "manager" || session.rank === "tm_admin";
+}
+
+export function canAccessTm001(session: Pick<SessionUser, "rank">): boolean {
+  return (
+    session.rank === "admin" ||
+    session.rank === "manager" ||
+    session.rank === "sales" ||
+    session.rank === "tm_admin"
+  );
 }
 
 export function canEditAdminComment(session: SessionUser): boolean {
@@ -75,11 +103,21 @@ export function canExportLeads(session: Pick<SessionUser, "rank">): boolean {
   return session.rank === "admin";
 }
 
+/** 소비자/후보자 CRM API — TM관리자 제외 */
+export function canAccessCrmLeads(session: Pick<SessionUser, "rank">): boolean {
+  return session.rank === "admin" || session.rank === "manager" || session.rank === "sales";
+}
+
 /** CRM 탭·보조 메뉴 접근 가능 여부 */
 export function canAccessAdminPath(rank: SessionUser["rank"], pathname: string): boolean {
   const path = pathname.split("?")[0] || pathname;
 
   if (rank === "admin") return true;
+
+  if (rank === "tm_admin") {
+    const allowed = ["/admin/tm001", "/admin/password"];
+    return allowed.some((p) => path === p || path.startsWith(`${p}/`));
+  }
 
   const allowed =
     rank === "manager"
@@ -106,5 +144,7 @@ export function canAccessAdminPath(rank: SessionUser["rank"], pathname: string):
 }
 
 export function defaultAdminHome(rank: SessionUser["rank"]): string {
-  return rank === "admin" ? "/admin/dashboard" : "/admin/consumers";
+  if (rank === "admin") return "/admin/dashboard";
+  if (rank === "tm_admin") return "/admin/tm001";
+  return "/admin/consumers";
 }

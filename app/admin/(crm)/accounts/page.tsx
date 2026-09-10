@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatPhoneKorean } from "@/lib/phone";
 import { formatKstDateTime } from "@/lib/crm/kst";
 import { REGION_ZONE_NAMES, isRegionZoneName } from "@/lib/crm/regionZones";
+import { staffRankLabel } from "@/lib/crm/types";
 import {
   CrmAlert,
   CrmBadge,
@@ -143,6 +144,7 @@ export default function AccountsPage() {
     admins: items.filter((u) => u.rank === "admin").length,
     managers: items.filter((u) => u.rank === "manager").length,
     sales: items.filter((u) => u.rank === "sales").length,
+    tmAdmins: items.filter((u) => u.rank === "tm_admin").length,
   };
 
   const canSelectUser = (u: User) => {
@@ -339,7 +341,7 @@ export default function AccountsPage() {
     <div className="crm-ui-content">
       <CrmPageHeader
         title="계정 관리"
-        description="관리자·매니저·영업자 계정을 발급하고 상태를 관리합니다."
+        description="관리자·매니저·영업자·TM관리자 계정을 발급하고 상태를 관리합니다."
         actions={
           <CrmButton variant="primary" onClick={openCreate}>
             <IconPlus /> 계정 추가
@@ -352,6 +354,7 @@ export default function AccountsPage() {
               ...(me?.rank === "admin" ? [{ label: "관리자", value: stats.admins }] : []),
               { label: "매니저", value: stats.managers },
               { label: "영업자", value: stats.sales },
+              ...(me?.rank === "admin" ? [{ label: "TM관리자", value: stats.tmAdmins }] : []),
             ]}
           />
         }
@@ -385,6 +388,7 @@ export default function AccountsPage() {
           {me?.rank === "admin" ? <option value="admin">관리자</option> : null}
           <option value="manager">매니저</option>
           <option value="sales">영업자</option>
+          {me?.rank === "admin" ? <option value="tm_admin">TM관리자</option> : null}
         </CrmSelect>
         <CrmSelect value={filterParent} onChange={(e) => setFilterParent(e.target.value)} aria-label="소속 필터" style={{ width: 160 }}>
           <option value="all">소속 전체</option>
@@ -493,7 +497,7 @@ export default function AccountsPage() {
                 </td>
                 <td style={{ fontWeight: 600 }} className="crm-cell-nowrap">{u.name}</td>
                 <td className="crm-cell-nowrap">
-                  {u.rank === "admin" ? "관리자" : u.rank === "manager" ? "매니저" : "영업자"}
+                  {staffRankLabel(u.rank)}
                 </td>
                 <td className="crm-cell-nowrap">{u.login_id}</td>
                 <td className="crm-cell-nowrap">{formatPhoneKorean(u.phone)}</td>
@@ -579,7 +583,9 @@ export default function AccountsPage() {
                 ? "매니저에서 다른 직급으로 바꾸면 기존 산하 영업자의 소속이 해제됩니다."
                 : rank === "admin"
                   ? "관리자는 대시보드·설정·계정 관리 등 전체 메뉴에 접근할 수 있습니다."
-                  : undefined
+                  : rank === "tm_admin"
+                    ? "TM관리자는 TM001 목록 전체 조회·수정만 가능합니다. 다른 메뉴는 보이지 않습니다."
+                    : undefined
             }
           >
             <CrmSelect
@@ -588,12 +594,13 @@ export default function AccountsPage() {
               onChange={(e) => {
                 const next = e.target.value;
                 setRank(next);
-                if (next === "manager" || next === "admin") setParentId("");
+                if (next === "manager" || next === "admin" || next === "tm_admin") setParentId("");
               }}
             >
               <option value="admin">관리자</option>
               <option value="manager">매니저</option>
               <option value="sales">영업자</option>
+              <option value="tm_admin">TM관리자</option>
             </CrmSelect>
           </CrmField>
         )}
