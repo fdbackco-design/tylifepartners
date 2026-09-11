@@ -71,7 +71,10 @@
 .tm001-root .filter-meta b{color:var(--purple)}
 .tm001-root .selection-button{border-color:#ded1f0;color:var(--purple);background:#fcfaff}
 .tm001-root .region-message{font-size:11px;color:var(--purple);background:#f8f5fc;border-top:1px solid #f0eaf8;padding:8px 20px}
-.tm001-root .table-scroll{overflow-x:auto;scrollbar-width:thin;scrollbar-color:#cfc9dc #f5f4f8;width:100%;position:relative}
+.tm001-root .table-scroll{overflow-x:auto;scrollbar-width:thin;scrollbar-color:#cfc9dc #f5f4f8;width:100%;position:relative;overscroll-behavior-x:contain}
+.tm001-root .table-scroll.is-scrollable-x{cursor:grab}
+.tm001-root .table-scroll.is-grab-scrolling{cursor:grabbing;user-select:none}
+.tm001-root .table-scroll.is-grab-scrolling *{cursor:grabbing!important;user-select:none!important}
 .tm001-root .tm001-table{border-collapse:separate;border-spacing:0;width:100%;min-width:1817px;table-layout:fixed;font-size:12px}
 .tm001-root .tm001-table th{background:#f8f9fc;color:#727d91;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 12px;text-align:left;line-height:1.3;font-weight:650;font-size:11px;white-space:nowrap}
 .tm001-root .tm001-table th.group-head{text-align:center;color:#60547a;background:#f5f1fa;padding:9px 10px;border-left:1px solid #e8e0f1;border-right:1px solid #e8e0f1;letter-spacing:.005em}
