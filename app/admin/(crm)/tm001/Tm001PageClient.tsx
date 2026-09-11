@@ -208,6 +208,10 @@ export default function Tm001PageClient() {
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [commentCustomer, setCommentCustomer] = useState<Tm001Customer | null>(null);
   const [commentDraft, setCommentDraft] = useState("");
+  const [desktopTableShellEl, setDesktopTableShellEl] = useState<HTMLDivElement | null>(null);
+  const setDesktopTableShellRef = useCallback((node: HTMLDivElement | null) => {
+    setDesktopTableShellEl(node);
+  }, []);
   const fileRef = useRef<HTMLInputElement>(null);
   const memoCustomerRef = useRef<Tm001Customer | null>(null);
   const memoSavedRef = useRef("");
@@ -220,6 +224,90 @@ export default function Tm001PageClient() {
     setToast(msg);
     window.setTimeout(() => setToast(""), 2800);
   }, []);
+
+  // PC: 표 영역을 마우스로 끌어 가로 스크롤
+  useEffect(() => {
+    const el = desktopTableShellEl;
+    if (!el) return;
+
+    let dragging = false;
+    let moved = false;
+    let startX = 0;
+    let startScrollLeft = 0;
+
+    const syncScrollableClass = () => {
+      el.classList.toggle("is-scrollable-x", el.scrollWidth > el.clientWidth + 1);
+    };
+
+    const isInteractive = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      return Boolean(
+        target.closest("a, button, input, select, textarea, label, .crm-popover, [contenteditable='true']")
+      );
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      if (isInteractive(e.target)) return;
+      if (el.scrollWidth <= el.clientWidth + 1) return;
+
+      dragging = true;
+      moved = false;
+      startX = e.clientX;
+      startScrollLeft = el.scrollLeft;
+      el.classList.add("is-grab-scrolling");
+      e.preventDefault();
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 3) moved = true;
+      el.scrollLeft = startScrollLeft - dx;
+      e.preventDefault();
+    };
+
+    const endDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove("is-grab-scrolling");
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", endDrag);
+    };
+
+    const onClickCapture = (e: MouseEvent) => {
+      if (!moved) return;
+      e.preventDefault();
+      e.stopPropagation();
+      moved = false;
+    };
+
+    const onMouseDownCapture = (e: MouseEvent) => {
+      onMouseDown(e);
+      if (!dragging) return;
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", endDrag);
+    };
+
+    syncScrollableClass();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncScrollableClass) : null;
+    ro?.observe(el);
+    const table = el.querySelector("table");
+    if (table) ro?.observe(table);
+
+    el.addEventListener("mousedown", onMouseDownCapture);
+    el.addEventListener("click", onClickCapture, true);
+    window.addEventListener("resize", syncScrollableClass);
+    return () => {
+      ro?.disconnect();
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", endDrag);
+      el.removeEventListener("mousedown", onMouseDownCapture);
+      el.removeEventListener("click", onClickCapture, true);
+      window.removeEventListener("resize", syncScrollableClass);
+      el.classList.remove("is-grab-scrolling", "is-scrollable-x");
+    };
+  }, [desktopTableShellEl, items.length, loading, pageSize]);
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -828,7 +916,12 @@ export default function Tm001PageClient() {
             </div>
           ) : (
             <>
-              <div className="crm-table-shell table-scroll" role="region" aria-label="TM001 고객 DB">
+              <div
+                className="crm-table-shell crm-table-desktop table-scroll"
+                role="region"
+                aria-label="TM001 고객 DB"
+                ref={setDesktopTableShellRef}
+              >
                 <table className="tm001-table">
                   <colgroup>
                     <col style={{ width: 39 }} />
