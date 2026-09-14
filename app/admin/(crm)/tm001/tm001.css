@@ -90,11 +90,36 @@
 .tm001-root .tm001-col-filter-caret{font-size:9px;opacity:.75;flex-shrink:0}
 .tm001-root .tm001-col-filter-menu{
   position:absolute;top:calc(100% + 6px);left:0;z-index:40;
-  min-width:168px;max-width:240px;max-height:280px;overflow:auto;
+  min-width:168px;max-width:240px;max-height:min(320px,70vh);overflow:auto;
   padding:8px;border:1px solid #e4e0ec;border-radius:10px;background:#fff;
   box-shadow:0 10px 28px rgba(40,28,64,.14);
 }
 .tm001-root .tm001-col-filter-menu.align-right{left:auto;right:0}
+/* 테이블 overflow에 잘리지 않도록 body 포털 */
+.tm001-col-filter-menu-portal{
+  position:fixed;z-index:1200;
+  max-width:min(240px,calc(100vw - 16px));
+  max-height:min(320px,70vh);overflow:auto;
+  padding:8px;border:1px solid #e4e0ec;border-radius:10px;background:#fff;
+  box-shadow:0 10px 28px rgba(40,28,64,.14);
+}
+.tm001-col-filter-menu-portal .tm001-col-filter-list{display:grid;gap:2px}
+.tm001-col-filter-menu-portal .tm001-col-filter-list button{
+  display:block;width:100%;text-align:left;border:0;border-radius:7px;
+  background:transparent;padding:8px 10px;font-size:12px;font-weight:600;color:#2f3545;cursor:pointer;
+}
+.tm001-col-filter-menu-portal .tm001-col-filter-list button:hover{background:#f5f2fa}
+.tm001-col-filter-menu-portal .tm001-col-filter-list button.is-selected{background:#efe8f8;color:#5b3d8a}
+.tm001-col-filter-menu-portal .tm001-col-filter-date{display:grid;gap:8px;min-width:180px}
+.tm001-col-filter-menu-portal .tm001-col-filter-date-label{display:grid;gap:6px;font-size:11px;font-weight:650;color:#727d91}
+.tm001-col-filter-menu-portal .tm001-col-filter-date-input{
+  width:100%;min-height:34px;border:1px solid #dfe3ed;border-radius:8px;
+  padding:6px 8px;font-size:12px;color:#2f3545;background:#fff;box-sizing:border-box;
+}
+.tm001-col-filter-menu-portal .tm001-col-filter-clear{
+  border:0;background:transparent;padding:6px 4px;text-align:left;
+  font-size:11px;font-weight:650;color:#5b3d8a;text-decoration:underline;text-underline-offset:3px;cursor:pointer;
+}
 .tm001-root .tm001-col-filter-list{display:grid;gap:2px}
 .tm001-root .tm001-col-filter-list button{
   display:block;width:100%;text-align:left;border:0;border-radius:7px;
@@ -201,8 +226,8 @@
 .tm001-root .status-cell{position:relative;min-width:0;max-width:100%;overflow:hidden;display:flex;flex-direction:column;gap:6px}
 .tm001-root .status-cell.is-saving .status-select{opacity:.65}
 .tm001-root .status-meeting{width:100%;max-width:100%;min-width:0;min-height:35px;border:1px solid #f0ddb7;border-radius:7px;background:var(--amber-soft);font-size:10px;padding:6px 6px;appearance:auto;color:var(--amber);font-weight:650;box-sizing:border-box;display:block}
-.tm001-root .tm001-table td.status-col,
-.tm001-root .tm001-table th.status-col{overflow:hidden}
+.tm001-root .tm001-table td.status-col{overflow:hidden}
+.tm001-root .tm001-table th.status-col{overflow:visible}
 .tm001-root .row-saving{display:block;margin-top:6px;font-size:10px;font-weight:700;color:var(--purple)}
 .tm001-root .tm001-table tr.contact-row.is-saving td{background:#faf8ff}
 .tm001-root .tm001-table tr.contact-row.is-saving[data-row-status="관심"] td{background:#fff0f5}
