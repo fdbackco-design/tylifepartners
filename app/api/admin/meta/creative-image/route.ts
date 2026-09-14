@@ -5,6 +5,7 @@ import {
   isMetaAdsConfigured,
   pickMetaAdId,
   resolveMetaAdCreative,
+  resolveMetaCreativeSlideUpstreamUrl,
 } from "@/lib/meta/ads";
 import { isLikelyMetaObjectId } from "@/lib/utm";
 
@@ -59,11 +60,26 @@ export async function GET(request: NextRequest) {
   }
 
   let creative = await resolveMetaAdCreative(adId);
-  let url = creative.image_url || creative.thumbnail_url;
+  const slideRaw = request.nextUrl.searchParams.get("slide");
+  const slideIndex =
+    slideRaw != null && slideRaw !== "" && Number.isFinite(Number(slideRaw))
+      ? Math.max(0, Math.floor(Number(slideRaw)))
+      : null;
+
+  let url: string | null = null;
+  if (slideIndex != null) {
+    url = await resolveMetaCreativeSlideUpstreamUrl(adId, slideIndex);
+  }
+  if (!url) {
+    url = creative.image_url || creative.thumbnail_url;
+  }
 
   if (!url) {
     creative = await fetchAndCacheMetaAdCreative(adId);
-    url = creative.image_url || creative.thumbnail_url;
+    if (slideIndex != null) {
+      url = await resolveMetaCreativeSlideUpstreamUrl(adId, slideIndex);
+    }
+    if (!url) url = creative.image_url || creative.thumbnail_url;
   }
   if (!url) {
     return new NextResponse("No creative image", { status: 404 });
@@ -72,7 +88,11 @@ export async function GET(request: NextRequest) {
   let upstream = await fetchUpstreamImage(url);
   if (!upstream) {
     creative = await fetchAndCacheMetaAdCreative(adId);
-    url = creative.image_url || creative.thumbnail_url;
+    if (slideIndex != null) {
+      url = await resolveMetaCreativeSlideUpstreamUrl(adId, slideIndex);
+    } else {
+      url = creative.image_url || creative.thumbnail_url;
+    }
     if (!url) {
       return new NextResponse("No creative image", { status: 404 });
     }

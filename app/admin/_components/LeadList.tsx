@@ -26,6 +26,21 @@ import {
 
 type StaffOpt = { id: string; name: string; parent_id: string | null; rank?: string };
 
+type CreativePreviewState = {
+  adId: string;
+  adName: string | null;
+  kind: "image" | "video" | "carousel";
+  slides: { index: number; label: string; src: string }[];
+  videoSrc: string | null;
+  videoEmbedSrc: string | null;
+  poster: string | null;
+  slideIndex: number;
+  loading: boolean;
+  error: string | null;
+  videoError: string | null;
+  videoMessage: string | null;
+};
+
 /** 담당자 필터 — 미배정 (URL assignee_ids 센티널, queryLeads와 동일) */
 const UNASSIGNED_ASSIGNEE_FILTER = "__unassigned__";
 
@@ -233,6 +248,7 @@ export default function LeadList({
   const commentNotifyOnCloseRef = useRef(false);
   const commentRowRef = useRef<LeadRow | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [creativePreview, setCreativePreview] = useState<CreativePreviewState | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Map<string, "consumers" | "candidates">>(new Map());
   const [bulkAssigneeId, setBulkAssigneeId] = useState<string | null>(null);
@@ -608,6 +624,79 @@ export default function LeadList({
         next.delete(row.id);
         return next;
       });
+    }
+  };
+
+  const openCreativePreview = async (row: LeadRow) => {
+    const adId = String(row.meta_ad_id ?? "").trim();
+    const fallback = row.meta_creative_full || row.meta_creative_preview;
+    if (!adId) {
+      if (fallback) setPreviewSrc(fallback);
+      return;
+    }
+
+    const kindGuess =
+      row.meta_creative_type === "video"
+        ? "video"
+        : row.meta_creative_type === "carousel"
+          ? "carousel"
+          : "image";
+
+    setPreviewSrc(null);
+    setCreativePreview({
+      adId,
+      adName: row.meta_ad_name,
+      kind: kindGuess,
+      slides: fallback ? [{ index: 0, label: row.meta_ad_name || "소재", src: fallback }] : [],
+      videoSrc: null,
+      videoEmbedSrc: null,
+      poster: fallback,
+      slideIndex: 0,
+      loading: true,
+      error: null,
+      videoError: null,
+      videoMessage: null,
+    });
+
+    try {
+      const res = await fetch(`/api/admin/meta/creative-detail?ad_id=${encodeURIComponent(adId)}`);
+      const data = await res.json();
+      if (!data.ok || !data.viewer) {
+        setCreativePreview((prev) =>
+          prev?.adId === adId
+            ? { ...prev, loading: false, error: data.message || "소재를 불러오지 못했습니다." }
+            : prev
+        );
+        return;
+      }
+      const v = data.viewer as {
+        ad_id: string;
+        ad_name: string | null;
+        kind: "image" | "video" | "carousel";
+        slides: { index: number; label: string; src: string }[];
+        video_src: string | null;
+        video_embed_src: string | null;
+        poster: string | null;
+        video_message: string | null;
+      };
+      setCreativePreview({
+        adId: v.ad_id,
+        adName: v.ad_name,
+        kind: v.kind,
+        slides: Array.isArray(v.slides) ? v.slides : [],
+        videoSrc: v.video_src,
+        videoEmbedSrc: v.video_embed_src,
+        poster: v.poster,
+        slideIndex: 0,
+        loading: false,
+        error: null,
+        videoError: null,
+        videoMessage: v.video_message,
+      });
+    } catch {
+      setCreativePreview((prev) =>
+        prev?.adId === adId ? { ...prev, loading: false, error: "네트워크 오류" } : prev
+      );
     }
   };
 
@@ -1642,9 +1731,7 @@ export default function LeadList({
                                         .filter(Boolean)
                                         .join(" · ") || "Meta 광고 소재"
                                     }
-                                    onClick={() =>
-                                      setPreviewSrc(row.meta_creative_full || row.meta_creative_preview)
-                                    }
+                                    onClick={() => void openCreativePreview(row)}
                                   >
                                     <img
                                       className="crm-thumb crm-thumb-meta"
@@ -1652,9 +1739,11 @@ export default function LeadList({
                                       alt={row.meta_ad_name || "광고 소재"}
                                       onError={(e) => onMetaCreativeImgError(e, row.meta_ad_id)}
                                     />
-                                    {row.meta_creative_type === "video" && (
+                                    {row.meta_creative_type === "video" ? (
                                       <span className="crm-meta-creative-badge">영상</span>
-                                    )}
+                                    ) : row.meta_creative_type === "carousel" ? (
+                                      <span className="crm-meta-creative-badge">카드</span>
+                                    ) : null}
                                   </button>
                                 ) : row.meta_ad_id ? (
                                   <span
@@ -2021,9 +2110,7 @@ export default function LeadList({
                                     .filter(Boolean)
                                     .join(" · ") || "Meta 광고 소재"
                                 }
-                                onClick={() =>
-                                  setPreviewSrc(row.meta_creative_full || row.meta_creative_preview)
-                                }
+                                onClick={() => void openCreativePreview(row)}
                               >
                                 <img
                                   className="crm-thumb crm-thumb-meta"
@@ -2031,9 +2118,11 @@ export default function LeadList({
                                   alt={row.meta_ad_name || "광고 소재"}
                                   onError={(e) => onMetaCreativeImgError(e, row.meta_ad_id)}
                                 />
-                                {row.meta_creative_type === "video" && (
+                                {row.meta_creative_type === "video" ? (
                                   <span className="crm-meta-creative-badge">영상</span>
-                                )}
+                                ) : row.meta_creative_type === "carousel" ? (
+                                  <span className="crm-meta-creative-badge">카드</span>
+                                ) : null}
                               </button>
                             ) : row.meta_ad_id ? (
                               <span
@@ -2199,6 +2288,144 @@ export default function LeadList({
               </>
             )}
           </aside>
+        </>
+      )}
+
+      {creativePreview && (
+        <>
+          <button
+            type="button"
+            className="crm-drawer-backdrop"
+            aria-label="광고 소재 미리보기 닫기"
+            onClick={() => setCreativePreview(null)}
+          />
+          <div className="crm-creative-viewer" role="dialog" aria-label="광고 소재 미리보기">
+            <div
+              className={`crm-creative-viewer__panel${
+                creativePreview.kind === "video" ? " is-video" : ""
+              }`}
+            >
+              <div className="crm-creative-viewer__head">
+                <div>
+                  <strong>{creativePreview.adName || "광고 소재"}</strong>
+                  <span className="crm-creative-viewer__kind">
+                    {creativePreview.kind === "video"
+                      ? "영상"
+                      : creativePreview.kind === "carousel"
+                        ? "카드뉴스"
+                        : "이미지"}
+                  </span>
+                </div>
+                <button type="button" className="crm-btn" onClick={() => setCreativePreview(null)}>
+                  닫기
+                </button>
+              </div>
+              {creativePreview.loading ? (
+                <div className="crm-creative-viewer__status">불러오는 중…</div>
+              ) : creativePreview.error ? (
+                <div className="crm-creative-viewer__status">{creativePreview.error}</div>
+              ) : creativePreview.kind === "video" && creativePreview.videoSrc && !creativePreview.videoError ? (
+                <video
+                  key={creativePreview.videoSrc}
+                  className="crm-creative-viewer__media"
+                  src={creativePreview.videoSrc}
+                  poster={creativePreview.poster || undefined}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  onError={() =>
+                    setCreativePreview((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            videoError: "직접 재생에 실패했습니다. Facebook 플레이어로 전환합니다.",
+                            videoSrc: null,
+                          }
+                        : prev
+                    )
+                  }
+                />
+              ) : creativePreview.kind === "video" && creativePreview.videoEmbedSrc ? (
+                <div className="crm-creative-viewer__embed-wrap">
+                  <iframe
+                    className="crm-creative-viewer__embed"
+                    src={creativePreview.videoEmbedSrc}
+                    title={creativePreview.adName || "광고 영상"}
+                    allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                  {creativePreview.videoMessage || creativePreview.videoError ? (
+                    <div className="crm-creative-viewer__hint">
+                      {creativePreview.videoError || creativePreview.videoMessage}
+                    </div>
+                  ) : null}
+                </div>
+              ) : creativePreview.kind === "video" ? (
+                <div className="crm-creative-viewer__fallback">
+                  {creativePreview.poster ? (
+                    <img
+                      className="crm-creative-viewer__media"
+                      src={creativePreview.poster}
+                      alt={creativePreview.adName || "광고 소재"}
+                    />
+                  ) : null}
+                  <div className="crm-creative-viewer__status">
+                    {creativePreview.videoMessage ||
+                      "이 광고 영상은 Meta에서 재생 주소를 제공하지 않아 썸네일만 표시합니다."}
+                  </div>
+                </div>
+              ) : creativePreview.slides.length ? (
+                <>
+                  <img
+                    className="crm-creative-viewer__media"
+                    src={creativePreview.slides[creativePreview.slideIndex]?.src}
+                    alt={creativePreview.slides[creativePreview.slideIndex]?.label || "광고 소재"}
+                  />
+                  {creativePreview.kind === "carousel" && creativePreview.slides.length > 1 ? (
+                    <div className="crm-creative-viewer__nav">
+                      <button
+                        type="button"
+                        className="crm-btn"
+                        disabled={creativePreview.slideIndex <= 0}
+                        onClick={() =>
+                          setCreativePreview((prev) =>
+                            prev ? { ...prev, slideIndex: Math.max(0, prev.slideIndex - 1) } : prev
+                          )
+                        }
+                      >
+                        이전
+                      </button>
+                      <span>
+                        {creativePreview.slideIndex + 1} / {creativePreview.slides.length}
+                        {creativePreview.slides[creativePreview.slideIndex]?.label
+                          ? ` · ${creativePreview.slides[creativePreview.slideIndex].label}`
+                          : ""}
+                      </span>
+                      <button
+                        type="button"
+                        className="crm-btn"
+                        disabled={creativePreview.slideIndex >= creativePreview.slides.length - 1}
+                        onClick={() =>
+                          setCreativePreview((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  slideIndex: Math.min(prev.slides.length - 1, prev.slideIndex + 1),
+                                }
+                              : prev
+                          )
+                        }
+                      >
+                        다음
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="crm-creative-viewer__status">표시할 소재가 없습니다.</div>
+              )}
+            </div>
+          </div>
         </>
       )}
 
