@@ -1,5 +1,13 @@
 -- TM001 목록: 미배정 필터 + 배정일(KST) 필터
--- p_assignee_ids 는 기존처럼 가시 범위(또는 단일 담당자 필터로 축소)에 사용
+-- 인자 추가 시 오버로드가 생기므로 기존 시그니처를 먼저 제거합니다.
+
+DROP FUNCTION IF EXISTS public.tm001_list_customers(
+  text, text, text, text, uuid[], int, int, boolean
+);
+
+DROP FUNCTION IF EXISTS public.tm001_list_customers(
+  text, text, text, text, uuid[], int, int, boolean, boolean, date
+);
 
 CREATE OR REPLACE FUNCTION public.tm001_list_customers(
   p_partner_code text DEFAULT 'TM001',
@@ -116,5 +124,6 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.tm001_list_customers IS
-  'TM001 고객 목록 검색/필터/페이징 (담당자·미배정·배정일·상태)';
+COMMENT ON FUNCTION public.tm001_list_customers(
+  text, text, text, text, uuid[], int, int, boolean, boolean, date
+) IS 'TM001 고객 목록 검색/필터/페이징 (담당자·미배정·배정일·상태)';
