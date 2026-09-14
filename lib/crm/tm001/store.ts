@@ -13,6 +13,7 @@ import {
   type Tm001Status,
 } from "@/lib/crm/tm001/types";
 import { buildAssigneeNameChain } from "@/lib/crm/assigneeHistoryFormat";
+import { addDaysYmd, parseKstYmd } from "@/lib/crm/kst";
 import { appendStatusMemo } from "@/lib/crm/memo";
 import { canAssignTm001To, canChangeTm001Assignee, tm001VisibleAssigneeIds } from "@/lib/crm/scope";
 import type { SessionUser } from "@/lib/crm/types";
@@ -214,10 +215,44 @@ async function attachTm001AssigneeHistories(
   });
 }
 
+function resolveTm001AssigneeFilter(
+  scoped: string[] | "all",
+  assigneeId: string,
+  unassignedOnly: boolean
+): { scoped: string[] | "all"; unassignedOnly: boolean } | "empty" {
+  if (unassignedOnly) {
+    // 가시 범위가 담당자 id로 제한된 계정은 미배정 건을 볼 수 없음
+    if (scoped !== "all") return "empty";
+    return { scoped: "all", unassignedOnly: true };
+  }
+  if (assigneeId) {
+    if (scoped === "all") return { scoped: [assigneeId], unassignedOnly: false };
+    if (!scoped.includes(assigneeId)) return "empty";
+    return { scoped: [assigneeId], unassignedOnly: false };
+  }
+  return { scoped, unassignedOnly: false };
+}
+
+function applyAssignedDateFilter<T extends { gte: (c: string, v: string) => T; lt: (c: string, v: string) => T }>(
+  query: T,
+  assignedDate: string
+): T {
+  if (!assignedDate) return query;
+  const start = parseKstYmd(assignedDate).toISOString();
+  const end = parseKstYmd(addDaysYmd(assignedDate, 1)).toISOString();
+  return query.gte("assigned_at", start).lt("assigned_at", end);
+}
+
 export async function listTm001Customers(opts?: {
   q?: string;
   region?: string;
   status?: string;
+  /** 특정 담당자만 (가시 범위와 교집합) */
+  assigneeId?: string;
+  /** 미배정만 */
+  unassignedOnly?: boolean;
+  /** KST YYYY-MM-DD 배정일 */
+  assignedDate?: string;
   /** admin=all, 그 외 본인+산하 id */
   visibleAssigneeIds?: string[] | "all";
   limit?: number;
@@ -228,24 +263,34 @@ export async function listTm001Customers(opts?: {
   /** false면 지역 목록 생략(페이지 이동 시) */
   includeRegions?: boolean;
 }): Promise<{ items: Tm001Customer[]; regions: string[]; total: number; stayTotal: number }> {
-  const scoped = opts?.visibleAssigneeIds ?? "all";
+  const visible = opts?.visibleAssigneeIds ?? "all";
   const limit = Math.min(Math.max(Number(opts?.limit) || 20, 1), 1000);
   const offset = Math.max(Number(opts?.offset) || 0, 0);
   const q = String(opts?.q ?? "").trim();
   const region = String(opts?.region ?? "").trim();
   const status = String(opts?.status ?? "").trim();
+  const assigneeId = String(opts?.assigneeId ?? "").trim();
+  const unassignedOnly = Boolean(opts?.unassignedOnly);
+  const assignedDate = String(opts?.assignedDate ?? "").trim();
   const includeStayTotal = opts?.includeStayTotal !== false;
   const includeRegions = opts?.includeRegions !== false;
 
-  if (scoped !== "all" && !scoped.length) {
+  if (visible !== "all" && !visible.length) {
     return { items: [], regions: [], total: 0, stayTotal: 0 };
+  }
+
+  const resolved = resolveTm001AssigneeFilter(visible, assigneeId, unassignedOnly);
+  if (resolved === "empty") {
+    return { items: [], regions: includeRegions ? await listTm001Regions() : [], total: 0, stayTotal: 0 };
   }
 
   const viaRpc = await listTm001CustomersViaRpc({
     q,
     region,
     status,
-    scoped,
+    scoped: resolved.scoped,
+    unassignedOnly: resolved.unassignedOnly,
+    assignedDate,
     limit,
     offset,
     includeStayTotal,
@@ -258,7 +303,9 @@ export async function listTm001Customers(opts?: {
     q,
     region,
     status,
-    scoped,
+    scoped: resolved.scoped,
+    unassignedOnly: resolved.unassignedOnly,
+    assignedDate,
     limit,
     offset,
     includeStayTotal,
@@ -337,6 +384,8 @@ async function listTm001CustomersViaRpc(opts: {
   region: string;
   status: string;
   scoped: string[] | "all";
+  unassignedOnly: boolean;
+  assignedDate: string;
   limit: number;
   offset: number;
   includeStayTotal: boolean;
@@ -346,19 +395,31 @@ async function listTm001CustomersViaRpc(opts: {
   const supabase = getSupabaseAdmin();
   const regionsPromise = opts.includeRegions ? listTm001Regions() : Promise.resolve([] as string[]);
 
-  const { data, error } = await supabase.rpc("tm001_list_customers", {
+  const rpcArgs: Record<string, unknown> = {
     p_partner_code: TM001_PARTNER_CODE,
     p_q: opts.q || null,
     p_region: opts.region || null,
     p_status: opts.status || null,
-    p_assignee_ids: opts.scoped === "all" ? null : opts.scoped,
+    p_assignee_ids: opts.unassignedOnly || opts.scoped === "all" ? null : opts.scoped,
     p_limit: opts.limit,
     p_offset: opts.offset,
     p_include_stay_total: opts.includeStayTotal,
-  });
+  };
+  // 구버전 RPC 호환: 미배정/배정일 필터가 있을 때만 새 인자 전달
+  if (opts.unassignedOnly || opts.assignedDate) {
+    rpcArgs.p_unassigned_only = opts.unassignedOnly;
+    rpcArgs.p_assigned_date = opts.assignedDate || null;
+  }
+
+  const { data, error } = await supabase.rpc("tm001_list_customers", rpcArgs);
 
   if (error) {
-    if (/tm001_list_customers|schema cache|does not exist|function/i.test(error.message)) {
+    // 구버전 RPC(새 인자 없음)면 fallback — 미배정/배정일 필터는 fallback에서 처리
+    if (
+      /tm001_list_customers|schema cache|does not exist|function|Could not find the function|p_unassigned_only|p_assigned_date/i.test(
+        error.message
+      )
+    ) {
       return null;
     }
     throw new Error(error.message);
@@ -389,6 +450,8 @@ async function listTm001CustomersFallback(opts: {
   region: string;
   status: string;
   scoped: string[] | "all";
+  unassignedOnly: boolean;
+  assignedDate: string;
   limit: number;
   offset: number;
   includeStayTotal: boolean;
@@ -396,15 +459,24 @@ async function listTm001CustomersFallback(opts: {
   includeHistory: boolean;
 }): Promise<{ items: Tm001Customer[]; regions: string[]; total: number; stayTotal: number }> {
   const supabase = getSupabaseAdmin();
-  const { q, region, status, scoped, limit, offset } = opts;
+  const { q, region, status, scoped, unassignedOnly, assignedDate, limit, offset } = opts;
   const CUSTOMER_COLS =
     "id, partner_code, partner_name, batch_code, name, phone, normalized_phone, raw_phone, visit_count, assignee_id, assigned_at, status, product, meeting_at, memo, comments, created_at, updated_at";
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyAssigneeStatus = (query: any) => {
+    let next = query;
+    if (unassignedOnly) next = next.is("assignee_id", null);
+    else if (scoped !== "all") next = next.in("assignee_id", scoped);
+    if (status) next = next.eq("status", status);
+    next = applyAssignedDateFilter(next, assignedDate);
+    return next;
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const applyBase = (query: any, withStaysInner: boolean) => {
     let next = query.eq("partner_code", TM001_PARTNER_CODE);
-    if (scoped !== "all") next = next.in("assignee_id", scoped);
-    if (status) next = next.eq("status", status);
+    next = applyAssigneeStatus(next);
     if (region) {
       if (withStaysInner) next = next.eq("tm001_stays.region", region);
       else next = next.eq("stays.region", region);
@@ -425,8 +497,7 @@ async function listTm001CustomersFallback(opts: {
       .select("id", { count: "exact", head: true })
       .eq("partner_code", TM001_PARTNER_CODE)
       .or(orFilter);
-    if (scoped !== "all") nameCountQ = nameCountQ.in("assignee_id", scoped);
-    if (status) nameCountQ = nameCountQ.eq("status", status);
+    nameCountQ = applyAssigneeStatus(nameCountQ);
 
     let nameListQ = supabase
       .from("tm001_customers")
@@ -435,8 +506,7 @@ async function listTm001CustomersFallback(opts: {
       .or(orFilter)
       .order("updated_at", { ascending: false })
       .range(0, Math.max(offset + limit - 1, limit - 1));
-    if (scoped !== "all") nameListQ = nameListQ.in("assignee_id", scoped);
-    if (status) nameListQ = nameListQ.eq("status", status);
+    nameListQ = applyAssigneeStatus(nameListQ);
 
     const hotelQ = supabase
       .from("tm001_stays")
@@ -466,8 +536,7 @@ async function listTm001CustomersFallback(opts: {
           .select(CUSTOMER_COLS)
           .eq("partner_code", TM001_PARTNER_CODE)
           .in("id", chunk);
-        if (scoped !== "all") hq = hq.in("assignee_id", scoped);
-        if (status) hq = hq.eq("status", status);
+        hq = applyAssigneeStatus(hq);
         const { data, error } = await hq;
         if (error) throw new Error(error.message);
         for (const row of (data ?? []) as Record<string, unknown>[]) {
@@ -543,8 +612,7 @@ async function listTm001CustomersFallback(opts: {
       .from("tm001_customers")
       .select("id", { count: "exact", head: true })
       .eq("partner_code", TM001_PARTNER_CODE);
-    if (scoped !== "all") countQ = countQ.in("assignee_id", scoped);
-    if (status) countQ = countQ.eq("status", status);
+    countQ = applyAssigneeStatus(countQ);
 
     let listQ = supabase
       .from("tm001_customers")
@@ -552,13 +620,13 @@ async function listTm001CustomersFallback(opts: {
       .eq("partner_code", TM001_PARTNER_CODE)
       .order("updated_at", { ascending: false })
       .range(offset, offset + limit - 1);
-    if (scoped !== "all") listQ = listQ.in("assignee_id", scoped);
-    if (status) listQ = listQ.eq("status", status);
+    listQ = applyAssigneeStatus(listQ);
 
+    const noExtraFilters = !status && !unassignedOnly && !assignedDate && scoped === "all";
     const [countRes, listRes, stayCountRes] = await Promise.all([
       countQ,
       listQ,
-      opts.includeStayTotal && !status && scoped === "all"
+      opts.includeStayTotal && noExtraFilters
         ? supabase.from("tm001_stays").select("id", { count: "exact", head: true })
         : Promise.resolve({ count: null as number | null, error: null }),
     ]);

@@ -68,6 +68,7 @@ async function sendToSubscriptions(subs: SubRow[], payload: PushPayload): Promis
 
   const navigate = toAbsoluteAppUrl(payload.url || "/admin/consumers");
   const tag = payload.tag || "tylife-crm";
+  const icon = toAbsoluteAppUrl("/icon.png");
 
   // Declarative Web Push (iOS 홈화면 웹앱): 알림 탭 시 JS 없이도 navigate URL로 이동
   // 구형 SW/브라우저는 동일 JSON을 push 이벤트로 받아 showNotification 처리
@@ -81,12 +82,15 @@ async function sendToSubscriptions(subs: SubRow[], payload: PushPayload): Promis
       lang: "ko",
       dir: "ltr",
       silent: false,
+      icon,
+      badge: icon,
     },
     // 레거시 SW 호환 필드
     title: payload.title,
     body: payload.body,
     url: navigate,
     tag,
+    icon,
   });
 
   const supabase = getSupabaseAdmin();
@@ -99,7 +103,12 @@ async function sendToSubscriptions(subs: SubRow[], payload: PushPayload): Promis
             keys: { p256dh: sub.p256dh, auth: sub.auth },
           },
           body,
-          { TTL: 60 * 60 }
+          {
+            TTL: 60 * 60,
+            // Windows/Mac 데스크톱 푸시 우선 전달
+            urgency: "high",
+            contentEncoding: "aes128gcm",
+          }
         );
       } catch (e: unknown) {
         const statusCode =

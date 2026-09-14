@@ -15,6 +15,7 @@ import {
   stashPendingOpenCalendarEvent,
   stashPendingOpenComment,
 } from "@/lib/crm/pushDeepLink";
+import { ensureWebPushSubscription } from "@/lib/crm/webPushClient";
 import type { SessionUser } from "@/lib/crm/types";
 import { staffRankLabel } from "@/lib/crm/types";
 
@@ -73,6 +74,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         if (d.ok) setAutoAssign(d.auto_assign_enabled !== false);
       })
       .catch(() => {});
+  }, [user]);
+
+  // 알림 허용된 브라우저는 로그인 시 Push 구독을 서버에 재동기화 (Win/Mac OS 알림)
+  useEffect(() => {
+    if (!user) return;
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    void ensureWebPushSubscription().catch(() => {});
   }, [user]);
 
   useEffect(() => {

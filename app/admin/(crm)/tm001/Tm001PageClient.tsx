@@ -15,7 +15,10 @@ import {
   type Tm001Customer,
   type Tm001Stay,
 } from "@/lib/crm/tm001/types";
+import Tm001ColumnFilter from "./Tm001ColumnFilter";
 import "./tm001.css";
+
+const UNASSIGNED_FILTER = "__none__";
 
 type Staff = { id: string; name: string; parent_id: string | null };
 
@@ -191,6 +194,10 @@ export default function Tm001PageClient() {
   );
   const [region, setRegion] = useState("");
   const [status, setStatus] = useState("");
+  /** ""=전체, UNASSIGNED_FILTER=미배정, 그 외 staff id */
+  const [assigneeFilter, setAssigneeFilter] = useState("");
+  /** KST YYYY-MM-DD */
+  const [assignedDate, setAssignedDate] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [pageSize, setPageSize] = useState(20);
@@ -242,7 +249,9 @@ export default function Tm001PageClient() {
     const isInteractive = (target: EventTarget | null) => {
       if (!(target instanceof Element)) return false;
       return Boolean(
-        target.closest("a, button, input, select, textarea, label, .crm-popover, [contenteditable='true']")
+        target.closest(
+          "a, button, input, select, textarea, label, .crm-popover, .tm001-col-filter, [contenteditable='true']"
+        )
       );
     };
 
@@ -325,6 +334,9 @@ export default function Tm001PageClient() {
       if (qDebounced) sp.set("q", qDebounced);
       if (region) sp.set("region", region);
       if (status) sp.set("status", status);
+      if (assigneeFilter === UNASSIGNED_FILTER) sp.set("unassigned", "1");
+      else if (assigneeFilter) sp.set("assignee_id", assigneeFilter);
+      if (assignedDate) sp.set("assigned_date", assignedDate);
       sp.set("limit", String(pageSize));
       sp.set("offset", String(page * pageSize));
       if (regionsRef.current.length > 0) sp.set("skipRegions", "1");
@@ -349,7 +361,7 @@ export default function Tm001PageClient() {
     } finally {
       setLoading(false);
     }
-  }, [qDebounced, region, status, page, pageSize]);
+  }, [qDebounced, region, status, assigneeFilter, assignedDate, page, pageSize]);
 
   useEffect(() => {
     void load();
@@ -368,6 +380,13 @@ export default function Tm001PageClient() {
 
   const allExpanded = pageItems.length > 0 && pageItems.every((c) => expanded.has(c.id));
   const allPageSelected = pageItems.length > 0 && pageItems.every((c) => selected.has(c.id));
+
+  const assigneeFilterLabel =
+    assigneeFilter === UNASSIGNED_FILTER
+      ? "미배정"
+      : assigneeFilter
+        ? staff.find((s) => s.id === assigneeFilter)?.name || "담당자"
+        : null;
 
   const toggleStay = (id: string) => {
     setExpanded((prev) => {
@@ -811,6 +830,8 @@ export default function Tm001PageClient() {
               setQ("");
               setRegion("");
               setStatus("");
+              setAssigneeFilter("");
+              setAssignedDate("");
               setPage(0);
             }}
           >
@@ -969,16 +990,140 @@ export default function Tm001PageClient() {
                         </button>
                       </th>
                       <th rowSpan={2} scope="col">
-                        담당자
+                        <Tm001ColumnFilter
+                          label="담당자"
+                          active={Boolean(assigneeFilter)}
+                          activeLabel={assigneeFilterLabel}
+                        >
+                          {(close) => (
+                            <div className="tm001-col-filter-list" role="listbox" aria-label="담당자 필터">
+                              <button
+                                type="button"
+                                role="option"
+                                className={!assigneeFilter ? "is-selected" : undefined}
+                                aria-selected={!assigneeFilter}
+                                onClick={() => {
+                                  setAssigneeFilter("");
+                                  setPage(0);
+                                  close();
+                                }}
+                              >
+                                전체
+                              </button>
+                              <button
+                                type="button"
+                                role="option"
+                                className={assigneeFilter === UNASSIGNED_FILTER ? "is-selected" : undefined}
+                                aria-selected={assigneeFilter === UNASSIGNED_FILTER}
+                                onClick={() => {
+                                  setAssigneeFilter(UNASSIGNED_FILTER);
+                                  setPage(0);
+                                  close();
+                                }}
+                              >
+                                미배정
+                              </button>
+                              {staff.map((s) => (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  role="option"
+                                  className={assigneeFilter === s.id ? "is-selected" : undefined}
+                                  aria-selected={assigneeFilter === s.id}
+                                  onClick={() => {
+                                    setAssigneeFilter(s.id);
+                                    setPage(0);
+                                    close();
+                                  }}
+                                >
+                                  {s.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </Tm001ColumnFilter>
                       </th>
                       <th rowSpan={2} scope="col">
-                        배정일
+                        <Tm001ColumnFilter
+                          label="배정일"
+                          active={Boolean(assignedDate)}
+                          activeLabel={assignedDate ? assignedDate.replace(/-/g, ".") : null}
+                        >
+                          {(close) => (
+                            <div className="tm001-col-filter-date">
+                              <label className="tm001-col-filter-date-label">
+                                배정일 선택
+                                <input
+                                  type="date"
+                                  className="tm001-col-filter-date-input"
+                                  value={assignedDate}
+                                  onChange={(e) => {
+                                    setAssignedDate(e.target.value);
+                                    setPage(0);
+                                    if (e.target.value) close();
+                                  }}
+                                  aria-label="배정일"
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                className="tm001-col-filter-clear"
+                                onClick={() => {
+                                  setAssignedDate("");
+                                  setPage(0);
+                                  close();
+                                }}
+                              >
+                                전체 (날짜 해제)
+                              </button>
+                            </div>
+                          )}
+                        </Tm001ColumnFilter>
                       </th>
                       <th rowSpan={2} scope="col">
                         관리자상태
                       </th>
                       <th rowSpan={2} scope="col" className="status-col">
-                        상담상태
+                        <Tm001ColumnFilter
+                          label="상담상태"
+                          active={Boolean(status)}
+                          activeLabel={status || null}
+                          align="right"
+                        >
+                          {(close) => (
+                            <div className="tm001-col-filter-list" role="listbox" aria-label="상담상태 필터">
+                              <button
+                                type="button"
+                                role="option"
+                                className={!status ? "is-selected" : undefined}
+                                aria-selected={!status}
+                                onClick={() => {
+                                  setStatus("");
+                                  setPage(0);
+                                  close();
+                                }}
+                              >
+                                전체
+                              </button>
+                              {TM001_STATUSES.map((s) => (
+                                <button
+                                  key={s}
+                                  type="button"
+                                  role="option"
+                                  className={status === s ? "is-selected" : undefined}
+                                  aria-selected={status === s}
+                                  onClick={() => {
+                                    setStatus(s);
+                                    setPage(0);
+                                    close();
+                                  }}
+                                >
+                                  {s}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </Tm001ColumnFilter>
                       </th>
                       <th rowSpan={2} scope="col" className="memo-col">
                         메모
