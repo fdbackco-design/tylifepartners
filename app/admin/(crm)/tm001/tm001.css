@@ -77,6 +77,41 @@
 .tm001-root .table-scroll.is-grab-scrolling *{cursor:grabbing!important;user-select:none!important}
 .tm001-root .tm001-table{border-collapse:separate;border-spacing:0;width:100%;min-width:1817px;table-layout:fixed;font-size:12px}
 .tm001-root .tm001-table th{background:#f8f9fc;color:#727d91;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 12px;text-align:left;line-height:1.3;font-weight:650;font-size:11px;white-space:nowrap}
+.tm001-root .tm001-col-filter{position:relative;display:inline-flex;max-width:100%;vertical-align:middle}
+.tm001-root .tm001-col-filter-btn{
+  display:inline-flex;align-items:center;gap:4px;max-width:100%;
+  margin:0;padding:2px 4px;border:0;border-radius:6px;background:transparent;
+  color:inherit;font:inherit;font-weight:650;cursor:pointer;line-height:1.3;
+}
+.tm001-root .tm001-col-filter-btn:hover,
+.tm001-root .tm001-col-filter.is-open .tm001-col-filter-btn{background:#efe8f8;color:#5b3d8a}
+.tm001-root .tm001-col-filter.is-active .tm001-col-filter-btn{background:#efe8f8;color:#5b3d8a}
+.tm001-root .tm001-col-filter-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:7.5em}
+.tm001-root .tm001-col-filter-caret{font-size:9px;opacity:.75;flex-shrink:0}
+.tm001-root .tm001-col-filter-menu{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:40;
+  min-width:168px;max-width:240px;max-height:280px;overflow:auto;
+  padding:8px;border:1px solid #e4e0ec;border-radius:10px;background:#fff;
+  box-shadow:0 10px 28px rgba(40,28,64,.14);
+}
+.tm001-root .tm001-col-filter-menu.align-right{left:auto;right:0}
+.tm001-root .tm001-col-filter-list{display:grid;gap:2px}
+.tm001-root .tm001-col-filter-list button{
+  display:block;width:100%;text-align:left;border:0;border-radius:7px;
+  background:transparent;padding:8px 10px;font-size:12px;font-weight:600;color:#2f3545;cursor:pointer;
+}
+.tm001-root .tm001-col-filter-list button:hover{background:#f5f2fa}
+.tm001-root .tm001-col-filter-list button.is-selected{background:#efe8f8;color:#5b3d8a}
+.tm001-root .tm001-col-filter-date{display:grid;gap:8px;min-width:180px}
+.tm001-root .tm001-col-filter-date-label{display:grid;gap:6px;font-size:11px;font-weight:650;color:#727d91}
+.tm001-root .tm001-col-filter-date-input{
+  width:100%;min-height:34px;border:1px solid #dfe3ed;border-radius:8px;
+  padding:6px 8px;font-size:12px;color:#2f3545;background:#fff;box-sizing:border-box;
+}
+.tm001-root .tm001-col-filter-clear{
+  border:0;background:transparent;padding:6px 4px;text-align:left;
+  font-size:11px;font-weight:650;color:#5b3d8a;text-decoration:underline;text-underline-offset:3px;cursor:pointer;
+}
 .tm001-root .tm001-table th.group-head{text-align:center;color:#60547a;background:#f5f1fa;padding:9px 10px;border-left:1px solid #e8e0f1;border-right:1px solid #e8e0f1;letter-spacing:.005em}
 .tm001-root .tm001-table .sub-head th{background:#faf8fd;border-top:0;padding:7px 12px;font-size:10px;color:#81758e}
 .tm001-root .tm001-table td{border-bottom:1px solid var(--line);padding:20px 12px;vertical-align:top;background:#fff}
@@ -473,3 +508,94 @@
 .tm001-root .modal{background:#fff;border-radius:14px;padding:20px;width:min(640px,100%);max-height:min(80vh,720px);overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.15)}
 .tm001-root .toast{position:fixed;right:20px;bottom:20px;z-index:100;background:#263147;color:#fff;padding:12px 16px;border-radius:10px;font-size:13px;max-width:min(420px,calc(100vw - 32px))}
 .tm001-root .stay-row.is-highlight{outline:2px solid #c4a8ef;background:#faf7ff}
+
+/* 목록 가독성: 텍스트 검정 + 고객명 제외 글자 +3px */
+.tm001-root .tm001-table{
+  font-size:15px;
+  color:#000;
+}
+.tm001-root .tm001-table th{
+  font-size:14px;
+  color:#000;
+}
+.tm001-root .tm001-col-filter-btn,
+.tm001-root .tm001-col-filter-label{font-size:14px;color:#000}
+.tm001-root .tm001-col-filter.is-active .tm001-col-filter-btn,
+.tm001-root .tm001-col-filter.is-active .tm001-col-filter-label,
+.tm001-root .tm001-col-filter.is-open .tm001-col-filter-btn{color:#5b3d8a}
+.tm001-root .tm001-table th.group-head,
+.tm001-root .tm001-table .sub-head th{
+  font-size:13px;
+  color:#000;
+}
+.tm001-root .tm001-table td,
+.tm001-root .tm001-table td *{
+  color:#000;
+}
+.tm001-root .partner-name{font-size:15px;color:#000}
+.tm001-root .batch-badge{font-size:15px;color:#000}
+.tm001-root .phone{font-size:14px;color:#000}
+.tm001-root .copy-btn{color:#000}
+.tm001-root .merge-badge,
+.tm001-root .merge-badge.simple{font-size:13px;color:#000}
+.tm001-root .stay-cell{font-size:14px;color:#000}
+.tm001-root .stay-region,
+.tm001-root .stay-detail{color:#000}
+.tm001-root .hotel-title{font-size:15px;color:#000}
+.tm001-root .hotel-meta{font-size:13px;color:#000}
+.tm001-root .review-badge{font-size:12px;color:#000}
+.tm001-root .state-pill{font-size:13px;color:#000}
+.tm001-root .state-pill.warn,
+.tm001-root .state-pill.done{color:#000}
+.tm001-root .assignee{font-size:14px;color:#000}
+.tm001-root .assignee .icon{color:#000}
+.tm001-root .date-value,
+.tm001-root .date-value small{font-size:13px;color:#000}
+.tm001-root .muted-value{font-size:14px;color:#000}
+.tm001-root .status-select,
+.tm001-root .status-select[data-status],
+.tm001-root .product-select{font-size:14px;color:#000}
+.tm001-root .status-meeting{font-size:13px;color:#000}
+.tm001-root .note-button,
+.tm001-root .note-button.has-text,
+.tm001-root .note-button:hover{font-size:14px;color:#000}
+.tm001-root .note-action{font-size:13px;color:#000}
+.tm001-root .comment-time,
+.tm001-root .comment-more{font-size:12px;color:#000}
+.tm001-root .row-saving{font-size:13px;color:#000}
+.tm001-root .stay-group-toggle{font-size:14px;color:#000}
+.tm001-root .stay-group-control{font-size:13px;color:#000}
+.tm001-root .stay-toggle-heading{font-size:15px;color:#000}
+.tm001-root .stay-count{font-size:13px;color:#000}
+.tm001-root .stay-toggle-regions{font-size:13px;color:#000}
+.tm001-root .stay-summary-warning{font-size:12px;color:#000}
+.tm001-root .stay-toggle-action{font-size:13px;color:#000}
+.tm001-root .crm-assignee-picker-btn,
+.tm001-root .crm-assignee-picker-label,
+.tm001-root .crm-assignee-picker-history{font-size:14px;color:#000}
+/* 고객명은 크기·강조 유지 */
+.tm001-root .customer-name{font-size:14px;color:#000}
+.tm001-root .customer-name-alt{font-size:11px;color:#000}
+.tm001-root .customer-name:hover{color:#000}
+
+/* 모바일 카드 목록도 동일 규칙 */
+.tm001-root .mobile-card,
+.tm001-root .mobile-card *{color:#000}
+.tm001-root .m-head .customer-name{font-size:14px}
+.tm001-root .m-head .phone{font-size:14px}
+.tm001-root .m-partner{font-size:13px;color:#000}
+.tm001-root .m-code{font-size:12px;color:#000}
+.tm001-root .m-stay-head{font-size:12px;color:#000}
+.tm001-root .mobile-card .stay-cell{font-size:13px}
+.tm001-root .mobile-card .hotel-title{font-size:14px}
+.tm001-root .mobile-card .hotel-meta{font-size:12px}
+.tm001-root .mobile-card .review-badge{font-size:11px}
+.tm001-root .m-label{font-size:12px;color:#000}
+.tm001-root .m-admin{font-size:13px}
+.tm001-root .m-admin .date-value,
+.tm001-root .m-admin .date-value small{font-size:12px;color:#000}
+.tm001-root .m-notes .note-button{font-size:13px;color:#000}
+.tm001-root .m-stay-actions{font-size:13px;color:#000}
+.tm001-root .mobile-card .stay-toggle-heading{font-size:15px;color:#000}
+.tm001-root .mobile-card .stay-toggle-regions,
+.tm001-root .mobile-card .stay-toggle-action{font-size:13px;color:#000}

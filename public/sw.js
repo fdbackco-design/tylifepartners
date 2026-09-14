@@ -1,6 +1,6 @@
 /* global self, clients */
 /* FEED LIFE CRM Web Push Service Worker */
-/* sw-version: 2026-08-27-calendar-deeplink */
+/* sw-version: 2026-09-14-desktop-win-mac */
 
 function resolveNotificationUrl(raw) {
   try {
@@ -11,12 +11,21 @@ function resolveNotificationUrl(raw) {
   }
 }
 
+function absoluteAsset(path) {
+  try {
+    return new URL(path, self.location.origin).href;
+  } catch {
+    return `${self.location.origin}${path.startsWith("/") ? path : `/${path}`}`;
+  }
+}
+
 function parsePushPayload(event) {
   const fallback = {
     title: "FEED LIFE 상담관리",
     body: "새 알림이 있습니다.",
     url: `${self.location.origin}/admin/consumers`,
     tag: "tylife-crm",
+    icon: absoluteAsset("/icon.png"),
   };
   if (!event.data) return fallback;
   try {
@@ -28,6 +37,7 @@ function parsePushPayload(event) {
         body: n.body || fallback.body,
         url: resolveNotificationUrl(n.navigate || parsed.url || fallback.url),
         tag: n.tag || parsed.tag || fallback.tag,
+        icon: n.icon || parsed.icon || fallback.icon,
       };
     }
     return {
@@ -35,6 +45,7 @@ function parsePushPayload(event) {
       body: parsed.body || fallback.body,
       url: resolveNotificationUrl(parsed.url || parsed.navigate || fallback.url),
       tag: parsed.tag || fallback.tag,
+      icon: parsed.icon || fallback.icon,
     };
   } catch {
     try {
@@ -49,17 +60,21 @@ function parsePushPayload(event) {
 
 self.addEventListener("push", (event) => {
   const data = parsePushPayload(event);
+  const icon = data.icon || absoluteAsset("/icon.png");
 
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/icon.png",
-      badge: "/icon.png",
+      icon,
+      badge: icon,
       tag: data.tag,
       data: { url: data.url },
       // Declarative / iOS: 알림 탭 시 이 URL로 이동
       navigate: data.url,
       renotify: true,
+      // Windows/Mac 데스크톱: 알림 센터에 더 잘 노출
+      requireInteraction: true,
+      silent: false,
     })
   );
 });
@@ -105,10 +120,17 @@ self.addEventListener("notificationclick", (event) => {
         }
       }
 
-      // 백그라운드 iOS 웹앱: focus만 하면 URL이 안 바뀜 → openWindow로 딥링크 강제
       if (clients.openWindow) {
         await clients.openWindow(targetUrl);
       }
     })()
   );
+});
+
+// SW 설치 직후 즉시 활성화 (데스크톱 push 수신 갱신)
+self.addEventListener("install", (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+self.addEventListener("activate", (event) => {
+  event.waitUntil(clients.claim());
 });
