@@ -84,11 +84,14 @@ function isMetaCdnUrl(url: string | null | undefined): boolean {
 /** 관리자 목록/확대용 — 동일 출처 프록시 (CDN 만료 시 서버에서 재발급) */
 export function metaCreativeImageProxyPath(
   adId: string,
-  opts?: { full?: boolean; bust?: string | number }
+  opts?: { full?: boolean; bust?: string | number; slide?: number }
 ): string {
   const q = new URLSearchParams({ ad_id: String(adId).trim() });
   if (opts?.full) q.set("full", "1");
   if (opts?.bust != null && String(opts.bust)) q.set("t", String(opts.bust));
+  if (opts?.slide != null && Number.isFinite(opts.slide) && opts.slide >= 0) {
+    q.set("slide", String(Math.floor(opts.slide)));
+  }
   return `/api/admin/meta/creative-image?${q.toString()}`;
 }
 
@@ -97,7 +100,15 @@ async function graphGet(
   fields: string,
   extraParams?: Record<string, string>
 ): Promise<{ ok: true; data: any } | { ok: false; status: number; message: string }> {
-  const token = accessToken();
+  return graphGetWithToken(path, fields, accessToken(), extraParams);
+}
+
+async function graphGetWithToken(
+  path: string,
+  fields: string,
+  token: string | null,
+  extraParams?: Record<string, string>
+): Promise<{ ok: true; data: any } | { ok: false; status: number; message: string }> {
   if (!token) return { ok: false, status: 0, message: "META_ADS_ACCESS_TOKEN(또는 META_ACCESS_TOKEN) 미설정" };
   const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${path.replace(/^\//, "")}`);
   url.searchParams.set("fields", fields);
@@ -116,7 +127,11 @@ async function graphGet(
 
 function mapCreativeType(creative: any): string {
   if (!creative) return "unknown";
-  if (creative.video_id) return "video";
+  const children = creative?.object_story_spec?.link_data?.child_attachments;
+  if (Array.isArray(children) && children.length > 1) return "carousel";
+  if (creative.video_id || creative?.object_story_spec?.video_data?.video_id) return "video";
+  const feedVideos = creative?.asset_feed_spec?.videos;
+  if (Array.isArray(feedVideos) && feedVideos.length) return "video";
   if (creative.image_url || creative.thumbnail_url || creative.image_hash) return "image";
   const ot = String(creative.object_type ?? "").toLowerCase();
   if (ot.includes("video")) return "video";
@@ -388,6 +403,278 @@ export type MetaCreativeAttach = {
   meta_creative_full: string | null;
   meta_creative_status: string | null;
 };
+
+export type MetaCreativeViewerSlide = {
+  index: number;
+  label: string;
+  src: string;
+};
+
+export type MetaCreativeViewer = {
+  ad_id: string;
+  ad_name: string | null;
+  kind: "image" | "video" | "carousel";
+  slides: MetaCreativeViewerSlide[];
+  /** 동일 출처 프록시 <video src> — source 확보된 경우만 */
+  video_src: string | null;
+  /** Facebook video plugin iframe — source 없을 때 폴백 */
+  video_embed_src: string | null;
+  poster: string | null;
+  video_message: string | null;
+};
+
+type CachedCreativeRow = MetaCreativeCache & { raw?: unknown };
+
+function carouselAttachmentsFromRaw(raw: unknown): Array<{ image_hash?: string; picture?: string; name?: string }> {
+  const creative = (raw as { creative?: unknown } | null)?.creative as Record<string, unknown> | null | undefined;
+  const oss = (creative?.object_story_spec as Record<string, unknown> | undefined) ?? {};
+  const link = (oss.link_data as Record<string, unknown> | undefined) ?? {};
+  const children = link.child_attachments;
+  return Array.isArray(children) ? (children as Array<{ image_hash?: string; picture?: string; name?: string }>) : [];
+}
+
+async function getCachedWithRaw(adId: string): Promise<CachedCreativeRow | null> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.from("meta_ad_creatives").select("*").eq("ad_id", adId).maybeSingle();
+  if (error || !data) return null;
+  return data as CachedCreativeRow;
+}
+
+/** 확대 모달용 — 카드뉴스 슬라이드·영상 소스 포함 */
+export async function getMetaCreativeViewer(adId: string): Promise<MetaCreativeViewer> {
+  const id = String(adId).trim();
+  let row = await getCachedWithRaw(id);
+  if (!row || !isFresh(row) || (!row.image_url && !row.thumbnail_url && !row.video_id)) {
+    await fetchAndCacheMetaAdCreative(id);
+    row = await getCachedWithRaw(id);
+  }
+  if (!row) {
+    return {
+      ad_id: id,
+      ad_name: null,
+      kind: "image",
+      slides: [],
+      video_src: null,
+      video_embed_src: null,
+      poster: null,
+      video_message: null,
+    };
+  }
+
+  const attachments = carouselAttachmentsFromRaw(row.raw);
+  const type = String(row.creative_type || "").toLowerCase();
+  const isCarousel = type === "carousel" || attachments.length > 1;
+  const isVideo = type === "video" || Boolean(row.video_id);
+
+  const poster = hasPreview(row) ? metaCreativeImageProxyPath(id, { full: true }) : null;
+  const slides: MetaCreativeViewerSlide[] = [];
+
+  if (isCarousel && attachments.length > 1) {
+    for (let i = 0; i < attachments.length; i++) {
+      const a = attachments[i];
+      slides.push({
+        index: i,
+        label: String(a?.name ?? `카드 ${i + 1}`).trim() || `카드 ${i + 1}`,
+        src: metaCreativeImageProxyPath(id, { full: true, slide: i }),
+      });
+    }
+  } else if (poster) {
+    slides.push({ index: 0, label: row.ad_name || "소재", src: poster });
+  }
+
+  let video_src: string | null = null;
+  let video_embed_src: string | null = null;
+  let video_message: string | null = null;
+
+  if (isVideo) {
+    const playback = await resolveMetaCreativeVideoPlayback(id);
+    if (playback.sourceUrl) {
+      video_src = `/api/admin/meta/creative-video?ad_id=${encodeURIComponent(id)}`;
+    }
+    video_embed_src = playback.embedSrc;
+    if (!video_src && !video_embed_src) {
+      video_message =
+        "이 광고 영상은 Meta API에서 재생 주소(source)를 주지 않습니다. Ads 권한(ads_management) 또는 페이지 토큰을 확인하거나, 썸네일로만 확인하세요.";
+    }
+  }
+
+  return {
+    ad_id: id,
+    ad_name: row.ad_name,
+    kind: isCarousel ? "carousel" : isVideo ? "video" : "image",
+    slides,
+    video_src,
+    video_embed_src,
+    poster,
+    video_message,
+  };
+}
+
+/** 카드뉴스 N번째 이미지의 업스트림 URL */
+export async function resolveMetaCreativeSlideUpstreamUrl(
+  adId: string,
+  slideIndex: number
+): Promise<string | null> {
+  const id = String(adId).trim();
+  let row = await getCachedWithRaw(id);
+  if (!row?.raw) {
+    await fetchAndCacheMetaAdCreative(id);
+    row = await getCachedWithRaw(id);
+  }
+  const attachments = carouselAttachmentsFromRaw(row?.raw);
+  if (slideIndex < 0 || slideIndex >= attachments.length) {
+    return row?.image_url || row?.thumbnail_url || null;
+  }
+  const slide = attachments[slideIndex];
+  const hash = firstNonEmpty(slide?.image_hash);
+  if (hash) {
+    const fromHash = await resolveImageHashUrl(hash);
+    if (fromHash) return fromHash;
+  }
+  return firstNonEmpty(slide?.picture) || row?.image_url || row?.thumbnail_url || null;
+}
+
+function storyIdFromRaw(raw: unknown): string | null {
+  const creative = (raw as { creative?: Record<string, unknown> } | null)?.creative;
+  if (!creative) return null;
+  return firstNonEmpty(creative.effective_object_story_id, creative.object_story_id);
+}
+
+function facebookVideoEmbedSrc(permalinkOrWatchUrl: string): string {
+  const href = encodeURIComponent(permalinkOrWatchUrl);
+  // 숏폼(9:16)에 맞춰 세로 플레이어 크기 요청
+  return `https://www.facebook.com/plugins/video.php?href=${href}&show_text=false&width=420&height=746&allowfullscreen=true`;
+}
+
+async function resolveStoryVideoSource(storyId: string): Promise<string | null> {
+  const fields =
+    "attachments{media_type,type,url,media{source,image},target{id}},source,permalink_url";
+  const tokens = Array.from(
+    new Set([pageAccessToken(), accessToken()].filter((t): t is string => Boolean(t)))
+  );
+  for (const token of tokens) {
+    const result = await graphGetWithToken(storyId, fields, token);
+    if (!result.ok) {
+      console.warn("[meta/ads] story video failed:", storyId, result.message);
+      continue;
+    }
+    const direct = firstNonEmpty(result.data?.source);
+    if (direct) return direct;
+    const atts = result.data?.attachments?.data;
+    if (Array.isArray(atts)) {
+      for (const att of atts) {
+        const mediaType = String(att?.media_type ?? att?.type ?? "").toLowerCase();
+        const src = firstNonEmpty(att?.media?.source);
+        if (src) return src;
+        if (mediaType.includes("video")) {
+          const url = firstNonEmpty(att?.url, att?.media?.image?.src);
+          if (url && /\.mp4(\?|$)/i.test(url)) return url;
+        }
+      }
+      // 서브첨부 (공유/앨범)
+      for (const att of atts) {
+        const sub = att?.subattachments?.data;
+        if (!Array.isArray(sub)) continue;
+        for (const s of sub) {
+          const src = firstNonEmpty(s?.media?.source);
+          if (src) return src;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+type VideoPlayback = {
+  sourceUrl: string | null;
+  embedSrc: string | null;
+  permalink: string | null;
+};
+
+/** 재생 가능한 mp4 source + Facebook embed 폴백을 함께 조회 */
+export async function resolveMetaCreativeVideoPlayback(adId: string): Promise<VideoPlayback> {
+  const id = String(adId).trim();
+  let row = await getCachedWithRaw(id);
+  if (!row?.video_id && !storyIdFromRaw(row?.raw)) {
+    await fetchAndCacheMetaAdCreative(id);
+    row = await getCachedWithRaw(id);
+  }
+
+  const videoId = firstNonEmpty(row?.video_id);
+  const storyId = storyIdFromRaw(row?.raw);
+  const tokens = Array.from(
+    new Set([accessToken(), pageAccessToken()].filter((t): t is string => Boolean(t)))
+  );
+
+  let sourceUrl: string | null = null;
+  let permalink: string | null = firstNonEmpty(row?.permalink_url);
+  let embedSrc: string | null = null;
+
+  if (videoId) {
+    for (const token of tokens) {
+      const result = await graphGetWithToken(
+        videoId,
+        "source,permalink_url,embed_html,picture,format",
+        token
+      );
+      if (!result.ok) {
+        console.warn("[meta/ads] video playback lookup failed:", videoId, result.message);
+        continue;
+      }
+      sourceUrl = firstNonEmpty(result.data?.source) || sourceUrl;
+      permalink = firstNonEmpty(result.data?.permalink_url) || permalink;
+
+      const formats = Array.isArray(result.data?.format) ? result.data.format : [];
+      for (const f of formats) {
+        const embed = String(f?.embed_html ?? result.data?.embed_html ?? "");
+        const m = embed.match(/src=["']([^"']+)["']/i);
+        if (m?.[1]) {
+          if (/\.(mp4|mov)(\?|$)/i.test(m[1])) sourceUrl = sourceUrl || m[1];
+          else if (/facebook\.com\/plugins\/video\.php/i.test(m[1])) embedSrc = embedSrc || m[1];
+        }
+      }
+      const topEmbed = String(result.data?.embed_html ?? "");
+      const topMatch = topEmbed.match(/src=["']([^"']+)["']/i);
+      if (topMatch?.[1] && /facebook\.com\/plugins\/video\.php/i.test(topMatch[1])) {
+        embedSrc = embedSrc || topMatch[1];
+      }
+      if (sourceUrl) break;
+    }
+  }
+
+  if (!sourceUrl && storyId) {
+    sourceUrl = await resolveStoryVideoSource(storyId);
+  }
+
+  if (!embedSrc && permalink) {
+    embedSrc = facebookVideoEmbedSrc(permalink);
+  }
+  if (!embedSrc && videoId) {
+    // 공개 페이지 영상이면 watch URL 임베드가 동작하는 경우가 있음
+    embedSrc = facebookVideoEmbedSrc(`https://www.facebook.com/watch/?v=${videoId}`);
+  }
+
+  if (permalink && permalink !== row?.permalink_url) {
+    // 캐시에 permalink 보강 (다음 오픈 속도)
+    try {
+      const supabase = getSupabaseAdmin();
+      await supabase
+        .from("meta_ad_creatives")
+        .update({ permalink_url: permalink, updated_at: new Date().toISOString() })
+        .eq("ad_id", id);
+    } catch {
+      // ignore
+    }
+  }
+
+  return { sourceUrl, embedSrc, permalink };
+}
+
+/** Meta 영상 source URL (만료 가능) — 프록시용 */
+export async function resolveMetaCreativeVideoSourceUrl(adId: string): Promise<string | null> {
+  const playback = await resolveMetaCreativeVideoPlayback(adId);
+  return playback.sourceUrl;
+}
 
 export async function attachMetaCreatives<T extends {
   meta_ad_id?: string | null;

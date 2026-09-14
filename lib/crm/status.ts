@@ -1,4 +1,4 @@
-import { calendarDaysElapsed, calendarDaysInclusive } from "@/lib/crm/kst";
+import { calendarDaysElapsed } from "@/lib/crm/kst";
 import type { AdminStatusInfo, LeadStatus, SessionUser } from "@/lib/crm/types";
 import { LEAD_STATUSES } from "@/lib/crm/types";
 
@@ -33,23 +33,24 @@ export function getAdminStatus(
     return { key: "waiting_day", label: "대기 0일차", tone: "danger" };
   }
   if (st === "대기") {
-    // 대기 전환 당일 = 0일차, 4일차부터 담당자 변경 필요
+    // 상태 전환 당일 = 0일차, 4일차부터 담당자 변경 필요
     const days = calendarDaysElapsed(since);
     if (days >= 4) return { key: "need_reassign", label: "담당자 변경 필요", tone: "danger" };
     return { key: "waiting_day", label: `대기 ${days}일차`, tone: "danger" };
   }
   if (st === "1차컨택") {
-    const days = calendarDaysInclusive(since);
+    // 상태 전환 당일 = 0일차, 3일차부터 담당자 변경 필요
+    const days = calendarDaysElapsed(since);
     if (days >= 3) return { key: "need_reassign", label: "담당자 변경 필요", tone: "danger" };
     return { key: "first_contact_day", label: `1차컨택 ${days}일차`, tone: "danger" };
   }
   if (st === "부재(메신저완료)") {
-    const days = calendarDaysInclusive(since);
+    const days = calendarDaysElapsed(since);
     if (days >= 3) return { key: "need_reassign", label: "담당자 변경 필요", tone: "danger" };
     return { key: "absent_day", label: `부재 ${days}일차`, tone: "danger" };
   }
   if (st === "상담완료") {
-    const days = calendarDaysInclusive(since);
+    const days = calendarDaysElapsed(since);
     if (days > 7) return { key: "need_recontact", label: "재컨택 필요", tone: "danger" };
     return { key: "done_day", label: `상담완료 ${days}일차`, tone: "danger" };
   }
