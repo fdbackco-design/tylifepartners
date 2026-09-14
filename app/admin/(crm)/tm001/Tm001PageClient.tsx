@@ -928,15 +928,7 @@ export default function Tm001PageClient() {
 
       {!error && (
         <div className="tm001-root">
-          {loading && items.length === 0 ? (
-            <div className="crm-empty">로딩 중…</div>
-          ) : total === 0 && !loading ? (
-            <div className="crm-empty">
-              <strong>등록된 고객이 없습니다</strong>
-              상단에서 핫DB 엑셀을 업로드해 주세요.
-            </div>
-          ) : (
-            <>
+          <>
               <div
                 className="crm-table-shell crm-table-desktop table-scroll"
                 role="region"
@@ -967,6 +959,7 @@ export default function Tm001PageClient() {
                           checked={allPageSelected}
                           onChange={toggleSelectAll}
                           aria-label="현재 페이지 전체 선택"
+                          disabled={total === 0}
                         />
                       </th>
                       <th rowSpan={2} scope="col" className="pin-partner">
@@ -979,7 +972,7 @@ export default function Tm001PageClient() {
                         고객
                       </th>
                       <th colSpan={3} scope="colgroup" className="group-head stays-group-head">
-                        <button type="button" className="stay-group-toggle" onClick={toggleAllStays} aria-expanded={allExpanded}>
+                        <button type="button" className="stay-group-toggle" onClick={toggleAllStays} aria-expanded={allExpanded} disabled={total === 0}>
                           <span>고객 분류 · 숙박 내역</span>
                           <span className="stay-group-control">
                             <span>{allExpanded ? "모두 접기" : "모두 펼치기"}</span>
@@ -1139,7 +1132,28 @@ export default function Tm001PageClient() {
                     </tr>
                   </thead>
                   <tbody>
-                    {pageItems.map((c) => {
+                    {loading && items.length === 0 ? (
+                      <tr className="tm001-empty-row">
+                        <td colSpan={13}>로딩 중…</td>
+                      </tr>
+                    ) : total === 0 ? (
+                      <tr className="tm001-empty-row">
+                        <td colSpan={13}>
+                          {qDebounced || region || status || assigneeFilter || assignedDate ? (
+                            <>
+                              <strong>검색 결과가 없습니다</strong>
+                              필터를 바꾸거나 초기화해 보세요.
+                            </>
+                          ) : (
+                            <>
+                              <strong>등록된 고객이 없습니다</strong>
+                              상단에서 핫DB 엑셀을 업로드해 주세요.
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ) : (
+                      pageItems.map((c) => {
                       const unassigned = !c.assignee_id;
                       const saving = savingIds.has(c.id);
                       return (
@@ -1299,13 +1313,31 @@ export default function Tm001PageClient() {
                           </td>
                         </tr>
                       );
-                    })}
+                    })
+                    )}
                   </tbody>
                 </table>
               </div>
 
               <div className="mobile-list" aria-label="모바일 고객 목록">
-                {pageItems.map((c) => {
+                {loading && items.length === 0 ? (
+                  <div className="crm-empty">로딩 중…</div>
+                ) : total === 0 ? (
+                  <div className="crm-empty">
+                    {qDebounced || region || status || assigneeFilter || assignedDate ? (
+                      <>
+                        <strong>검색 결과가 없습니다</strong>
+                        필터를 바꾸거나 초기화해 보세요.
+                      </>
+                    ) : (
+                      <>
+                        <strong>등록된 고객이 없습니다</strong>
+                        상단에서 핫DB 엑셀을 업로드해 주세요.
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  pageItems.map((c) => {
                   const saving = savingIds.has(c.id);
                   return (
                   <article
@@ -1386,7 +1418,8 @@ export default function Tm001PageClient() {
                     </div>
                   </article>
                   );
-                })}
+                })
+                )}
               </div>
 
               <div className="crm-pagination">
@@ -1394,13 +1427,13 @@ export default function Tm001PageClient() {
                   {page + 1} / {pages} 페이지
                 </span>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button type="button" className="crm-btn" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                  <button type="button" className="crm-btn" disabled={page === 0 || total === 0} onClick={() => setPage((p) => p - 1)}>
                     이전
                   </button>
                   <button
                     type="button"
                     className="crm-btn"
-                    disabled={page >= pages - 1}
+                    disabled={page >= pages - 1 || total === 0}
                     onClick={() => setPage((p) => p + 1)}
                   >
                     다음
@@ -1408,7 +1441,6 @@ export default function Tm001PageClient() {
                 </div>
               </div>
             </>
-          )}
         </div>
       )}
 
