@@ -236,7 +236,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           <Link href={home} className="crm-brand">
             <img className="crm-brand-mark" src="/assets/crm-app-icon.png" alt="" width={28} height={28} />
             <span className="crm-brand-text">
-              <span className="crm-brand-full">FEED LIFE 상담관리</span>
+              <span className="crm-brand-full">FEED LIFE CRM</span>
               <span className="crm-brand-short">FEED LIFE</span>
             </span>
           </Link>

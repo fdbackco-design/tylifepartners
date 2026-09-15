@@ -117,7 +117,7 @@ export async function showLocalPushConfirmation(): Promise<void> {
   try {
     const registration = await navigator.serviceWorker.ready;
     const origin = window.location.origin;
-    await registration.showNotification("FEED LIFE 상담관리", {
+    await registration.showNotification("FEED LIFE CRM", {
       body: "알림이 켜졌습니다. 코멘트·신규 DB·배정 시 Windows/Mac에서도 알림이 표시됩니다.",
       icon: `${origin}/assets/crm-app-icon.png`,
       badge: `${origin}/assets/crm-app-icon.png`,

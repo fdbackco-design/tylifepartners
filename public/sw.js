@@ -21,7 +21,7 @@ function absoluteAsset(path) {
 
 function parsePushPayload(event) {
   const fallback = {
-    title: "FEED LIFE 상담관리",
+    title: "FEED LIFE CRM",
     body: "새 알림이 있습니다.",
     url: `${self.location.origin}/admin/consumers`,
     tag: "tylife-crm",

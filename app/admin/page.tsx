@@ -71,7 +71,7 @@ export default function AdminLoginPage() {
     <main className="crm-admin-login">
       <div className="crm-admin-login-card">
         <p className="crm-admin-login-brand">Feed Life</p>
-        <h1 className="crm-admin-login-title">상담관리 로그인</h1>
+        <h1 className="crm-admin-login-title">CRM 로그인</h1>
         <form className="crm-admin-login-form" onSubmit={onSubmit}>
           <label htmlFor="login-id" className="crm-admin-login-label">
             아이디
