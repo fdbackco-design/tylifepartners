@@ -93,9 +93,10 @@ describe("tm_admin scope", () => {
     parentId: null,
   };
 
-  it("homes to tm001 and only allows tm001/password paths", () => {
+  it("homes to tm001 and allows tm001/calendar/password paths", () => {
     assert.equal(defaultAdminHome("tm_admin"), "/admin/tm001");
     assert.equal(canAccessAdminPath("tm_admin", "/admin/tm001"), true);
+    assert.equal(canAccessAdminPath("tm_admin", "/admin/calendar"), true);
     assert.equal(canAccessAdminPath("tm_admin", "/admin/password"), true);
     assert.equal(canAccessAdminPath("tm_admin", "/admin/consumers"), false);
     assert.equal(canAccessAdminPath("tm_admin", "/admin/dashboard"), false);

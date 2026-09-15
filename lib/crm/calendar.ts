@@ -86,6 +86,21 @@ export function canEditCalendar(session: SessionUser): boolean {
   return session.rank === "admin" || session.rank === "manager";
 }
 
+/** 캘린더 페이지·API 열람 (TM 관리자는 TM001 일정만) */
+export function canAccessCalendar(session: Pick<SessionUser, "rank">): boolean {
+  return (
+    session.rank === "admin" ||
+    session.rank === "manager" ||
+    session.rank === "sales" ||
+    session.rank === "tm_admin"
+  );
+}
+
+/** TM 관리자: 일반 캘린더 일정 제외, TM001 재콜만 */
+export function isTmCalendarOnlyViewer(session: Pick<SessionUser, "rank">): boolean {
+  return session.rank === "tm_admin";
+}
+
 /** ENV 관리자(userId 없음)도 관리자 작성으로 취급 */
 export function writerRank(session: SessionUser): "admin" | "manager" | null {
   if (session.rank === "admin") return "admin";

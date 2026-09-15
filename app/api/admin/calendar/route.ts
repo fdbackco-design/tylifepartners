@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   CALENDAR_EVENT_TYPES,
   CALENDAR_EVENT_TYPE_LABELS,
+  canAccessCalendar,
   canEditCalendar,
   canViewCalendarEvent,
   isCalendarEventType,
   isCalendarVisibility,
+  isTmCalendarOnlyViewer,
   normalizeVisibilityForWriter,
   parseEventDate,
   resolveCalendarNotifyStaffIds,
@@ -15,7 +17,7 @@ import {
   type CalendarVisibility,
 } from "@/lib/crm/calendar";
 import { addDaysYmd, kstYmd, startOfKstDayIso } from "@/lib/crm/kst";
-import { visibleAssigneeIds, canAccessCrmLeads } from "@/lib/crm/scope";
+import { visibleAssigneeIds } from "@/lib/crm/scope";
 import { getSession } from "@/lib/adminSession";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { notifyCalendarEventCreated } from "@/lib/webPush";
@@ -204,7 +206,7 @@ function canViewLeadMeeting(
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
-  if (!canAccessCrmLeads(session)) {
+  if (!canAccessCalendar(session)) {
     return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
   }
 
@@ -223,31 +225,37 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdmin();
   const staff = await loadStaff();
   const staffById = new Map(staff.map((s) => [s.id, s]));
+  const tmOnly = isTmCalendarOnlyViewer(session);
 
-  const { data, error } = await supabase
-    .from("crm_calendar_events")
-    .select(
-      "id, title, body, event_date, event_type, all_day, start_at, end_at, visibility, viewer_ids, created_by, created_by_rank, team_root_id, created_at, updated_at"
-    )
-    .gte("event_date", start)
-    .lt("event_date", nextMonth)
-    .order("event_date", { ascending: true })
-    .order("created_at", { ascending: true });
+  let calendarItems: CalendarEventRow[] = [];
+  if (!tmOnly) {
+    const { data, error } = await supabase
+      .from("crm_calendar_events")
+      .select(
+        "id, title, body, event_date, event_type, all_day, start_at, end_at, visibility, viewer_ids, created_by, created_by_rank, team_root_id, created_at, updated_at"
+      )
+      .gte("event_date", start)
+      .lt("event_date", nextMonth)
+      .order("event_date", { ascending: true })
+      .order("created_at", { ascending: true });
 
-  if (error) {
-    console.error("GET calendar events:", error);
-    return NextResponse.json({ ok: false, message: "일정을 불러오지 못했습니다." }, { status: 500 });
+    if (error) {
+      console.error("GET calendar events:", error);
+      return NextResponse.json({ ok: false, message: "일정을 불러오지 못했습니다." }, { status: 500 });
+    }
+
+    calendarItems = ((data ?? []) as Record<string, unknown>[])
+      .map((r) => mapDbRow(r, staffById))
+      .filter((ev) => canViewCalendarEvent(session, ev, staff));
   }
 
-  const calendarItems = ((data ?? []) as Record<string, unknown>[])
-    .map((r) => mapDbRow(r, staffById))
-    .filter((ev) => canViewCalendarEvent(session, ev, staff));
-
-  // 대면확정·통화약속(리드) — meeting_at 호환. 스코프는 담당자 기준
-  const scoped = await visibleAssigneeIds(session);
-  const leadItems = (await fetchLeadMeetings(month, staffById)).filter((ev) =>
-    canViewLeadMeeting(session, ev, scoped)
-  );
+  // 대면·통화(리드) / TM001 재콜 — meeting_at 호환. TM 관리자는 TM001만
+  const scoped = tmOnly ? ("all" as const) : await visibleAssigneeIds(session);
+  const leadItems = (
+    tmOnly
+      ? await fetchTm001Meetings(staffById, start, nextMonth)
+      : await fetchLeadMeetings(month, staffById)
+  ).filter((ev) => canViewLeadMeeting(session, ev, scoped));
 
   let items = [...calendarItems, ...leadItems].filter((ev) => typeFilter.includes(ev.event_type));
   items.sort((a, b) => {
@@ -279,6 +287,7 @@ export async function GET(request: NextRequest) {
     ok: true,
     month,
     can_edit: canEditCalendar(session),
+    tm_only: tmOnly,
     items,
     viewer_options: viewerOptions,
     me: { userId: session.userId, rank: session.rank, name: session.name },

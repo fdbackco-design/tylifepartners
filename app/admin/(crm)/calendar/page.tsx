@@ -92,6 +92,7 @@ function CalendarPageInner() {
   });
   const [items, setItems] = useState<CalendarEventRow[]>([]);
   const [canEdit, setCanEdit] = useState(false);
+  const [tmOnly, setTmOnly] = useState(false);
   const [rank, setRank] = useState<string>("sales");
   const [viewerOptions, setViewerOptions] = useState<{ managers: ViewerOpt[]; sales: ViewerOpt[] }>({
     managers: [],
@@ -183,7 +184,14 @@ function CalendarPageInner() {
       }
       setItems(d.items ?? []);
       setCanEdit(Boolean(d.can_edit));
+      setTmOnly(Boolean(d.tm_only));
       setRank(d.me?.rank || "sales");
+      if (d.tm_only) {
+        setTypeFilter((prev) => {
+          if (prev.size === 1 && prev.has("call")) return prev;
+          return new Set<CalendarEventType>(["call"]);
+        });
+      }
       setViewerOptions(d.viewer_options ?? { managers: [], sales: [] });
       setStatus(`일정 ${d.items?.length ?? 0}건`);
     } catch {
@@ -493,10 +501,10 @@ function CalendarPageInner() {
       });
 
       const filterSlug =
-        typeFilter.size === CALENDAR_EVENT_TYPES.length
+        typeFilter.size === availableTypes.length
           ? "전체"
           : Array.from(typeFilter)
-              .map((t) => CALENDAR_EVENT_TYPE_LABELS[t])
+              .map((t) => typeLabel(t))
               .join("+");
       const a = document.createElement("a");
       a.href = dataUrl;
@@ -504,7 +512,7 @@ function CalendarPageInner() {
       a.click();
       setStatus("PNG 저장 완료");
       showToast(
-        typeFilter.size === CALENDAR_EVENT_TYPES.length
+        typeFilter.size === availableTypes.length
           ? "월간 캘린더 PNG를 저장했습니다."
           : `선택한 종류(${filterSlug})만 PNG로 저장했습니다.`
       );
@@ -520,6 +528,16 @@ function CalendarPageInner() {
 
   const visibilityChoices: CalendarVisibility[] =
     rank === "manager" ? ["all", "sales"] : ["all", "admin_plus", "managers", "sales"];
+
+  const availableTypes = useMemo(
+    () => (tmOnly ? (["call"] as CalendarEventType[]) : [...CALENDAR_EVENT_TYPES]),
+    [tmOnly]
+  );
+
+  const typeLabel = useCallback(
+    (t: CalendarEventType) => (tmOnly && t === "call" ? "TM001 재콜" : CALENDAR_EVENT_TYPE_LABELS[t]),
+    [tmOnly]
+  );
 
   const pickerList = useMemo(() => {
     const base =
@@ -583,7 +601,7 @@ function CalendarPageInner() {
           </div>
 
           <div className="wc-filters" aria-label="일정 종류 필터">
-            {CALENDAR_EVENT_TYPES.map((t) => {
+            {availableTypes.map((t) => {
               const on = typeFilter.has(t);
               const c = CALENDAR_EVENT_TYPE_COLORS[t];
               return (
@@ -595,7 +613,7 @@ function CalendarPageInner() {
                   onClick={() => toggleType(t)}
                 >
                   <i style={{ background: c.accent }} />
-                  {CALENDAR_EVENT_TYPE_LABELS[t]}
+                  {typeLabel(t)}
                 </button>
               );
             })}
@@ -677,10 +695,10 @@ function CalendarPageInner() {
           </div>
 
           <div className="wc-legend">
-            {CALENDAR_EVENT_TYPES.map((t) => (
+            {availableTypes.map((t) => (
               <b key={t} className={typeFilter.has(t) ? "is-on" : undefined}>
                 <i style={{ background: CALENDAR_EVENT_TYPE_COLORS[t].accent }} />
-                {CALENDAR_EVENT_TYPE_LABELS[t]}
+                {typeLabel(t)}
               </b>
             ))}
             <em>날짜를 누르면 일정 목록 · 상세가 열립니다</em>
@@ -713,7 +731,7 @@ function CalendarPageInner() {
                       </b>
                       {ev.body && ev.body !== ev.title ? ev.body.split("\n").slice(0, 2).join(" ") : ""}
                     </span>
-                    <span className="wc-ag__tag">{CALENDAR_EVENT_TYPE_LABELS[ev.event_type]}</span>
+                    <span className="wc-ag__tag">{typeLabel(ev.event_type)}</span>
                   </button>
                 );
               })
@@ -772,8 +790,12 @@ function CalendarPageInner() {
                             {calendarEventLabel(ev)}
                           </strong>
                           <span>
-                            {CALENDAR_EVENT_TYPE_LABELS[ev.event_type]}
-                            {ev.source === "lead_meeting" ? " · 고객 DB" : ""}
+                            {typeLabel(ev.event_type)}
+                            {ev.source === "lead_meeting"
+                              ? ev.lead_category === "tm001"
+                                ? " · TM001"
+                                : " · 고객 DB"
+                              : ""}
                             {ev.body ? `\n${ev.body}` : ""}
                           </span>
                         </div>
