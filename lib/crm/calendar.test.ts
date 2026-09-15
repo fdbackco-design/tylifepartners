@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  canAccessCalendar,
   canViewCalendarEvent,
+  isTmCalendarOnlyViewer,
   normalizeVisibilityForWriter,
   resolveCalendarNotifyStaffIds,
   type CalendarEventRow,
@@ -164,5 +166,14 @@ describe("calendar notify recipients", () => {
       staff
     );
     assert.deepEqual(ids, ["s1"]);
+  });
+});
+
+describe("tm_admin calendar access", () => {
+  it("allows calendar access but only TM-scoped viewing", () => {
+    const tm = session({ rank: "tm_admin", userId: "tm1" });
+    assert.equal(canAccessCalendar(tm), true);
+    assert.equal(isTmCalendarOnlyViewer(tm), true);
+    assert.equal(isTmCalendarOnlyViewer(session({ rank: "admin", userId: "a1" })), false);
   });
 });

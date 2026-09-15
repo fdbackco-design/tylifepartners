@@ -128,7 +128,7 @@ export function canAccessAdminPath(rank: SessionUser["rank"], pathname: string):
   if (rank === "admin") return true;
 
   if (rank === "tm_admin") {
-    const allowed = ["/admin/tm001", "/admin/password"];
+    const allowed = ["/admin/tm001", "/admin/calendar", "/admin/password"];
     return allowed.some((p) => path === p || path.startsWith(`${p}/`));
   }
 
