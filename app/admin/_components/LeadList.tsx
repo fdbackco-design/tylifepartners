@@ -16,6 +16,7 @@ import DateRangePicker from "@/app/admin/_components/crm/DateRangePicker";
 import FilterPopover, { type FilterGroup } from "@/app/admin/_components/crm/FilterPopover";
 import StatusBadgeMenu from "@/app/admin/_components/crm/StatusBadgeMenu";
 import { CrmAlert, CrmButton, CrmDialog } from "@/app/admin/_components/crm/ui";
+import { CrmCheckupToolbarBanner } from "@/app/admin/_components/CrmCheckupReminder";
 import { formatAssigneeWithTeam } from "@/lib/crm/assigneeHistoryFormat";
 import { buildAdminCommentValue, formatAdminCommentPrefix } from "@/lib/crm/adminComment";
 import { canExportLeads } from "@/lib/crm/scope";
@@ -222,6 +223,7 @@ export default function LeadList({
   const [regions, setRegions] = useState(csvParam(searchParams.get("regions")));
   const [statuses, setStatuses] = useState(csvParam(searchParams.get("statuses")));
   const [adminStatuses, setAdminStatuses] = useState(csvParam(searchParams.get("admin_statuses")));
+  const [checkupIds, setCheckupIds] = useState(csvParam(searchParams.get("ids")));
   const [jobRanks, setJobRanks] = useState(csvParam(searchParams.get("job_ranks")));
   const [ageGroups, setAgeGroups] = useState(csvParam(searchParams.get("age_groups")));
   const [jobs, setJobs] = useState(csvParam(searchParams.get("jobs")));
@@ -294,6 +296,22 @@ export default function LeadList({
     return () => mq.removeEventListener("change", apply);
   }, []);
 
+  // 점검 알림 등 외부 딥링크: URL의 ids/statuses/admin_statuses를 목록 필터에 반영
+  useEffect(() => {
+    const nextIds = csvParam(searchParams.get("ids"));
+    const nextStatuses = csvParam(searchParams.get("statuses"));
+    const nextAdmin = csvParam(searchParams.get("admin_statuses"));
+    setCheckupIds((prev) =>
+      prev.length === nextIds.length && prev.every((v, i) => v === nextIds[i]) ? prev : nextIds
+    );
+    setStatuses((prev) =>
+      prev.length === nextStatuses.length && prev.every((v, i) => v === nextStatuses[i]) ? prev : nextStatuses
+    );
+    setAdminStatuses((prev) =>
+      prev.length === nextAdmin.length && prev.every((v, i) => v === nextAdmin[i]) ? prev : nextAdmin
+    );
+  }, [searchParams]);
+
   // Sync filters to URL
   useEffect(() => {
     if (urlSearchOverrideRef.current && search === urlSearchOverrideRef.current) {
@@ -307,6 +325,7 @@ export default function LeadList({
     if (assigneeIds.length) sp.set("assignee_ids", assigneeIds.join(","));
     if (teamIds.length) sp.set("team_ids", teamIds.join(","));
     if (regions.length) sp.set("regions", regions.join(","));
+    if (checkupIds.length) sp.set("ids", checkupIds.join(","));
     if (statuses.length) sp.set("statuses", statuses.join(","));
     if (adminStatuses.length) sp.set("admin_statuses", adminStatuses.join(","));
     if (jobRanks.length) sp.set("job_ranks", jobRanks.join(","));
@@ -341,6 +360,7 @@ export default function LeadList({
     assigneeIds,
     teamIds,
     regions,
+    checkupIds,
     statuses,
     adminStatuses,
     jobRanks,
@@ -364,6 +384,7 @@ export default function LeadList({
     if (assigneeIds.length) sp.set("assignee_ids", assigneeIds.join(","));
     if (teamIds.length) sp.set("team_ids", teamIds.join(","));
     if (regions.length) sp.set("regions", regions.join(","));
+    if (checkupIds.length) sp.set("ids", checkupIds.join(","));
     if (statuses.length) sp.set("statuses", statuses.join(","));
     if (adminStatuses.length) sp.set("admin_statuses", adminStatuses.join(","));
     if (jobRanks.length) sp.set("job_ranks", jobRanks.join(","));
@@ -382,6 +403,7 @@ export default function LeadList({
     assigneeIds,
     teamIds,
     regions,
+    checkupIds,
     statuses,
     adminStatuses,
     jobRanks,
@@ -868,6 +890,7 @@ export default function LeadList({
           setAssigneeIds([]);
           setTeamIds([]);
           setRegions([]);
+          setCheckupIds([]);
           setStatuses([]);
           setAdminStatuses([]);
           setJobRanks([]);
@@ -1413,6 +1436,16 @@ export default function LeadList({
       },
     });
   }
+  if (checkupIds.length) {
+    chips.push({
+      key: "checkup-ids",
+      label: `점검 대상 ${checkupIds.length}건`,
+      onRemove: () => {
+        setCheckupIds([]);
+        setPage(0);
+      },
+    });
+  }
   for (const v of statuses) {
     chips.push({
       key: `s-${v}`,
@@ -1491,6 +1524,7 @@ export default function LeadList({
     setAssigneeIds([]);
     setTeamIds([]);
     setRegions([]);
+    setCheckupIds([]);
     setStatuses([]);
     setAdminStatuses([]);
     setJobRanks([]);
@@ -1534,6 +1568,15 @@ export default function LeadList({
             aria-label="이름 또는 연락처 검색"
           />
         </div>
+        <CrmCheckupToolbarBanner
+          enabled={Boolean(
+            session &&
+              (session.rank === "sales" ||
+                session.rank === "manager" ||
+                session.rank === "tm_admin" ||
+                (session.rank === "admin" && session.userId))
+          )}
+        />
         <div className="crm-toolbar-actions">
           <DateRangePicker
             from={dateFrom}

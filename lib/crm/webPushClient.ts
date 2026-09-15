@@ -119,8 +119,8 @@ export async function showLocalPushConfirmation(): Promise<void> {
     const origin = window.location.origin;
     await registration.showNotification("FEED LIFE 상담관리", {
       body: "알림이 켜졌습니다. 코멘트·신규 DB·배정 시 Windows/Mac에서도 알림이 표시됩니다.",
-      icon: `${origin}/icon.png`,
-      badge: `${origin}/icon.png`,
+      icon: `${origin}/assets/crm-app-icon.png`,
+      badge: `${origin}/assets/crm-app-icon.png`,
       tag: "tylife-crm-push-on",
       data: { url: `${origin}/admin/consumers` },
     });

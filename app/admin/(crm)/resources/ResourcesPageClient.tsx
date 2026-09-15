@@ -12,7 +12,15 @@ import {
   CrmPageHeader,
   CrmSheet,
 } from "@/app/admin/_components/crm/ui";
-import { formatBytes, type ResourcePostRow } from "@/lib/crm/resourceShares";
+import {
+  RESOURCE_PRODUCT_TAGS,
+  RESOURCE_SITUATION_TAGS,
+  RESOURCE_STATUS_TAGS,
+  formatBytes,
+  isResourcePostNew,
+  resourceBodyPreview,
+  type ResourcePostRow,
+} from "@/lib/crm/resourceShares";
 
 type PendingFile = {
   storage_path: string;
@@ -66,6 +74,41 @@ function formatKst(iso: string): string {
   }
 }
 
+function toggleInList(list: string[], value: string): string[] {
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
+
+function TagChips({
+  product,
+  status,
+  situation,
+}: {
+  product: string[];
+  status: string[];
+  situation: string[];
+}) {
+  if (!product.length && !status.length && !situation.length) return null;
+  return (
+    <div className="resource-tags">
+      {product.map((t) => (
+        <span key={`p-${t}`} className="resource-tag" data-kind="product">
+          {t}
+        </span>
+      ))}
+      {status.map((t) => (
+        <span key={`st-${t}`} className="resource-tag" data-kind="status">
+          {t}
+        </span>
+      ))}
+      {situation.map((t) => (
+        <span key={`s-${t}`} className="resource-tag" data-kind="situation">
+          {t}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function ResourcesPageClient() {
   const searchParams = useSearchParams();
   const highlightPost = searchParams.get("post")?.trim() || "";
@@ -76,12 +119,25 @@ export default function ResourcesPageClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
+
+  const [query, setQuery] = useState("");
+  const [productFilter, setProductFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [situationFilter, setSituationFilter] = useState<string[]>([]);
+  const [expandedBody, setExpandedBody] = useState<Set<string>>(() => new Set());
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(() => new Set());
+
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [formProductTags, setFormProductTags] = useState<string[]>([]);
+  const [formStatusTags, setFormStatusTags] = useState<string[]>([]);
+  const [formSituationTags, setFormSituationTags] = useState<string[]>([]);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [existingFiles, setExistingFiles] = useState<ResourcePostRow["files"]>([]);
   const [uploading, setUploading] = useState(false);
 
   const showToast = useCallback((msg: string) => {
@@ -120,12 +176,62 @@ export default function ResourcesPageClient() {
     if (!highlightPost || loading) return;
     const el = document.getElementById(`resource-post-${highlightPost}`);
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setExpandedBody((prev) => new Set(prev).add(highlightPost));
+    setExpandedFiles((prev) => new Set(prev).add(highlightPost));
   }, [highlightPost, loading, items]);
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((post) => {
+      if (productFilter.length) {
+        const tags = post.product_tags ?? [];
+        if (!productFilter.every((t) => tags.includes(t))) return false;
+      }
+      if (statusFilter.length) {
+        const tags = post.status_tags ?? [];
+        if (!statusFilter.every((t) => tags.includes(t))) return false;
+      }
+      if (situationFilter.length) {
+        const tags = post.situation_tags ?? [];
+        if (!situationFilter.every((t) => tags.includes(t))) return false;
+      }
+      if (!q) return true;
+      const hay = [
+        post.title,
+        post.created_by_name || "",
+        ...(post.product_tags ?? []),
+        ...(post.status_tags ?? []),
+        ...(post.situation_tags ?? []),
+        post.body,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [items, query, productFilter, statusFilter, situationFilter]);
+
   const openCreate = () => {
+    setEditingId(null);
     setTitle("");
     setBody("");
+    setFormProductTags([]);
+    setFormStatusTags([]);
+    setFormSituationTags([]);
     setPendingFiles([]);
+    setExistingFiles([]);
+    setFormError("");
+    setSheetOpen(true);
+  };
+
+  const openEdit = (post: ResourcePostRow) => {
+    setEditingId(post.id);
+    setTitle(post.title);
+    setBody(post.body);
+    setFormProductTags([...(post.product_tags ?? [])]);
+    setFormStatusTags([...(post.status_tags ?? [])]);
+    setFormSituationTags([...(post.situation_tags ?? [])]);
+    setPendingFiles([]);
+    setExistingFiles(post.files ?? []);
     setFormError("");
     setSheetOpen(true);
   };
@@ -154,22 +260,29 @@ export default function ResourcesPageClient() {
     setSaving(true);
     setFormError("");
     try {
-      const res = await fetch("/api/admin/resources", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          body,
-          files: pendingFiles,
-        }),
-      });
+      const payload = {
+        title,
+        body,
+        product_tags: formProductTags,
+        status_tags: formStatusTags,
+        situation_tags: formSituationTags,
+        files: pendingFiles,
+      };
+      const res = await fetch(
+        editingId ? `/api/admin/resources/${editingId}` : "/api/admin/resources",
+        {
+          method: editingId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
       const data = await res.json();
       if (!data.ok) {
-        setFormError(data.message || "등록 실패");
+        setFormError(data.message || (editingId ? "수정 실패" : "등록 실패"));
         return;
       }
       setSheetOpen(false);
-      showToast("자료를 등록하고 알림을 보냈습니다.");
+      showToast(editingId ? "자료를 수정했습니다." : "자료를 등록하고 알림을 보냈습니다.");
       await load();
     } catch {
       setFormError("네트워크 오류");
@@ -195,12 +308,15 @@ export default function ResourcesPageClient() {
   };
 
   const maxLabel = useMemo(() => formatBytes(maxBytes), [maxBytes]);
+  const hasActiveFilter = Boolean(
+    query.trim() || productFilter.length || statusFilter.length || situationFilter.length
+  );
 
   return (
-    <div className="crm-ui-content">
+    <div className="crm-ui-content resource-board">
       <CrmPageHeader
         title="자료 공유"
-        description="교육·영업 자료를 공유합니다. 관리자가 등록하면 전 직원에게 푸시 알림이 갑니다."
+        description=""
         actions={
           canWrite ? (
             <CrmButton variant="primary" onClick={openCreate}>
@@ -213,6 +329,112 @@ export default function ResourcesPageClient() {
       {toast ? <CrmAlert tone="success">{toast}</CrmAlert> : null}
       {error ? <CrmAlert tone="danger">{error}</CrmAlert> : null}
 
+      <section className="resource-discovery" aria-label="자료 검색 및 필터">
+        <div className="resource-search">
+          <span className="resource-search-icon" aria-hidden>
+            ⌕
+          </span>
+          <input
+            className="resource-search-input"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="제목 · 작성자 · 태그 검색"
+            aria-label="제목, 작성자, 태그 검색"
+          />
+        </div>
+
+        <div className="resource-filter-group">
+          <div className="resource-filter-label">상품</div>
+          <div className="resource-filter-list" role="group" aria-label="상품 필터">
+            {RESOURCE_PRODUCT_TAGS.map((tag) => {
+              const pressed = productFilter.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  className="resource-filter"
+                  aria-pressed={pressed}
+                  onClick={() => setProductFilter((prev) => toggleInList(prev, tag))}
+                >
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="resource-filter-group">
+          <div className="resource-filter-label">상품 상태</div>
+          <div className="resource-filter-list" role="group" aria-label="상품 상태 필터">
+            {RESOURCE_STATUS_TAGS.map((tag) => {
+              const pressed = statusFilter.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  className="resource-filter"
+                  aria-pressed={pressed}
+                  onClick={() => setStatusFilter((prev) => toggleInList(prev, tag))}
+                >
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="resource-filter-group">
+          <div className="resource-filter-label">영업 상황</div>
+          <div className="resource-filter-list" role="group" aria-label="영업 상황 필터">
+            {RESOURCE_SITUATION_TAGS.map((tag) => {
+              const pressed = situationFilter.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  className="resource-filter"
+                  aria-pressed={pressed}
+                  onClick={() => setSituationFilter((prev) => toggleInList(prev, tag))}
+                >
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {!loading && items.length > 0 ? (
+        <div className="resource-result-bar">
+          <span>
+            {hasActiveFilter ? (
+              <>
+                조건에 맞는 자료 <strong>{filtered.length}</strong>건
+                <span className="resource-result-muted"> / 전체 {items.length}건</span>
+              </>
+            ) : (
+              <>
+                전체 자료 <strong>{items.length}</strong>건
+              </>
+            )}
+          </span>
+          {hasActiveFilter ? (
+            <button
+              type="button"
+              className="resource-clear-filters"
+              onClick={() => {
+                setQuery("");
+                setProductFilter([]);
+                setStatusFilter([]);
+                setSituationFilter([]);
+              }}
+            >
+              필터 초기화
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {loading ? (
         <div className="crm-skeleton" style={{ height: 180 }} />
       ) : items.length === 0 ? (
@@ -220,102 +442,121 @@ export default function ResourcesPageClient() {
           title="공유된 자료가 없습니다"
           description={
             canWrite
-              ? "제목·내용·파일을 등록해 팀에 공유하세요."
+              ? "제목·내용·태그·파일을 등록해 팀에 공유하세요."
               : "관리자가 자료를 올리면 이 메뉴에서 확인할 수 있습니다."
           }
         />
+      ) : filtered.length === 0 ? (
+        <CrmEmptyState title="검색 결과가 없습니다" description="다른 검색어나 필터를 시도해 보세요." />
       ) : (
-        <div style={{ display: "grid", gap: 16 }}>
-          {items.map((post) => {
+        <div className="resource-list">
+          {filtered.map((post) => {
             const highlighted = highlightPost === post.id;
+            const preview = resourceBodyPreview(post.body);
+            const bodyOpen = expandedBody.has(post.id);
+            const filesOpen = expandedFiles.has(post.id);
+            const isNew = isResourcePostNew(post.created_at);
             return (
               <article
                 key={post.id}
                 id={`resource-post-${post.id}`}
-                className="crm-ui-panel"
-                style={{
-                  padding: 16,
-                  outline: highlighted ? "2px solid var(--crm-primary, #5b19c6)" : undefined,
-                }}
+                className={`resource-item${highlighted ? " is-highlighted" : ""}${canWrite ? "" : " resource-item--solo"}`}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    alignItems: "flex-start",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{post.title}</h2>
-                    <div style={{ marginTop: 6, fontSize: 12, color: "var(--crm-muted)" }}>
-                      {post.created_by_name || "관리자"} · {formatKst(post.created_at)}
-                      {post.files.length ? ` · 첨부 ${post.files.length}개` : ""}
-                    </div>
+                <div className="resource-item-main">
+                  <div className="resource-item-heading">
+                    <h2>{post.title}</h2>
+                    {isNew ? <span className="resource-new-label">NEW</span> : null}
                   </div>
-                  {canWrite ? (
-                    <CrmButton size="sm" variant="danger" onClick={() => void removePost(post.id, post.title)}>
-                      삭제
-                    </CrmButton>
+                  <div className="resource-meta">
+                    <span>{post.created_by_name || "관리자"}</span>
+                    <span>{formatKst(post.created_at)}</span>
+                    <span>첨부 {post.files.length}개</span>
+                  </div>
+                  {preview ? (
+                    bodyOpen ? (
+                      <p className="resource-body-full">{post.body}</p>
+                    ) : (
+                      <p className="resource-preview">{preview}</p>
+                    )
+                  ) : null}
+                  {post.body.trim().length > 72 ? (
+                    <button
+                      type="button"
+                      className="resource-inline-link"
+                      onClick={() =>
+                        setExpandedBody((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(post.id)) next.delete(post.id);
+                          else next.add(post.id);
+                          return next;
+                        })
+                      }
+                    >
+                      {bodyOpen ? "본문 접기" : "본문 더보기"}
+                    </button>
+                  ) : null}
+                  <TagChips
+                    product={post.product_tags ?? []}
+                    status={post.status_tags ?? []}
+                    situation={post.situation_tags ?? []}
+                  />
+
+                  {post.files.length > 0 ? (
+                    <div className="resource-attachments">
+                      <button
+                        type="button"
+                        className="resource-attachments-toggle"
+                        aria-expanded={filesOpen}
+                        onClick={() =>
+                          setExpandedFiles((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(post.id)) next.delete(post.id);
+                            else next.add(post.id);
+                            return next;
+                          })
+                        }
+                      >
+                        <span className="resource-attachments-chevron" aria-hidden>
+                          {filesOpen ? "∨" : ">"}
+                        </span>
+                        첨부파일
+                        <span className="resource-attachments-count">{post.files.length}</span>
+                      </button>
+                      {filesOpen ? (
+                        <ul className="resource-file-list" aria-label={`${post.title} 첨부파일`}>
+                          {post.files.map((f) => (
+                            <li key={f.id} className="resource-file-row">
+                              <div className="resource-file-meta">
+                                <div className="resource-file-name" title={f.original_filename}>
+                                  {f.original_filename}
+                                </div>
+                                <div className="resource-file-size">
+                                  {formatBytes(Number(f.size_bytes || 0))}
+                                </div>
+                              </div>
+                              <a
+                                className="crm-ui-btn crm-ui-btn-secondary crm-ui-btn-sm"
+                                href={`/api/admin/resources/files/${f.id}/download`}
+                              >
+                                다운로드
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
 
-                {post.body ? (
-                  <p
-                    style={{
-                      margin: "12px 0 0",
-                      whiteSpace: "pre-wrap",
-                      lineHeight: 1.55,
-                      fontSize: 14,
-                    }}
-                  >
-                    {post.body}
-                  </p>
-                ) : null}
-
-                {post.files.length > 0 ? (
-                  <ul style={{ margin: "14px 0 0", padding: 0, listStyle: "none", display: "grid", gap: 8 }}>
-                    {post.files.map((f) => (
-                      <li
-                        key={f.id}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 10,
-                          padding: "10px 12px",
-                          borderRadius: 10,
-                          border: "1px solid var(--crm-border, #e2e8f0)",
-                          background: "var(--crm-surface-2, #f8fafc)",
-                        }}
-                      >
-                        <div style={{ minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontWeight: 600,
-                              fontSize: 13,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                            title={f.original_filename}
-                          >
-                            {f.original_filename}
-                          </div>
-                          <div style={{ fontSize: 12, color: "var(--crm-muted)" }}>
-                            {formatBytes(Number(f.size_bytes || 0))}
-                          </div>
-                        </div>
-                        <a
-                          className="crm-ui-btn crm-ui-btn-secondary crm-ui-btn-sm"
-                          href={`/api/admin/resources/files/${f.id}/download`}
-                        >
-                          다운로드
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
+                {canWrite ? (
+                  <div className="resource-item-actions">
+                    <CrmButton size="sm" variant="secondary" onClick={() => openEdit(post)}>
+                      수정
+                    </CrmButton>
+                    <CrmButton size="sm" variant="danger" onClick={() => void removePost(post.id, post.title)}>
+                      삭제
+                    </CrmButton>
+                  </div>
                 ) : null}
               </article>
             );
@@ -326,7 +567,7 @@ export default function ResourcesPageClient() {
       <CrmSheet
         open={sheetOpen}
         onClose={() => !saving && setSheetOpen(false)}
-        title="자료 등록"
+        title={editingId ? "자료 수정" : "자료 등록"}
         footer={
           <>
             <CrmButton variant="secondary" disabled={saving || uploading} onClick={() => setSheetOpen(false)}>
@@ -337,12 +578,12 @@ export default function ResourcesPageClient() {
               disabled={saving || uploading || !title.trim()}
               onClick={() => void submit()}
             >
-              {saving ? "등록 중…" : "등록 및 알림"}
+              {saving ? (editingId ? "저장 중…" : "등록 중…") : editingId ? "저장" : "등록 및 알림"}
             </CrmButton>
           </>
         }
       >
-        <div style={{ display: "grid", gap: 14 }}>
+        <div className="resource-form">
           {formError ? <CrmAlert tone="danger">{formError}</CrmAlert> : null}
           <CrmField label="제목" htmlFor="res-title">
             <CrmInput
@@ -358,22 +599,89 @@ export default function ResourcesPageClient() {
               id="res-body"
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              rows={8}
+              rows={7}
               placeholder="안내 문구를 입력하세요."
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: 10,
-                border: "1px solid var(--crm-border, #e2e8f0)",
-                font: "inherit",
-                resize: "vertical",
-              }}
+              className="resource-textarea"
             />
           </CrmField>
+
+          <fieldset className="resource-tag-fieldset">
+            <legend>상품 태그</legend>
+            <p className="resource-help">복수 선택 가능 · 없으면 비워 두어도 됩니다.</p>
+            <div className="resource-check-grid">
+              {RESOURCE_PRODUCT_TAGS.map((tag) => (
+                <label key={tag} className="resource-check">
+                  <input
+                    type="checkbox"
+                    checked={formProductTags.includes(tag)}
+                    onChange={() => setFormProductTags((prev) => toggleInList(prev, tag))}
+                  />
+                  <span>{tag}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset className="resource-tag-fieldset">
+            <legend>상품 상태 태그</legend>
+            <p className="resource-help">복수 선택 가능 · 없으면 비워 두어도 됩니다.</p>
+            <div className="resource-check-grid">
+              {RESOURCE_STATUS_TAGS.map((tag) => (
+                <label key={tag} className="resource-check">
+                  <input
+                    type="checkbox"
+                    checked={formStatusTags.includes(tag)}
+                    onChange={() => setFormStatusTags((prev) => toggleInList(prev, tag))}
+                  />
+                  <span>{tag}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset className="resource-tag-fieldset">
+            <legend>영업 상황 태그</legend>
+            <p className="resource-help">복수 선택 가능 · 없으면 비워 두어도 됩니다.</p>
+            <div className="resource-check-grid resource-check-grid--situation">
+              {RESOURCE_SITUATION_TAGS.map((tag) => (
+                <label key={tag} className="resource-check">
+                  <input
+                    type="checkbox"
+                    checked={formSituationTags.includes(tag)}
+                    onChange={() => setFormSituationTags((prev) => toggleInList(prev, tag))}
+                  />
+                  <span>{tag}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          {existingFiles.length > 0 ? (
+            <div className="resource-existing-files">
+              <div className="resource-existing-label">기존 첨부</div>
+              <ul className="resource-file-list">
+                {existingFiles.map((f) => (
+                  <li key={f.id} className="resource-file-row">
+                    <div className="resource-file-meta">
+                      <div className="resource-file-name">{f.original_filename}</div>
+                      <div className="resource-file-size">{formatBytes(Number(f.size_bytes || 0))}</div>
+                    </div>
+                    <a
+                      className="crm-ui-btn crm-ui-btn-secondary crm-ui-btn-sm"
+                      href={`/api/admin/resources/files/${f.id}/download`}
+                    >
+                      다운로드
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <CrmField
-            label="파일 첨부"
+            label={editingId ? "파일 추가" : "파일 첨부"}
             htmlFor="res-files"
-            hint={`최대 ${maxLabel} / 파일 · 한글 파일명 지원 · Storage 직접 업로드`}
+            hint={`최대 ${maxLabel} / 파일 · 한글 파일명 지원`}
           >
             <input
               id="res-files"
@@ -388,41 +696,22 @@ export default function ResourcesPageClient() {
           </CrmField>
           {uploading ? <CrmBadge>업로드 중…</CrmBadge> : null}
           {pendingFiles.length > 0 ? (
-            <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 6 }}>
+            <ul className="resource-file-list">
               {pendingFiles.map((f) => (
-                <li
-                  key={f.storage_path}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 8,
-                    fontSize: 13,
-                    padding: "8px 10px",
-                    borderRadius: 8,
-                    background: "#f1f5f9",
-                  }}
-                >
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {f.original_filename}
-                  </span>
-                  <span style={{ color: "var(--crm-muted)", flexShrink: 0 }}>
-                    {formatBytes(f.size_bytes)}
-                    <button
-                      type="button"
-                      style={{
-                        marginLeft: 8,
-                        border: "none",
-                        background: "transparent",
-                        color: "#b91c1c",
-                        cursor: "pointer",
-                      }}
-                      onClick={() =>
-                        setPendingFiles((prev) => prev.filter((x) => x.storage_path !== f.storage_path))
-                      }
-                    >
-                      제거
-                    </button>
-                  </span>
+                <li key={f.storage_path} className="resource-file-row">
+                  <div className="resource-file-meta">
+                    <div className="resource-file-name">{f.original_filename}</div>
+                    <div className="resource-file-size">{formatBytes(f.size_bytes)}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="resource-remove-file"
+                    onClick={() =>
+                      setPendingFiles((prev) => prev.filter((x) => x.storage_path !== f.storage_path))
+                    }
+                  >
+                    제거
+                  </button>
                 </li>
               ))}
             </ul>

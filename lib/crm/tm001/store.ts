@@ -247,6 +247,8 @@ export async function listTm001Customers(opts?: {
   q?: string;
   region?: string;
   status?: string;
+  /** 점검 알림 등 — 이 ID만 조회 */
+  ids?: string[];
   /** 특정 담당자만 (가시 범위와 교집합) */
   assigneeId?: string;
   /** 미배정만 */
@@ -269,6 +271,9 @@ export async function listTm001Customers(opts?: {
   const q = String(opts?.q ?? "").trim();
   const region = String(opts?.region ?? "").trim();
   const status = String(opts?.status ?? "").trim();
+  const ids = Array.from(
+    new Set((opts?.ids ?? []).map((id) => String(id).trim()).filter(Boolean))
+  ).slice(0, 200);
   const assigneeId = String(opts?.assigneeId ?? "").trim();
   const unassignedOnly = Boolean(opts?.unassignedOnly);
   const assignedDate = String(opts?.assignedDate ?? "").trim();
@@ -277,6 +282,30 @@ export async function listTm001Customers(opts?: {
 
   if (visible !== "all" && !visible.length) {
     return { items: [], regions: [], total: 0, stayTotal: 0 };
+  }
+
+  if (ids.length) {
+    const supabase = getSupabaseAdmin();
+    let listQ = supabase
+      .from("tm001_customers")
+      .select(
+        "id, partner_code, partner_name, batch_code, name, phone, normalized_phone, raw_phone, visit_count, assignee_id, assigned_at, status, product, meeting_at, memo, comments, created_at, updated_at"
+      )
+      .eq("partner_code", TM001_PARTNER_CODE)
+      .in("id", ids)
+      .order("updated_at", { ascending: false });
+    if (visible !== "all") listQ = listQ.in("assignee_id", visible);
+    const { data, error } = await listQ;
+    if (error) throw new Error(error.message);
+    const custRows = (data ?? []) as Record<string, unknown>[];
+    const [items, regions] = await Promise.all([
+      hydrateTm001Page({ custRows, includeHistory: Boolean(opts?.includeHistory) }),
+      includeRegions ? listTm001Regions() : Promise.resolve([] as string[]),
+    ]);
+    const stayTotal = includeStayTotal
+      ? items.reduce((n, c) => n + Number(c.visit_count ?? c.stays?.length ?? 0), 0)
+      : -1;
+    return { items, regions, total: items.length, stayTotal };
   }
 
   const resolved = resolveTm001AssigneeFilter(visible, assigneeId, unassignedOnly);

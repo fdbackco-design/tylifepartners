@@ -29,7 +29,7 @@ import { parseMetaIdsFromBody, parseUTMFromHref } from "@/lib/utm";
 import { notifyAdminsNewLead } from "@/lib/webPush";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
-const ALLOWED_JOB_RANKS = new Set(["지점장 이상", "팀장 이상", "FC"]);
+const ALLOWED_JOB_RANKS = new Set(["지점장 이상", "팀장 이상", "FC", "기타"]);
 
 function formatKstYmd(date: Date): string {
   const parts = new Intl.DateTimeFormat("sv-SE", {

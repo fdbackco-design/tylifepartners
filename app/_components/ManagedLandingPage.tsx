@@ -19,7 +19,7 @@ const BROCHURE_ICON = "/assets/icon-brochure-download.png";
 const CONSULTATION_ICON = "/assets/icon-consultation-write.png";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
-const JOB_RANK_OPTIONS = ["지점장 이상", "팀장 이상", "FC"] as const;
+const JOB_RANK_OPTIONS = ["지점장 이상", "팀장 이상", "FC", "기타"] as const;
 
 function formatPhone(value: string): string {
   const digits = value.replace(/\D/g, "");
