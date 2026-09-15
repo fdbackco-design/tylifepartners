@@ -30,7 +30,7 @@ function formatPhone(value: string): string {
 }
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
-const JOB_RANK_OPTIONS = ["지점장 이상", "팀장 이상", "FC"] as const;
+const JOB_RANK_OPTIONS = ["지점장 이상", "팀장 이상", "FC", "기타"] as const;
 
 export default function BusinessLandingPage() {
   const router = useRouter();

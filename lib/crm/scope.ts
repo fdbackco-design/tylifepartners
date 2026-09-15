@@ -135,6 +135,7 @@ export function canAccessAdminPath(rank: SessionUser["rank"], pathname: string):
   const allowed =
     rank === "manager"
       ? [
+          "/admin/dashboard",
           "/admin/consumers",
           "/admin/candidates",
           "/admin/tm001",

@@ -378,10 +378,10 @@ export default function AdminLandingsListPage() {
               <article key={it.id} className="crm-ui-landing-card">
                 <img
                   className="crm-ui-landing-thumb"
-                  src={it.hero1_url || "/icon.png"}
+                  src={it.hero1_url || "/assets/crm-app-icon.png"}
                   alt=""
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = "/icon.png";
+                    (e.target as HTMLImageElement).src = "/assets/crm-app-icon.png";
                   }}
                 />
                 <div className="crm-ui-landing-body">

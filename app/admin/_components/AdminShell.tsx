@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { CrmSwitch } from "@/app/admin/_components/crm/ui";
 import PushSubscribeButton from "@/app/admin/_components/PushSubscribeButton";
+import CrmCheckupReminder from "@/app/admin/_components/CrmCheckupReminder";
 import { canAccessAdminPath, defaultAdminHome } from "@/lib/crm/scope";
 import {
   parseOpenCalendarEventFromUrl,
@@ -20,7 +21,7 @@ import type { SessionUser } from "@/lib/crm/types";
 import { staffRankLabel } from "@/lib/crm/types";
 
 const PRIMARY_TABS = [
-  { href: "/admin/dashboard", label: "대시보드", ranks: ["admin"] as const },
+  { href: "/admin/dashboard", label: "대시보드", ranks: ["admin", "manager"] as const },
   { href: "/admin/consumers", label: "소비자 DB", ranks: ["admin", "manager", "sales"] as const },
   { href: "/admin/candidates", label: "후보자 DB", ranks: ["admin", "manager", "sales"] as const },
   { href: "/admin/tm001", label: "TM001", ranks: ["admin", "manager", "sales", "tm_admin"] as const },
@@ -233,7 +234,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <header className="crm-header">
         <div className="crm-header-bar">
           <Link href={home} className="crm-brand">
-            <img className="crm-brand-mark" src="/icon.png" alt="" width={28} height={28} />
+            <img className="crm-brand-mark" src="/assets/crm-app-icon.png" alt="" width={28} height={28} />
             <span className="crm-brand-text">
               <span className="crm-brand-full">FEED LIFE 상담관리</span>
               <span className="crm-brand-short">FEED LIFE</span>
@@ -254,6 +255,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               {user.name} · {rankLabel}
             </span>
             <div className="crm-header-actions">
+              {(user.rank === "sales" ||
+                user.rank === "manager" ||
+                user.rank === "tm_admin" ||
+                (user.rank === "admin" && user.userId)) && <CrmCheckupReminder user={user} />}
               <PushSubscribeButton />
               <button type="button" className="crm-btn" onClick={logout}>
                 로그아웃

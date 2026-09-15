@@ -84,6 +84,8 @@ async function enrichLeads(
 export type LeadQueryInput = {
   category: LeadCategory | "all";
   search?: string;
+  /** 점검 알림 등 — 이 ID만 조회 */
+  ids?: string[];
   assigneeIds?: string[];
   teamIds?: string[];
   regions?: string[];
@@ -126,6 +128,7 @@ export function parseLeadQuery(sp: URLSearchParams): LeadQueryInput {
   return {
     category,
     search: sp.get("search")?.trim() || undefined,
+    ids: csv(sp.get("ids")),
     assigneeIds: csv(sp.get("assignee_ids")),
     teamIds: csv(sp.get("team_ids")),
     regions: csv(sp.get("regions")),
@@ -157,6 +160,16 @@ function applyCommonFilters(
   scopedIds: string[] | "all",
   rank: SessionUser["rank"]
 ) {
+  if (q.ids?.length) {
+    query = query.in("id", q.ids.slice(0, 200));
+    // 점검 딥링크는 해당 ID만 — 다른 필터와 섞지 않음(스코프만 유지)
+    if (scopedIds !== "all") {
+      if (!scopedIds.length) return query.eq("id", NO_MATCH_ID);
+      query = query.in("assignee_id", scopedIds);
+    }
+    return query;
+  }
+
   if (q.search) {
     query = query.or(buildLeadSearchOrFilter(q.search));
   }

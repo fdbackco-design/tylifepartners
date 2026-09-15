@@ -1,6 +1,6 @@
 /* global self, clients */
 /* FEED LIFE CRM Web Push Service Worker */
-/* sw-version: 2026-09-14-desktop-win-mac */
+/* sw-version: 2026-09-15-icon-path */
 
 function resolveNotificationUrl(raw) {
   try {
@@ -25,7 +25,7 @@ function parsePushPayload(event) {
     body: "새 알림이 있습니다.",
     url: `${self.location.origin}/admin/consumers`,
     tag: "tylife-crm",
-    icon: absoluteAsset("/icon.png"),
+    icon: absoluteAsset("/assets/crm-app-icon.png"),
   };
   if (!event.data) return fallback;
   try {
@@ -60,7 +60,7 @@ function parsePushPayload(event) {
 
 self.addEventListener("push", (event) => {
   const data = parsePushPayload(event);
-  const icon = data.icon || absoluteAsset("/icon.png");
+  const icon = data.icon || absoluteAsset("/assets/crm-app-icon.png");
 
   event.waitUntil(
     self.registration.showNotification(data.title, {

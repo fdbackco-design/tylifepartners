@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
+import { CrmCheckupToolbarBanner } from "@/app/admin/_components/CrmCheckupReminder";
 import { CrmAlert, CrmButton, CrmDialog } from "@/app/admin/_components/crm/ui";
 import { fromKstMinuteLocalInput, toKstMinuteLocalInput } from "@/lib/crm/kst";
 import { appendStatusMemo } from "@/lib/crm/memo";
@@ -193,11 +194,17 @@ export default function Tm001PageClient() {
     (searchParams.get("q") || searchParams.get("search") || "").trim()
   );
   const [region, setRegion] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(() => searchParams.get("status") || "");
   /** ""=전체, UNASSIGNED_FILTER=미배정, 그 외 staff id */
   const [assigneeFilter, setAssigneeFilter] = useState("");
   /** KST YYYY-MM-DD */
-  const [assignedDate, setAssignedDate] = useState("");
+  const [assignedDate, setAssignedDate] = useState(() => searchParams.get("assigned_date") || "");
+  const [checkupIds, setCheckupIds] = useState(() =>
+    (searchParams.get("ids") || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [pageSize, setPageSize] = useState(20);
@@ -326,6 +333,18 @@ export default function Tm001PageClient() {
     return () => window.clearTimeout(t);
   }, [q]);
 
+  useEffect(() => {
+    const nextIds = (searchParams.get("ids") || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    setCheckupIds((prev) =>
+      prev.length === nextIds.length && prev.every((v, i) => v === nextIds[i]) ? prev : nextIds
+    );
+    const nextStatus = searchParams.get("status") || "";
+    setStatus((prev) => (prev === nextStatus ? prev : nextStatus));
+  }, [searchParams]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -334,6 +353,7 @@ export default function Tm001PageClient() {
       if (qDebounced) sp.set("q", qDebounced);
       if (region) sp.set("region", region);
       if (status) sp.set("status", status);
+      if (checkupIds.length) sp.set("ids", checkupIds.join(","));
       if (assigneeFilter === UNASSIGNED_FILTER) sp.set("unassigned", "1");
       else if (assigneeFilter) sp.set("assignee_id", assigneeFilter);
       if (assignedDate) sp.set("assigned_date", assignedDate);
@@ -361,7 +381,7 @@ export default function Tm001PageClient() {
     } finally {
       setLoading(false);
     }
-  }, [qDebounced, region, status, assigneeFilter, assignedDate, page, pageSize]);
+  }, [qDebounced, region, status, assigneeFilter, assignedDate, checkupIds, page, pageSize]);
 
   useEffect(() => {
     void load();
@@ -790,6 +810,15 @@ export default function Tm001PageClient() {
             aria-label="검색"
           />
         </div>
+        <CrmCheckupToolbarBanner
+          enabled={Boolean(
+            session &&
+              (session.rank === "sales" ||
+                session.rank === "manager" ||
+                session.rank === "tm_admin" ||
+                (session.rank === "admin" && session.userId))
+          )}
+        />
         <div className="crm-toolbar-actions">
           <select
             className="crm-select"
@@ -832,6 +861,7 @@ export default function Tm001PageClient() {
               setStatus("");
               setAssigneeFilter("");
               setAssignedDate("");
+              setCheckupIds([]);
               setPage(0);
             }}
           >

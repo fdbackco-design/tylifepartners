@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   title: "상담 신청",
   description: "상담 신청을 위한 랜딩 페이지",
   icons: {
-    icon: [{ url: "/icon.png", type: "image/png" }],
+    icon: [{ url: "/assets/crm-app-icon.png", type: "image/png" }],
     apple: [{ url: "/apple-icon.png" }],
   },
 };

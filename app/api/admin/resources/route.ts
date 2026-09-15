@@ -4,11 +4,40 @@ import { actorFromSession, writeAdminAudit } from "@/lib/crm/adminAudit";
 import { canAccessCrmLeads } from "@/lib/crm/scope";
 import {
   RESOURCE_MAX_BYTES,
+  RESOURCE_PRODUCT_TAGS,
+  RESOURCE_SITUATION_TAGS,
+  RESOURCE_STATUS_TAGS,
   createResourcePost,
   listResourcePosts,
 } from "@/lib/crm/resourceShares";
 import { notifyStaffResourceShare } from "@/lib/webPush";
 import { runAfterResponse } from "@/lib/runAfterResponse";
+
+function parseFiles(raw: unknown) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((f) => {
+      const row = f as Record<string, unknown>;
+      return {
+        storage_path: String(row.storage_path ?? "").trim(),
+        public_url: row.public_url != null ? String(row.public_url) : null,
+        original_filename: String(row.original_filename ?? "").trim(),
+        content_type: row.content_type != null ? String(row.content_type) : null,
+        size_bytes: Number(row.size_bytes ?? 0),
+      };
+    })
+    .filter((f) => f.storage_path && f.original_filename);
+}
+
+function migrationHint(msg: string): string | null {
+  if (/product_tags|status_tags|situation_tags|schema cache/i.test(msg)) {
+    return "자료 태그 컬럼이 없습니다. Supabase에서 supabase/migrations/056_resource_post_tags.sql 및 057_resource_status_tags.sql 을 실행해 주세요.";
+  }
+  if (/resource_posts|does not exist/i.test(msg)) {
+    return "자료 공유 테이블이 없습니다. Supabase에서 supabase/migrations/043_resource_shares.sql 을 실행해 주세요.";
+  }
+  return null;
+}
 
 /** GET /api/admin/resources — 전체 직원 열람 */
 export async function GET() {
@@ -27,18 +56,15 @@ export async function GET() {
       items,
       can_write: session.rank === "admin",
       max_bytes: RESOURCE_MAX_BYTES,
+      product_tags: [...RESOURCE_PRODUCT_TAGS],
+      status_tags: [...RESOURCE_STATUS_TAGS],
+      situation_tags: [...RESOURCE_SITUATION_TAGS],
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (/resource_posts|schema cache|does not exist/i.test(msg)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message:
-            "자료 공유 테이블이 없습니다. Supabase에서 supabase/migrations/043_resource_shares.sql 을 실행해 주세요.",
-        },
-        { status: 503 }
-      );
+    const hint = migrationHint(msg);
+    if (hint) {
+      return NextResponse.json({ ok: false, message: hint }, { status: 503 });
     }
     console.error("GET /api/admin/resources:", msg);
     return NextResponse.json({ ok: false, message: msg }, { status: 500 });
@@ -56,29 +82,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = (await request.json()) as {
-      title?: string;
-      body?: string;
-      files?: Array<{
-        storage_path?: string;
-        public_url?: string | null;
-        original_filename?: string;
-        content_type?: string | null;
-        size_bytes?: number;
-      }>;
-    };
-
-    const files = Array.isArray(body.files)
-      ? body.files
-          .map((f) => ({
-            storage_path: String(f.storage_path ?? "").trim(),
-            public_url: f.public_url != null ? String(f.public_url) : null,
-            original_filename: String(f.original_filename ?? "").trim(),
-            content_type: f.content_type != null ? String(f.content_type) : null,
-            size_bytes: Number(f.size_bytes ?? 0),
-          }))
-          .filter((f) => f.storage_path && f.original_filename)
-      : [];
+    const body = (await request.json()) as Record<string, unknown>;
+    const files = parseFiles(body.files);
 
     for (const f of files) {
       if (!Number.isFinite(f.size_bytes) || f.size_bytes < 0 || f.size_bytes > RESOURCE_MAX_BYTES) {
@@ -92,6 +97,9 @@ export async function POST(request: NextRequest) {
     const item = await createResourcePost({
       title: String(body.title ?? ""),
       body: String(body.body ?? ""),
+      productTags: body.product_tags as string[] | undefined,
+      statusTags: body.status_tags as string[] | undefined,
+      situationTags: body.situation_tags as string[] | undefined,
       createdBy: session.userId,
       createdByName: session.name,
       files,
@@ -103,7 +111,13 @@ export async function POST(request: NextRequest) {
       resourceType: "resource",
       resourceId: item.id,
       summary: `자료 공유 등록: ${item.title}`,
-      detail: { title: item.title, file_count: item.files.length },
+      detail: {
+        title: item.title,
+        file_count: item.files.length,
+        product_tags: item.product_tags,
+        status_tags: item.status_tags,
+        situation_tags: item.situation_tags,
+      },
       request,
     });
 
@@ -119,15 +133,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, item });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (/resource_posts|schema cache|does not exist/i.test(msg)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message:
-            "자료 공유 테이블이 없습니다. Supabase에서 supabase/migrations/043_resource_shares.sql 을 실행해 주세요.",
-        },
-        { status: 503 }
-      );
+    const hint = migrationHint(msg);
+    if (hint) {
+      return NextResponse.json({ ok: false, message: hint }, { status: 503 });
     }
     console.error("POST /api/admin/resources:", msg);
     const status = /제목|내용|입력/i.test(msg) ? 400 : 500;

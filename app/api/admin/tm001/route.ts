@@ -38,6 +38,10 @@ export async function GET(request: NextRequest) {
       q: sp.get("q") || "",
       region: sp.get("region") || "",
       status: sp.get("status") || "",
+      ids: String(sp.get("ids") || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
       assigneeId: sp.get("assignee_id") || "",
       unassignedOnly: sp.get("unassigned") === "1",
       assignedDate: sp.get("assigned_date") || "",

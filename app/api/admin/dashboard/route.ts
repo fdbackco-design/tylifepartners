@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/adminSession";
 import { kstYmd, startOfKstDayIso, startOfNextKstDayIso } from "@/lib/crm/kst";
 import { loadHiddenLeadIdMaps } from "@/lib/crm/leadListHide";
+import { descendantAssigneeIds } from "@/lib/crm/scope";
 import { getTtlCache, setTtlCache } from "@/lib/crm/ttlCache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -34,6 +35,8 @@ async function loadAssignedInPeriod(opts: {
   rangeStart: string;
   rangeEnd: string;
   hiddenFilter: string | null;
+  /** null이면 전체, 배열이면 해당 담당자만 */
+  assigneeIds: string[] | null;
 }): Promise<{
   counts: Map<string, number>;
   contactCounts: Map<string, number>;
@@ -41,6 +44,10 @@ async function loadAssignedInPeriod(opts: {
   const supabase = getSupabaseAdmin();
   const counts = new Map<string, number>();
   const contactCounts = new Map<string, number>();
+  if (opts.assigneeIds && !opts.assigneeIds.length) {
+    return { counts, contactCounts };
+  }
+
   for (let from = 0; ; from += PAGE_SIZE) {
     let q = supabase
       .from(opts.table)
@@ -49,6 +56,7 @@ async function loadAssignedInPeriod(opts: {
       .lt("assigned_at", opts.rangeEnd)
       .not("assignee_id", "is", null)
       .range(from, from + PAGE_SIZE - 1);
+    if (opts.assigneeIds) q = q.in("assignee_id", opts.assigneeIds);
     if (opts.hiddenFilter) q = q.not("id", "in", opts.hiddenFilter);
     const { data, error } = await q;
     if (error) {
@@ -76,14 +84,19 @@ function mergeCounts(into: Map<string, number>, from: Map<string, number>) {
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, message: "인증이 필요합니다." }, { status: 401 });
-  if (session.rank !== "admin") {
+  if (session.rank !== "admin" && session.rank !== "manager") {
     return NextResponse.json({ ok: false, message: "권한이 없습니다." }, { status: 403 });
+  }
+  if (session.rank === "manager" && !session.userId) {
+    return NextResponse.json({ ok: false, message: "담당자 정보가 없습니다." }, { status: 403 });
   }
 
   const sp = request.nextUrl.searchParams;
   const from = sp.get("date_from") || kstYmd();
   const to = sp.get("date_to") || from;
-  const cacheKey = `dashboard:v3:${from}:${to}`;
+  const scopeKey =
+    session.rank === "admin" ? "admin" : `manager:${session.userId}`;
+  const cacheKey = `dashboard:v5:${scopeKey}:${from}:${to}`;
   const cached = getTtlCache<Record<string, unknown>>(cacheKey);
   if (cached) return NextResponse.json(cached);
 
@@ -95,13 +108,51 @@ export async function GET(request: NextRequest) {
   const hiddenLeadsFilter = notInIdsFilter(hiddenLeads.leads);
   const hiddenCandidatesFilter = notInIdsFilter(hiddenLeads.tylife_b2b);
 
+  const { data: staffRows, error: staffErr } = await supabase
+    .from("staff_users")
+    .select("id, name, rank, parent_id")
+    .eq("is_active", true);
+  if (staffErr) {
+    console.error("[dashboard] staff:", staffErr.message);
+    return NextResponse.json({ ok: false, message: "직원 목록을 불러오지 못했습니다." }, { status: 500 });
+  }
+
+  const allStaff = staffRows ?? [];
+  let people = allStaff;
+  let assigneeScope: string[] | null = null;
+
+  if (session.rank === "manager" && session.userId) {
+    const managerId = session.userId;
+    const treeIds = new Set(
+      descendantAssigneeIds(
+        managerId,
+        allStaff.map((s) => ({
+          id: String(s.id),
+          parent_id: s.parent_id ? String(s.parent_id) : null,
+        }))
+      )
+    );
+    // 매니저 본인 + 산하 영업자
+    people = allStaff.filter((p) => {
+      const id = String(p.id);
+      if (id === managerId) return true;
+      return treeIds.has(id) && String(p.rank) === "sales";
+    });
+    assigneeScope = people.map((p) => String(p.id));
+  }
+
   const applyHidden = (table: "leads" | "tylife_b2b", q: any) => {
     const hiddenFilter = table === "tylife_b2b" ? hiddenCandidatesFilter : hiddenLeadsFilter;
     return hiddenFilter ? q.not("id", "in", hiddenFilter) : q;
   };
 
+  const applyScope = (q: any) => {
+    if (!assigneeScope) return q;
+    if (!assigneeScope.length) return q.eq("id", "00000000-0000-0000-0000-000000000000");
+    return q.in("assignee_id", assigneeScope);
+  };
+
   const [
-    staffRes,
     contactedLeads,
     contactedB2b,
     inboundLeads,
@@ -109,48 +160,52 @@ export async function GET(request: NextRequest) {
     assignedLeads,
     assignedB2b,
   ] = await Promise.all([
-    supabase.from("staff_users").select("id, name, rank").eq("is_active", true),
     countExact("leads", (q) =>
-      applyHidden(
-        "leads",
-        q
-          .gte("created_at", rangeStart)
-          .lt("created_at", rangeEnd)
-          .in("status", [...CONTACT_STATUSES])
-          .or("merge_status.eq.active,merge_status.is.null")
+      applyScope(
+        applyHidden(
+          "leads",
+          q
+            .gte("created_at", rangeStart)
+            .lt("created_at", rangeEnd)
+            .in("status", [...CONTACT_STATUSES])
+            .or("merge_status.eq.active,merge_status.is.null")
+        )
       )
     ),
     countExact("tylife_b2b", (q) =>
-      applyHidden(
-        "tylife_b2b",
-        q
-          .gte("created_at", rangeStart)
-          .lt("created_at", rangeEnd)
-          .in("status", [...CONTACT_STATUSES])
-          .or("merge_status.eq.active,merge_status.is.null")
+      applyScope(
+        applyHidden(
+          "tylife_b2b",
+          q
+            .gte("created_at", rangeStart)
+            .lt("created_at", rangeEnd)
+            .in("status", [...CONTACT_STATUSES])
+            .or("merge_status.eq.active,merge_status.is.null")
+        )
       )
     ),
     countExact("leads", (q) =>
-      applyHidden("leads", q.gte("created_at", rangeStart).lt("created_at", rangeEnd))
+      applyScope(applyHidden("leads", q.gte("created_at", rangeStart).lt("created_at", rangeEnd)))
     ),
     countExact("tylife_b2b", (q) =>
-      applyHidden("tylife_b2b", q.gte("created_at", rangeStart).lt("created_at", rangeEnd))
+      applyScope(applyHidden("tylife_b2b", q.gte("created_at", rangeStart).lt("created_at", rangeEnd)))
     ),
     loadAssignedInPeriod({
       table: "leads",
       rangeStart,
       rangeEnd,
       hiddenFilter: hiddenLeadsFilter,
+      assigneeIds: assigneeScope,
     }),
     loadAssignedInPeriod({
       table: "tylife_b2b",
       rangeStart,
       rangeEnd,
       hiddenFilter: hiddenCandidatesFilter,
+      assigneeIds: assigneeScope,
     }),
   ]);
 
-  const people = staffRes.data ?? [];
   const contacted = contactedLeads + contactedB2b;
   const inbound = inboundLeads + inboundB2b;
 
@@ -163,12 +218,13 @@ export async function GET(request: NextRequest) {
   mergeCounts(contactByPerson, assignedB2b.contactCounts);
 
   const by_person = people.map((p) => {
-    const assigned = assignedCounts.get(p.id) ?? 0;
-    const first_contact = contactByPerson.get(p.id) ?? 0;
+    const id = String(p.id);
+    const assigned = assignedCounts.get(id) ?? 0;
+    const first_contact = contactByPerson.get(id) ?? 0;
     return {
-      staff_id: p.id,
-      staff_name: p.name,
-      rank: p.rank,
+      staff_id: id,
+      staff_name: String(p.name),
+      rank: String(p.rank),
       assigned,
       first_contact,
       first_contact_rate: assigned > 0 ? Math.round((first_contact / assigned) * 1000) / 10 : null,
@@ -179,6 +235,7 @@ export async function GET(request: NextRequest) {
     ok: true as const,
     date_from: from,
     date_to: to,
+    scope: session.rank === "manager" ? "team" : "all",
     summary: {
       inbound,
       contacted,
