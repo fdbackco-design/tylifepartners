@@ -3,7 +3,10 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useUTM } from "@/lib/useUTM";
 import { attributionFieldsFromUtm } from "@/lib/utm";
-import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
+import PrivacyConsentSection, {
+  consentApiFields,
+  emptyConsentForm,
+} from "@/app/_components/PrivacyConsentSection";
 import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
 import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
 import { landingKeyForManaged } from "@/lib/managedLandings/types";
@@ -86,8 +89,7 @@ export default function ManagedLandingPage({
   const [ageGroup, setAgeGroup] = useState("");
   const [job, setJob] = useState("");
   const [jobRank, setJobRank] = useState("");
-  const [privacyRequiredChecked, setPrivacyRequiredChecked] = useState(false);
-  const [marketingChecked, setMarketingChecked] = useState(false);
+  const [consent, setConsent] = useState(() => emptyConsentForm());
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [img1Error, setImg1Error] = useState(false);
   const [img2Error, setImg2Error] = useState(false);
@@ -191,8 +193,8 @@ export default function ManagedLandingPage({
       showToast("직급을 선택해주세요.", true);
       return;
     }
-    if (!privacyRequiredChecked) {
-      showToast("개인정보제공 동의서에 동의해 주세요. (필수)", true);
+    if (!consent.privacy_required) {
+      showToast("상담을 위한 개인정보 동의에 동의해 주세요. (필수)", true);
       return;
     }
 
@@ -206,7 +208,7 @@ export default function ManagedLandingPage({
           phone: rawPhone,
           source: utm.utm_source || path.replace(/^\//, ""),
           ...attributionFieldsFromUtm(utm),
-          marketing_consent: marketingChecked ? 1 : null,
+          ...consentApiFields(consent),
           region: formConfig.includeRegion
             ? formatRegionValue(region, formConfig.allowRegionDetail ? district : null)
             : null,
@@ -777,26 +779,24 @@ export default function ManagedLandingPage({
                 </p>
 
                 <PrivacyConsentSection
-                  requiredChecked={privacyRequiredChecked}
-                  marketingChecked={marketingChecked}
-                  onRequiredCheckedChange={setPrivacyRequiredChecked}
-                  onMarketingCheckedChange={setMarketingChecked}
+                  value={consent}
+                  onChange={setConsent}
                   compact
                 />
 
                 <button
                   type="submit"
-                  disabled={loading || !privacyRequiredChecked}
+                  disabled={loading || !consent.privacy_required}
                   style={{
                     width: "100%",
                     padding: "14px",
-                    background: loading || !privacyRequiredChecked ? "#adb5bd" : "var(--cta-bg)",
+                    background: loading || !consent.privacy_required ? "#adb5bd" : "var(--cta-bg)",
                     color: "#fff",
                     border: "none",
                     borderRadius: 8,
                     fontSize: 16,
                     fontWeight: 600,
-                    cursor: loading || !privacyRequiredChecked ? "default" : "pointer",
+                    cursor: loading || !consent.privacy_required ? "default" : "pointer",
                   }}
                 >
                   {loading ? "제출 중..." : "제출하기"}

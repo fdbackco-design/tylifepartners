@@ -681,6 +681,31 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
             label="직업/직급 필드 포함"
           />
 
+          <div
+            style={{
+              marginTop: 4,
+              padding: "12px 14px",
+              borderRadius: 10,
+              background: "var(--crm-surface-2, #f8fafc)",
+              border: "1px solid var(--crm-border, #e2e8f0)",
+              display: "grid",
+              gap: 6,
+              fontSize: 13,
+              lineHeight: 1.45,
+              color: "var(--crm-muted)",
+            }}
+          >
+            <strong style={{ color: "var(--crm-text, #0f172a)", fontSize: 13 }}>동의 항목 (고객 신청폼 고정)</strong>
+            <span>[필수] 상담을 위한 개인정보 동의</span>
+            <span>[선택] 맞춤 상담 정보 활용 동의</span>
+            <span>[선택] 제휴상품 마케팅 활용 동의</span>
+            <span>[선택] 광고성 정보 수신 — 전화 / 문자 / 카카오톡 / 이메일</span>
+            <span style={{ fontSize: 12 }}>
+              선택 동의는 체크하지 않아도 상담 신청이 접수됩니다. TM 대상은 마케팅+전화광고 동의·미철회만
+              해당됩니다.
+            </span>
+          </div>
+
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <CrmButton
               type="button"
@@ -898,6 +923,30 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
               onChange={(v) => setFormConfig((c) => ({ ...c, includeJob: v }))}
               label="직업/직급 필드 포함"
             />
+
+            <div
+              style={{
+                marginTop: 4,
+                padding: "12px 14px",
+                borderRadius: 10,
+                background: "var(--crm-surface-2, #f8fafc)",
+                border: "1px solid var(--crm-border, #e2e8f0)",
+                display: "grid",
+                gap: 6,
+                fontSize: 13,
+                lineHeight: 1.45,
+                color: "var(--crm-muted)",
+              }}
+            >
+              <strong style={{ color: "var(--crm-text, #0f172a)", fontSize: 13 }}>동의 항목 (고객 신청폼 고정)</strong>
+              <span>[필수] 상담을 위한 개인정보 동의</span>
+              <span>[선택] 맞춤 상담 정보 활용 동의</span>
+              <span>[선택] 제휴상품 마케팅 활용 동의</span>
+              <span>[선택] 광고성 정보 수신 — 전화 / 문자 / 카카오톡 / 이메일</span>
+              <span style={{ fontSize: 12 }}>
+                미리보기에서 「상담 신청하기」를 누르면 위 항목이 반영된 폼을 확인할 수 있습니다.
+              </span>
+            </div>
           </EditorAccordion>
 
           <EditorAccordion title="공개 설정" defaultOpen>

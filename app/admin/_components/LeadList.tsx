@@ -111,6 +111,7 @@ type LeadDesktopColId =
   | "job"
   | "job_rank"
   | "utm_source"
+  | "consent"
   | "assignee"
   | "assigned_at"
   | "admin_status"
@@ -129,6 +130,7 @@ const DEFAULT_LEAD_DESKTOP_COLS: LeadDesktopColId[] = [
   "job",
   "job_rank",
   "utm_source",
+  "consent",
   "assignee",
   "assigned_at",
   "admin_status",
@@ -151,6 +153,7 @@ const LEAD_DESKTOP_COL_META: Record<
   job: { label: "직업" },
   job_rank: { label: "직급" },
   utm_source: { label: "유입경로" },
+  consent: { label: "동의", title: "최신 개인정보·마케팅·광고수신 동의" },
   assignee: { label: "담당자" },
   assigned_at: { label: "배정일" },
   admin_status: { label: "관리자상태" },
@@ -228,6 +231,7 @@ export default function LeadList({
   const [ageGroups, setAgeGroups] = useState(csvParam(searchParams.get("age_groups")));
   const [jobs, setJobs] = useState(csvParam(searchParams.get("jobs")));
   const [entryPages, setEntryPages] = useState(csvParam(searchParams.get("entry_pages")));
+  const [tmEligible, setTmEligible] = useState(searchParams.get("tm_eligible") === "1");
   const [dateFrom, setDateFrom] = useState(searchParams.get("date_from") ?? "");
   const [dateTo, setDateTo] = useState(searchParams.get("date_to") ?? "");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -332,6 +336,7 @@ export default function LeadList({
     if (ageGroups.length) sp.set("age_groups", ageGroups.join(","));
     if (jobs.length) sp.set("jobs", jobs.join(","));
     if (entryPages.length) sp.set("entry_pages", entryPages.join(","));
+    if (tmEligible) sp.set("tm_eligible", "1");
     if (page > 0) sp.set("page", String(page));
     if (pageSize !== 20) sp.set("limit", String(pageSize));
     const pendingComment =
@@ -367,6 +372,7 @@ export default function LeadList({
     ageGroups,
     jobs,
     entryPages,
+    tmEligible,
     page,
     pageSize,
     pathname,
@@ -391,6 +397,7 @@ export default function LeadList({
     if (ageGroups.length) sp.set("age_groups", ageGroups.join(","));
     if (jobs.length) sp.set("jobs", jobs.join(","));
     if (entryPages.length) sp.set("entry_pages", entryPages.join(","));
+    if (tmEligible) sp.set("tm_eligible", "1");
     if (dateFrom) sp.set("date_from", dateFrom);
     if (dateTo) sp.set("date_to", dateTo);
     return sp.toString();
@@ -410,6 +417,7 @@ export default function LeadList({
     ageGroups,
     jobs,
     entryPages,
+    tmEligible,
     dateFrom,
     dateTo,
   ]);
@@ -1325,6 +1333,7 @@ export default function LeadList({
     !!search ||
     !!dateFrom ||
     !!dateTo ||
+    tmEligible ||
     assigneeIds.length +
       teamIds.length +
       regions.length +
@@ -1388,6 +1397,12 @@ export default function LeadList({
       label: "유입페이지",
       options: options.entry_pages.map((v) => ({ value: v, label: v })),
       selected: entryPages,
+    },
+    {
+      key: "tmEligible",
+      label: "TM대상",
+      options: [{ value: "1", label: "마케팅+전화광고 동의·미철회" }],
+      selected: tmEligible ? ["1"] : [],
     },
   ];
 
@@ -1506,6 +1521,16 @@ export default function LeadList({
       },
     });
   }
+  if (tmEligible) {
+    chips.push({
+      key: "tm",
+      label: "TM대상",
+      onRemove: () => {
+        setTmEligible(false);
+        setPage(0);
+      },
+    });
+  }
 
   const applyFilters = (next: Record<string, string[]>) => {
     setAssigneeIds(next.assigneeIds ?? []);
@@ -1517,6 +1542,7 @@ export default function LeadList({
     setAgeGroups(next.ageGroups ?? []);
     setJobs(next.jobs ?? []);
     setEntryPages(next.entryPages ?? []);
+    setTmEligible((next.tmEligible ?? []).includes("1"));
     setPage(0);
   };
 
@@ -1531,6 +1557,7 @@ export default function LeadList({
     setAgeGroups([]);
     setJobs([]);
     setEntryPages([]);
+    setTmEligible(false);
     setPage(0);
   };
 
@@ -1887,6 +1914,45 @@ export default function LeadList({
                                 {row.utm_source || "-"}
                               </td>
                             );
+                          case "consent": {
+                            const c = row.consent;
+                            let label = "-";
+                            let title = "동의 이력 없음";
+                            if (c?.withdrawn_at) {
+                              label = "철회";
+                              title = `철회 ${c.withdrawn_at}`;
+                            } else if (c?.tm_eligible) {
+                              label = "TM";
+                              title = `마케팅·전화광고 동의 (${c.consent_version ?? ""})`;
+                            } else if (c?.marketing_consent) {
+                              const channels = [
+                                c.ad_phone_consent ? "전화" : null,
+                                c.ad_sms_consent ? "문자" : null,
+                                c.ad_kakao_consent ? "카카오" : null,
+                                c.ad_email_consent ? "이메일" : null,
+                              ].filter(Boolean);
+                              label = "마케팅";
+                              title = channels.length
+                                ? `채널: ${channels.join(",")}`
+                                : "마케팅 동의 (채널 없음)";
+                            } else if (c) {
+                              label = "필수만";
+                              title = `개인정보 ${c.privacy_required ? "Y" : "N"} / 맞춤 ${c.custom_info_consent ? "Y" : "N"}`;
+                            } else if (row.marketing_consent === 1) {
+                              label = "레거시";
+                              title = "leads.marketing_consent=1 (이력 미이관)";
+                            }
+                            return (
+                              <td
+                                key={colId}
+                                className={`crm-cell-plain ${meta.tdClass ?? ""}`}
+                                title={title}
+                                style={{ fontSize: 12, color: "var(--crm-muted)" }}
+                              >
+                                {label}
+                              </td>
+                            );
+                          }
                           case "assignee":
                             return (
                               <td key={colId} onClick={(e) => e.stopPropagation()} className={meta.tdClass}>

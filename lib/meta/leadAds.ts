@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { tryAutoAssignLead } from "@/lib/crm/assignment";
+import { insertLeadConsentSafe, metaLeadConsentInput } from "@/lib/crm/leadConsents";
 import { mapMetaLeadJobRank } from "@/lib/crm/metaLeadCsv";
 import { resolveRegionZone } from "@/lib/crm/regionZones";
 import { getMetaAccessToken } from "@/lib/meta/ads";
@@ -504,6 +505,11 @@ export async function ingestMetaLeadFromWebhook(
       logSupabaseError("update existing candidate", updErr, { leadgenId, leadId: existing.id });
       return { ok: false, message: updErr.message, status: 500, stage: "supabase" };
     }
+    await insertLeadConsentSafe({
+      leadId: String(existing.id),
+      leadType: "tylife_b2b",
+      consent: metaLeadConsentInput("meta_lead_ads"),
+    });
     console.info("[meta-leads][supabase] upsert update ok:", {
       table: TABLE,
       leadgenId,
@@ -551,6 +557,12 @@ export async function ingestMetaLeadFromWebhook(
     leadgenId,
     leadId,
     phone: maskPhoneForLog(phone),
+  });
+
+  await insertLeadConsentSafe({
+    leadId,
+    leadType: "tylife_b2b",
+    consent: metaLeadConsentInput("meta_lead_ads"),
   });
 
   let assigned: { assigneeId: string; assigneeName: string } | null = null;
