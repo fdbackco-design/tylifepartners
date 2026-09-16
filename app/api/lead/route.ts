@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
     const availableTime = body.available_time != null ? String(body.available_time).trim() : null;
     const ageGroup = body.age_group != null ? String(body.age_group).trim() : null;
     const job = body.job != null ? String(body.job).trim() : null;
+    const jobRank = body.job_rank != null ? String(body.job_rank).trim() : null;
     const clientMeta = clientMetaFromRequest(request);
     const consentInput = {
       ...parseConsentFromBody(body as Record<string, unknown>, {
@@ -191,6 +192,7 @@ export async function POST(request: NextRequest) {
           available_time: desiredTime || null,
           age_group: ageGroup || null,
           job: job || null,
+          job_rank: jobRank || null,
         });
         if (!sheetResult.ok && !sheetResult.skipped) {
           console.error("Google Sheets append failed:", sheetResult.error);
@@ -283,6 +285,7 @@ export async function POST(request: NextRequest) {
       available_time: desiredTime || null,
       age_group: ageGroup || null,
       job: job || null,
+      job_rank: jobRank || null,
       merge_status: "active",
     })
       // 저장되는 값·컬럼은 그대로. CRM 동기화용 submission_id/실제 접수 시각만 돌려받는다.
@@ -346,6 +349,7 @@ export async function POST(request: NextRequest) {
         available_time: desiredTime || null,
         age_group: ageGroup || null,
         job: job || null,
+        job_rank: jobRank || null,
       });
       if (!sheetResult.ok && !sheetResult.skipped) {
         console.error("Google Sheets append failed:", sheetResult.error);

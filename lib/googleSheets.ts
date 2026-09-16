@@ -215,6 +215,14 @@ async function writeMainSheet(
     requestBody: { values: [row] },
   });
 
+  // S·T(직업·직급)는 별도 갱신 — 일부 시트에서 넓은 범위 update 시 끝열 유실 방지
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!S${targetRow}:T${targetRow}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[sheetCell(args.job), sheetCell(args.job_rank)]] },
+  });
+
   return targetRow;
 }
 
@@ -253,6 +261,14 @@ async function writeCrmSheet(
     range: `${sheetName}!A${targetRow}:R${targetRow}`,
     valueInputOption: "USER_ENTERED",
     requestBody: { values: [row] },
+  });
+
+  // K·L(직업·직급) 별도 갱신
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!K${targetRow}:L${targetRow}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[sheetCell(args.job), sheetCell(args.job_rank)]] },
   });
 }
 

@@ -215,11 +215,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // formConfig.includeJob 은 필수 검증·UI 노출용.
+    // 클라이언트가 보낸 직업/직급 값은 항상 DB·시트에 남긴다(설정 불일치로 유실 방지).
     const regionForDb = formConfig.includeRegion ? region || null : null;
     const availableTimeForDb = formConfig.includeAvailableTime ? availableTime || null : null;
     const ageGroupForDb = formConfig.includeAgeGroup ? ageGroup || null : null;
-    const jobForDb = formConfig.includeJob ? job || null : null;
-    const jobRankStored = formConfig.includeJob ? jobRankForDb : null;
+    const jobForDb = job || null;
+    const jobRankStored = jobRankForDb;
 
     const supabase = getSupabaseAdmin();
     const nowIso = new Date().toISOString();

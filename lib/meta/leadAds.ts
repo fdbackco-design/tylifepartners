@@ -3,10 +3,23 @@ import { tryAutoAssignLead } from "@/lib/crm/assignment";
 import { insertLeadConsentSafe, metaLeadConsentInput } from "@/lib/crm/leadConsents";
 import { mapMetaLeadJobRank } from "@/lib/crm/metaLeadCsv";
 import { resolveRegionZone } from "@/lib/crm/regionZones";
+import { appendLeadRowToGoogleSheet } from "@/lib/googleSheets";
 import { getMetaAccessToken } from "@/lib/meta/ads";
+import { formatPhoneKorean } from "@/lib/phone";
 import { isLeadSubmissionBlockedAsync, maskPhoneForLog, normalizePhoneDigits } from "@/lib/phoneBlacklist";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { notifyAdminsNewLead } from "@/lib/webPush";
+
+function formatKstYmd(date: Date): string {
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${map.year}-${map.month}-${map.day}`;
+}
 
 const GRAPH_VERSION = "v21.0";
 
@@ -564,6 +577,27 @@ export async function ingestMetaLeadFromWebhook(
     leadType: "tylife_b2b",
     consent: metaLeadConsentInput("meta_lead_ads"),
   });
+
+  try {
+    const sheetResult = await appendLeadRowToGoogleSheet({
+      dateKstYmd: formatKstYmd(new Date()),
+      medium: "meta",
+      kind: "B2B",
+      name,
+      phone: formatPhoneKorean(phone),
+      entry_page: "/meta-lead-ads",
+      region: regionRaw,
+      available_time: parsed.available_time,
+      age_group: parsed.age_group,
+      job: parsed.job,
+      job_rank: parsed.job_rank,
+    });
+    if (!sheetResult.ok && !sheetResult.skipped) {
+      console.warn("[meta-leads] google sheet append failed:", sheetResult.error);
+    }
+  } catch (e) {
+    console.warn("[meta-leads] google sheet skipped:", e instanceof Error ? e.message : e);
+  }
 
   let assigned: { assigneeId: string; assigneeName: string } | null = null;
   try {
