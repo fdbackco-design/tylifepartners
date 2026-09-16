@@ -58,3 +58,24 @@ CREATE INDEX IF NOT EXISTS idx_tylife_b2b_created_at ON public.tylife_b2b (creat
 CREATE INDEX IF NOT EXISTS idx_tylife_b2b_phone ON public.tylife_b2b (phone);
 CREATE INDEX IF NOT EXISTS idx_tylife_b2b_utm_source ON public.tylife_b2b (utm_source);
 CREATE INDEX IF NOT EXISTS idx_tylife_b2b_marketing_consent ON public.tylife_b2b (marketing_consent);
+
+-- lead_consents (개인정보/마케팅 동의 이력) — 상세는 migrations/058_lead_consents.sql
+CREATE TABLE IF NOT EXISTS public.lead_consents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lead_id UUID NOT NULL,
+  lead_type TEXT NOT NULL CHECK (lead_type IN ('feedlife', 'tylife_b2b')),
+  privacy_required BOOLEAN NOT NULL DEFAULT true,
+  custom_info_consent BOOLEAN NOT NULL DEFAULT false,
+  marketing_consent BOOLEAN NOT NULL DEFAULT false,
+  ad_phone_consent BOOLEAN NOT NULL DEFAULT false,
+  ad_sms_consent BOOLEAN NOT NULL DEFAULT false,
+  ad_kakao_consent BOOLEAN NOT NULL DEFAULT false,
+  ad_email_consent BOOLEAN NOT NULL DEFAULT false,
+  consent_version TEXT NOT NULL DEFAULT '2026-09-v1',
+  consent_source TEXT,
+  consented_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  withdrawn_at TIMESTAMPTZ,
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

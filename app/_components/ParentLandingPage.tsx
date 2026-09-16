@@ -4,7 +4,10 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { DESIRED_TIME_OPTIONS, LOCATION_OPTIONS, getDesiredDateOptions } from "@/lib/formOptions";
 import { useUTM } from "@/lib/useUTM";
 import { attributionFieldsFromUtm } from "@/lib/utm";
-import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
+import PrivacyConsentSection, {
+  consentApiFields,
+  emptyConsentForm,
+} from "@/app/_components/PrivacyConsentSection";
 import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
 import { useRouter } from "next/navigation";
 
@@ -41,8 +44,7 @@ export default function ParentLandingPage({ hero1, hero2, karrotPage, entryPage 
   const [desiredDate, setDesiredDate] = useState("");
   const [desiredTime, setDesiredTime] = useState("");
   const [location, setLocation] = useState("");
-  const [privacyRequiredChecked, setPrivacyRequiredChecked] = useState(false);
-  const [marketingChecked, setMarketingChecked] = useState(false);
+  const [consent, setConsent] = useState(() => emptyConsentForm());
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [img1Error, setImg1Error] = useState(false);
   const [img2Error, setImg2Error] = useState(false);
@@ -80,8 +82,8 @@ export default function ParentLandingPage({ hero1, hero2, karrotPage, entryPage 
       showToast("연락처를 확인해주세요. (숫자 10~11자리)", true);
       return;
     }
-    if (!privacyRequiredChecked) {
-      showToast("개인정보제공 동의서에 동의해 주세요. (필수)", true);
+    if (!consent.privacy_required) {
+      showToast("상담을 위한 개인정보 동의에 동의해 주세요. (필수)", true);
       return;
     }
 
@@ -98,7 +100,7 @@ export default function ParentLandingPage({ hero1, hero2, karrotPage, entryPage 
           desired_time: desiredTime || null,
           location: location || null,
           ...attributionFieldsFromUtm(utm),
-          marketing_consent: marketingChecked ? 1 : null,
+          ...consentApiFields(consent),
           entry_page: entryPage,
           ...getSubmissionAnalyticsPayload(),
         }),
@@ -469,25 +471,23 @@ export default function ParentLandingPage({ hero1, hero2, karrotPage, entryPage 
                 </p>
 
                 <PrivacyConsentSection
-                  requiredChecked={privacyRequiredChecked}
-                  marketingChecked={marketingChecked}
-                  onRequiredCheckedChange={setPrivacyRequiredChecked}
-                  onMarketingCheckedChange={setMarketingChecked}
+                  value={consent}
+                  onChange={setConsent}
                 />
 
                 <button
                   type="submit"
-                  disabled={loading || !privacyRequiredChecked}
+                  disabled={loading || !consent.privacy_required}
                   style={{
                     width: "100%",
                     padding: "16px",
-                    background: loading || !privacyRequiredChecked ? "#adb5bd" : "var(--cta-bg)",
+                    background: loading || !consent.privacy_required ? "#adb5bd" : "var(--cta-bg)",
                     color: "#fff",
                     border: "none",
                     borderRadius: 8,
                     fontSize: 18,
                     fontWeight: 600,
-                    cursor: loading || !privacyRequiredChecked ? "default" : "pointer",
+                    cursor: loading || !consent.privacy_required ? "default" : "pointer",
                   }}
                 >
                   {loading ? "제출 중..." : "제출하기"}

@@ -1,6 +1,7 @@
 import { startOfKstDayIso, startOfNextKstDayIso } from "@/lib/crm/kst";
 import { attachAssigneeHistories } from "@/lib/crm/assigneeHistory";
 import { applyHiddenLeadFilter, loadHiddenLeadIdMaps } from "@/lib/crm/leadListHide";
+import { attachLatestConsents, leadTypeForCategory, listTmEligibleLeadIds } from "@/lib/crm/leadConsents";
 import { buildLeadSearchOrFilter } from "@/lib/crm/leadSearch";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
 import { visibleAssigneeIdsFromStaff } from "@/lib/crm/scope";
@@ -71,6 +72,20 @@ async function enrichLeads(
     console.warn("[queryLeads] landing heatmap flags skipped:", e instanceof Error ? e.message : e);
   }
 
+  try {
+    const byId = new Map<string, LeadRow["consent"]>();
+    await attachLatestConsents(withMeta, (id, summary) => {
+      byId.set(id, summary);
+    });
+    if (byId.size) {
+      withMeta = withMeta.map((it) =>
+        byId.has(it.id) ? { ...it, consent: byId.get(it.id) ?? null } : it
+      );
+    }
+  } catch (e) {
+    console.warn("[queryLeads] consent attach skipped:", e instanceof Error ? e.message : e);
+  }
+
   // 담당자 이력 체인은 관리자 목록에서만 표시 → 영업자/매니저는 스킵
   if (session.rank !== "admin") return withMeta;
   try {
@@ -101,6 +116,8 @@ export type LeadQueryInput = {
   dateTo?: string;
   needReassign?: boolean;
   unassigned?: boolean;
+  /** TM 대상: 마케팅+전화광고 동의·미철회 */
+  tmEligible?: boolean;
   limit?: number;
   offset?: number;
   /** silent poll 등 — estimated count 생략 */
@@ -143,6 +160,7 @@ export function parseLeadQuery(sp: URLSearchParams): LeadQueryInput {
     dateTo: sp.get("date_to") || undefined,
     needReassign: sp.get("need_reassign") === "1" || sp.get("recontact") === "1",
     unassigned: sp.get("unassigned") === "1",
+    tmEligible: sp.get("tm_eligible") === "1",
     limit: Math.min(Math.max(Number(sp.get("limit") || 50), 1), 5000),
     offset: Math.max(Number(sp.get("offset") || 0), 0),
     skipCount: sp.get("skip_count") === "1",
@@ -278,6 +296,10 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
       query = applyCommonFilters(query, q, scoped, session.rank);
       query = applyBlacklistFilter(query, blockedPhones);
       query = applyHiddenLeadFilter(query, table, hiddenLeads);
+      if (q.tmEligible) {
+        const eligible = await listTmEligibleLeadIds(leadTypeForCategory(kind), 8000);
+        query = query.in("id", eligible.length ? eligible.slice(0, 2000) : [NO_MATCH_ID]);
+      }
       if (teamAssigneeIds) {
         let ids = teamAssigneeIds;
         if (scoped !== "all") ids = ids.filter((id) => scoped.includes(id));

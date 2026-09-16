@@ -1,4 +1,5 @@
 import { tryAutoAssignLead } from "@/lib/crm/assignment";
+import { insertLeadConsentSafe, metaLeadConsentInput } from "@/lib/crm/leadConsents";
 import {
   candidateInsertFromCsvRow,
   parseMetaLeadCsv,
@@ -181,6 +182,11 @@ export async function executeMetaLeadCsvImport(buffer: Buffer): Promise<{
           resultRows.push({ ...row, reason: error.message });
           continue;
         }
+        await insertLeadConsentSafe({
+          leadId: row.existing_id,
+          leadType: "tylife_b2b",
+          consent: metaLeadConsentInput("meta_lead_csv"),
+        });
         updated += 1;
         resultRows.push(row);
         continue;
@@ -198,6 +204,11 @@ export async function executeMetaLeadCsvImport(buffer: Buffer): Promise<{
             const { created_at: _c, status: _s, status_changed_at: _sc, merge_status: _m, ...updatePayload } =
               payload as Record<string, unknown>;
             await supabase.from("tylife_b2b").update(updatePayload).eq("id", again.id);
+            await insertLeadConsentSafe({
+              leadId: String(again.id),
+              leadType: "tylife_b2b",
+              consent: metaLeadConsentInput("meta_lead_csv"),
+            });
             updated += 1;
             resultRows.push({ ...row, action: "update", existing_id: String(again.id) });
             continue;
@@ -212,6 +223,11 @@ export async function executeMetaLeadCsvImport(buffer: Buffer): Promise<{
       inserted += 1;
       const leadId = String(data.id);
       resultRows.push({ ...row, existing_id: leadId });
+      await insertLeadConsentSafe({
+        leadId,
+        leadType: "tylife_b2b",
+        consent: metaLeadConsentInput("meta_lead_csv"),
+      });
       let assigned: { assigneeName: string } | null = null;
       try {
         assigned = await tryAutoAssignLead({

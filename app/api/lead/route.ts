@@ -18,6 +18,12 @@ import {
 import { syncLeadToCrm } from "@/lib/crmSync";
 import { parseMetaIdsFromBody } from "@/lib/utm";
 import { notifyAdminsNewLead } from "@/lib/webPush";
+import {
+  clientMetaFromRequest,
+  insertLeadConsentSafe,
+  legacyMarketingConsentFlag,
+  parseConsentFromBody,
+} from "@/lib/crm/leadConsents";
 
 /** 클라이언트에서 보낸 유입 경로 (예: /, /v2, /me). 잘못된 값은 무시 */
 function normalizeEntryPage(raw: unknown): string | null {
@@ -68,8 +74,14 @@ export async function POST(request: NextRequest) {
     const availableTime = body.available_time != null ? String(body.available_time).trim() : null;
     const ageGroup = body.age_group != null ? String(body.age_group).trim() : null;
     const job = body.job != null ? String(body.job).trim() : null;
-    const marketingConsent =
-      body.marketing_consent === 1 || body.marketing_consent === "1" ? 1 : null;
+    const clientMeta = clientMetaFromRequest(request);
+    const consentInput = {
+      ...parseConsentFromBody(body as Record<string, unknown>, {
+        defaultSource: entryPage || source || "feedlife_landing",
+      }),
+      ...clientMeta,
+    };
+    const marketingConsent = legacyMarketingConsentFlag(consentInput);
 
     // validation
     if (!name) {
@@ -129,9 +141,15 @@ export async function POST(request: NextRequest) {
         console.error("reinquiry attach failed:", attached.message);
       } else {
         console.info("[lead] reinquiry attached to existing lead", samePerson.id);
+        await insertLeadConsentSafe({
+          leadId: samePerson.id,
+          leadType: "feedlife",
+          consent: consentInput,
+        });
         await supabase
           .from("leads")
           .update({
+            marketing_consent: marketingConsent,
             analytics_session_id: analytics.analytics_session_id,
             analytics_visitor_id: analytics.analytics_visitor_id,
             max_scroll_depth: analytics.max_scroll_depth,
@@ -288,6 +306,11 @@ export async function POST(request: NextRequest) {
 
     let assigned: { assigneeName: string } | null = null;
     if (insertedLead?.id) {
+      await insertLeadConsentSafe({
+        leadId: insertedLead.id,
+        leadType: "feedlife",
+        consent: consentInput,
+      });
       await linkLandingSessionToLead({
         leadTable: "leads",
         leadId: insertedLead.id,

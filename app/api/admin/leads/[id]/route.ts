@@ -5,6 +5,7 @@ import { appendStatusMemo } from "@/lib/crm/memo";
 import { changeLeadAssignee } from "@/lib/crm/assignLead";
 import { attachAssigneeHistories } from "@/lib/crm/assigneeHistory";
 import { CANDIDATE_SELECT, CONSUMER_SELECT, loadStaffMaps, mapLeadRow } from "@/lib/crm/mapLead";
+import { getLatestLeadConsent, leadTypeForCategory, toConsentSummary } from "@/lib/crm/leadConsents";
 import { visibleAssigneeIds, canEditAdminComment, canAccessCrmLeads } from "@/lib/crm/scope";
 import {
   allowedStatusesFor,
@@ -27,6 +28,12 @@ async function enrichLeadItem(item: LeadRow, session: SessionUser): Promise<Lead
   try {
     const [withMeta] = await attachMetaCreatives([next]);
     next = withMeta;
+  } catch {
+    // keep
+  }
+  try {
+    const latest = await getLatestLeadConsent(next.id, leadTypeForCategory(next.type === "후보자" ? "candidates" : "consumers"));
+    next = { ...next, consent: toConsentSummary(latest) };
   } catch {
     // keep
   }

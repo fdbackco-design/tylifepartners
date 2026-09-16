@@ -27,6 +27,14 @@ const HEADERS = [
   "메모",
   "코멘트",
   "마케팅동의",
+  "맞춤정보동의",
+  "전화광고",
+  "문자광고",
+  "카카오광고",
+  "이메일광고",
+  "동의버전",
+  "동의철회",
+  "TM대상",
 ];
 
 function asciiFilename(label: string, stamp: string, ext: string): string {
@@ -70,6 +78,14 @@ export async function GET(request: NextRequest) {
       r.memo,
       r.admin_comment,
       r.marketing_consent ?? "",
+      r.consent?.custom_info_consent ? 1 : r.consent ? 0 : "",
+      r.consent?.ad_phone_consent ? 1 : r.consent ? 0 : "",
+      r.consent?.ad_sms_consent ? 1 : r.consent ? 0 : "",
+      r.consent?.ad_kakao_consent ? 1 : r.consent ? 0 : "",
+      r.consent?.ad_email_consent ? 1 : r.consent ? 0 : "",
+      r.consent?.consent_version ?? "",
+      r.consent?.withdrawn_at ?? "",
+      r.consent?.tm_eligible ? 1 : r.consent ? 0 : "",
     ]);
 
     const format = request.nextUrl.searchParams.get("format") === "csv" ? "csv" : "xls";

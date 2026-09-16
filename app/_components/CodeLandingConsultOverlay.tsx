@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import PrivacyConsentSection from "@/app/_components/PrivacyConsentSection";
+import PrivacyConsentSection, {
+  consentApiFields,
+  emptyConsentForm,
+} from "@/app/_components/PrivacyConsentSection";
 import { getSubmissionAnalyticsPayload } from "@/lib/landing-analytics/submissionSnapshot";
 import {
   DEFAULT_FORM_CONFIG,
@@ -52,8 +55,7 @@ export default function CodeLandingConsultOverlay({ id, path, formConfig: formCo
   const [ageGroup, setAgeGroup] = useState("");
   const [job, setJob] = useState("");
   const [jobRank, setJobRank] = useState("");
-  const [privacyRequiredChecked, setPrivacyRequiredChecked] = useState(false);
-  const [marketingChecked, setMarketingChecked] = useState(false);
+  const [consent, setConsent] = useState(() => emptyConsentForm());
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [consultSource, setConsultSource] = useState<string | null>(null);
   const [utmOverride, setUtmOverride] = useState<UTMParams>({});
@@ -144,8 +146,8 @@ export default function CodeLandingConsultOverlay({ id, path, formConfig: formCo
       showToast("직급을 선택해주세요.", true);
       return;
     }
-    if (!privacyRequiredChecked) {
-      showToast("개인정보제공 동의서에 동의해 주세요. (필수)", true);
+    if (!consent.privacy_required) {
+      showToast("상담을 위한 개인정보 동의에 동의해 주세요. (필수)", true);
       return;
     }
 
@@ -164,7 +166,7 @@ export default function CodeLandingConsultOverlay({ id, path, formConfig: formCo
           phone: rawPhone,
           source: mergedUtm.utm_source || path.replace(/^\//, "") || "landing",
           ...attributionFieldsFromUtm(mergedUtm),
-          marketing_consent: marketingChecked ? 1 : null,
+          ...consentApiFields(consent),
           region: formConfig.includeRegion
             ? formatRegionValue(region, formConfig.allowRegionDetail ? district : null)
             : null,
@@ -488,26 +490,24 @@ export default function CodeLandingConsultOverlay({ id, path, formConfig: formCo
                   </>
                 )}
                 <PrivacyConsentSection
-                  requiredChecked={privacyRequiredChecked}
-                  marketingChecked={marketingChecked}
-                  onRequiredCheckedChange={setPrivacyRequiredChecked}
-                  onMarketingCheckedChange={setMarketingChecked}
+                  value={consent}
+                  onChange={setConsent}
                   compact
                 />
                 <button
                   type="submit"
-                  disabled={loading || !privacyRequiredChecked}
+                  disabled={loading || !consent.privacy_required}
                   style={{
                     width: "100%",
                     marginTop: 16,
                     padding: "14px 18px",
-                    background: loading || !privacyRequiredChecked ? "#adb5bd" : "var(--cta-bg, #5b19c6)",
+                    background: loading || !consent.privacy_required ? "#adb5bd" : "var(--cta-bg, #5b19c6)",
                     color: "#fff",
                     border: "none",
                     borderRadius: 10,
                     fontSize: 17,
                     fontWeight: 700,
-                    cursor: loading || !privacyRequiredChecked ? "default" : "pointer",
+                    cursor: loading || !consent.privacy_required ? "default" : "pointer",
                   }}
                 >
                   {loading ? "제출 중…" : "상담 신청하기"}

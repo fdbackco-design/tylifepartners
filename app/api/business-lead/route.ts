@@ -27,6 +27,12 @@ import { verifyAdminSession } from "@/lib/adminSession";
 import { parseBaseRegion } from "@/lib/regions";
 import { parseMetaIdsFromBody, parseUTMFromHref } from "@/lib/utm";
 import { notifyAdminsNewLead } from "@/lib/webPush";
+import {
+  clientMetaFromRequest,
+  insertLeadConsentSafe,
+  legacyMarketingConsentFlag,
+  parseConsentFromBody,
+} from "@/lib/crm/leadConsents";
 
 const INSURANCE_DESIGNER_JOB = "보험설계사";
 const ALLOWED_JOB_RANKS = new Set(["지점장 이상", "팀장 이상", "FC", "기타"]);
@@ -89,8 +95,14 @@ export async function POST(request: NextRequest) {
         utm_campaign: utmCampaign,
       }
     );
-    const marketingConsent =
-      body.marketing_consent === 1 || body.marketing_consent === "1" ? 1 : null;
+    const clientMeta = clientMetaFromRequest(request);
+    const consentInput = {
+      ...parseConsentFromBody(body as Record<string, unknown>, {
+        defaultSource: entryPage || source || "tylife_b2b_landing",
+      }),
+      ...clientMeta,
+    };
+    const marketingConsent = legacyMarketingConsentFlag(consentInput);
     const region = body.region != null ? String(body.region).trim() : body.location != null ? String(body.location).trim() : "";
     const availableTime =
       body.available_time != null
@@ -235,6 +247,7 @@ export async function POST(request: NextRequest) {
       await supabase
         .from("tylife_b2b")
         .update({
+          marketing_consent: marketingConsent,
           analytics_session_id: analytics.analytics_session_id,
           analytics_visitor_id: analytics.analytics_visitor_id,
           max_scroll_depth: analytics.max_scroll_depth,
@@ -242,6 +255,11 @@ export async function POST(request: NextRequest) {
           last_section_label: analytics.last_section_label,
         })
         .eq("id", samePerson.id);
+      await insertLeadConsentSafe({
+        leadId: samePerson.id,
+        leadType: "tylife_b2b",
+        consent: consentInput,
+      });
       await linkLandingSessionToLead({
         leadTable: "tylife_b2b",
         leadId: samePerson.id,
@@ -343,6 +361,11 @@ export async function POST(request: NextRequest) {
 
     let assigned: { assigneeName: string } | null = null;
     if (insertedLead?.id) {
+      await insertLeadConsentSafe({
+        leadId: insertedLead.id,
+        leadType: "tylife_b2b",
+        consent: consentInput,
+      });
       await linkLandingSessionToLead({
         leadTable: "tylife_b2b",
         leadId: insertedLead.id,

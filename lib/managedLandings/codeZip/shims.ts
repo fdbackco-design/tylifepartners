@@ -64,6 +64,35 @@ export function __landingCrmBridge(payload, entryPage, landingId) {
   } else if (!next.marketing_consent || next.marketing_consent === false || next.marketing_consent === "false") {
     next.marketing_consent = null;
   }
+  // boolean 동의 필드 정규화 (없으면 레거시 marketing_consent만 유지)
+  for (const key of [
+    "privacy_required",
+    "custom_info_consent",
+    "ad_phone_consent",
+    "ad_sms_consent",
+    "ad_kakao_consent",
+    "ad_email_consent",
+  ]) {
+    if (next[key] === undefined) continue;
+    if (next[key] === true || next[key] === "true" || next[key] === "1" || next[key] === 1) next[key] = true;
+    else if (next[key] === false || next[key] === "false" || next[key] === "0" || next[key] === 0) next[key] = false;
+  }
+  if (!next.consent_version) next.consent_version = "2026-09-v2";
+  // 레거시 ZIP 폼이 marketing만 보낸 경우 → 채널별 동의로 확장 (TM 호환)
+  const marketingOn =
+    next.marketing_consent === 1 || next.marketing_consent === true || next.marketing_consent === "1";
+  const hasAnyAdField =
+    next.ad_phone_consent != null ||
+    next.ad_sms_consent != null ||
+    next.ad_kakao_consent != null ||
+    next.ad_email_consent != null;
+  if (marketingOn && !hasAnyAdField) {
+    next.ad_phone_consent = true;
+    next.ad_sms_consent = true;
+    next.ad_kakao_consent = true;
+    next.ad_email_consent = true;
+  }
+  if (next.privacy_required == null) next.privacy_required = true;
   delete next.privacy_consent;
   delete next.website;
   return next;

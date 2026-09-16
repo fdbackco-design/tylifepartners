@@ -85,6 +85,22 @@ export type LeadRow = {
   meta_creative_full: string | null;
   meta_creative_status: string | null;
   marketing_consent: number | null;
+  /** 최신 개인정보·마케팅·광고채널 동의 (lead_consents_latest) */
+  consent: {
+    privacy_required: boolean;
+    custom_info_consent: boolean;
+    marketing_consent: boolean;
+    ad_phone_consent: boolean;
+    ad_sms_consent: boolean;
+    ad_kakao_consent: boolean;
+    ad_email_consent: boolean;
+    consent_version: string | null;
+    consent_source: string | null;
+    consented_at: string | null;
+    withdrawn_at: string | null;
+    is_active: boolean;
+    tm_eligible: boolean;
+  } | null;
   status: LeadStatus;
   memo: string;
   /** 관리자·매니저 코멘트 (영업자 조회 전용) */

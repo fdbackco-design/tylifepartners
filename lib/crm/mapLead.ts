@@ -49,6 +49,7 @@ export function mapLeadRow(
     meta_creative_full: null,
     meta_creative_status: null,
     marketing_consent: row.marketing_consent == null ? null : Number(row.marketing_consent),
+    consent: null,
     status,
     memo: String(row.memo ?? ""),
     admin_comment: String(row.admin_comment ?? ""),
