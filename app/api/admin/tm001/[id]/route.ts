@@ -26,6 +26,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       product?: string | null;
       meeting_at?: string | null;
       memo?: string;
+      memo_seen?: boolean;
       comment_append?: string;
       assignee_id?: string | null;
     };
@@ -48,6 +49,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
         product: body.product,
         meeting_at: body.meeting_at,
         memo: body.memo,
+        memo_seen: body.memo_seen,
         comment_append: body.comment_append,
         comment_by: session.name,
         assignee_id: body.assignee_id,

@@ -12,6 +12,8 @@ import type { LeadCategory, LeadRow, LeadStatus, SessionUser } from "@/lib/crm/t
 import { LEAD_STATUSES } from "@/lib/crm/types";
 import type { TodayDbCost } from "@/lib/meta/insights";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
+import ColumnFilter from "@/app/admin/_components/crm/ColumnFilter";
+import ColumnFilterSearchableList from "@/app/admin/_components/crm/ColumnFilterSearchableList";
 import DateRangePicker from "@/app/admin/_components/crm/DateRangePicker";
 import FilterPopover, { type FilterGroup } from "@/app/admin/_components/crm/FilterPopover";
 import StatusBadgeMenu from "@/app/admin/_components/crm/StatusBadgeMenu";
@@ -729,10 +731,17 @@ export default function LeadList({
 
   const openMemo = async (row: LeadRow) => {
     const openId = row.id;
+    const canClearUnread = session?.rank === "admin" || session?.rank === "manager";
     setMemoRow(row);
     memoSavedRef.current = row.memo ?? "";
     setMemoSaveStatus("idle");
     setMemoLogs([]);
+    // 관리자·매니저가 열면 목록의 미확인 점을 즉시 제거 (서버 GET에서 DB도 해제)
+    if (canClearUnread && row.memo_admin_unread) {
+      setItems((prev) =>
+        prev.map((i) => (i.id === openId ? { ...i, memo_admin_unread: false } : i))
+      );
+    }
     const cat = row.type === "후보자" ? "candidates" : "consumers";
     try {
       const res = await fetch(`/api/admin/leads/${row.id}?category=${cat}`);
@@ -751,6 +760,13 @@ export default function LeadList({
       } else if (memoRowRef.current?.id === openId) {
         memoSavedRef.current = data.item.memo ?? "";
         setMemoRow(data.item);
+      }
+      if (canClearUnread && data.item) {
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === openId ? { ...i, memo_admin_unread: Boolean(data.item.memo_admin_unread) } : i
+          )
+        );
       }
     } catch {
       // 목록 메모로 편집 유지
@@ -1029,6 +1045,136 @@ export default function LeadList({
   const filterManagers = managers.filter(visibleInStaffFilter);
   const isAdmin = session?.rank === "admin";
   const showAdmin = isAdmin || session?.rank === "manager";
+
+  const assigneeHeaderLabel = useMemo(() => {
+    if (assigneeIds.length === 0) return null;
+    if (assigneeIds.length === 1) {
+      const id = assigneeIds[0];
+      if (id === UNASSIGNED_ASSIGNEE_FILTER) return "미배정";
+      return filterStaff.find((s) => s.id === id)?.name || staff.find((s) => s.id === id)?.name || "담당자";
+    }
+    return `담당자 ${assigneeIds.length}`;
+  }, [assigneeIds, filterStaff, staff]);
+
+  const regionHeaderLabel = useMemo(() => {
+    if (regions.length === 0) return null;
+    if (regions.length === 1) return regions[0];
+    return `지역 ${regions.length}`;
+  }, [regions]);
+
+  const statusHeaderLabel = useMemo(() => {
+    if (statuses.length === 0) return null;
+    if (statuses.length === 1) return statuses[0];
+    return `상담상태 ${statuses.length}`;
+  }, [statuses]);
+
+  const renderAssigneeColumnFilter = (align?: "left" | "right") => (
+    <ColumnFilter
+      label="담당자"
+      active={assigneeIds.length > 0}
+      activeLabel={assigneeHeaderLabel}
+      align={align}
+    >
+      {(close) => (
+        <ColumnFilterSearchableList
+          ariaLabel="담당자 필터"
+          searchPlaceholder="이름 검색"
+          selected={assigneeIds.length === 1 ? assigneeIds[0] : assigneeIds.length === 0 ? null : ""}
+          options={[
+            ...(isAdmin ? [{ value: UNASSIGNED_ASSIGNEE_FILTER, label: "미배정" }] : []),
+            ...filterStaff.map((s) => ({ value: s.id, label: s.name })),
+          ]}
+          onSelect={(value) => {
+            setAssigneeIds(value == null ? [] : [value]);
+            setPage(0);
+            close();
+          }}
+        />
+      )}
+    </ColumnFilter>
+  );
+
+  const renderRegionColumnFilter = (align?: "left" | "right") => (
+    <ColumnFilter label="지역" active={regions.length > 0} activeLabel={regionHeaderLabel} align={align}>
+      {(close) => (
+        <div className="crm-col-filter-list" role="listbox" aria-label="지역 필터">
+          <button
+            type="button"
+            role="option"
+            className={regions.length === 0 ? "is-selected" : undefined}
+            aria-selected={regions.length === 0}
+            onClick={() => {
+              setRegions([]);
+              setPage(0);
+              close();
+            }}
+          >
+            전체
+          </button>
+          {options.regions.map((r) => (
+            <button
+              key={r}
+              type="button"
+              role="option"
+              className={regions.length === 1 && regions[0] === r ? "is-selected" : undefined}
+              aria-selected={regions.length === 1 && regions[0] === r}
+              onClick={() => {
+                setRegions([r]);
+                setPage(0);
+                close();
+              }}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+      )}
+    </ColumnFilter>
+  );
+
+  const renderStatusColumnFilter = (align?: "left" | "right") => (
+    <ColumnFilter
+      label="상담상태"
+      active={statuses.length > 0}
+      activeLabel={statusHeaderLabel}
+      align={align}
+    >
+      {(close) => (
+        <div className="crm-col-filter-list" role="listbox" aria-label="상담상태 필터">
+          <button
+            type="button"
+            role="option"
+            className={statuses.length === 0 ? "is-selected" : undefined}
+            aria-selected={statuses.length === 0}
+            onClick={() => {
+              setStatuses([]);
+              setPage(0);
+              close();
+            }}
+          >
+            전체
+          </button>
+          {LEAD_STATUSES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              role="option"
+              className={statuses.length === 1 && statuses[0] === s ? "is-selected" : undefined}
+              aria-selected={statuses.length === 1 && statuses[0] === s}
+              onClick={() => {
+                setStatuses([s]);
+                setPage(0);
+                close();
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </ColumnFilter>
+  );
+
   const canEditComment = showAdmin;
   const canExport = session ? canExportLeads(session) : false;
   const canBulkAssign = showAdmin;
@@ -1754,6 +1900,27 @@ export default function LeadList({
                   )}
                   {visibleDesktopCols.map((colId) => {
                     const meta = LEAD_DESKTOP_COL_META[colId];
+                    if (colId === "assignee") {
+                      return (
+                        <th key={colId} className={meta.thClass} title={meta.title}>
+                          {renderAssigneeColumnFilter()}
+                        </th>
+                      );
+                    }
+                    if (colId === "region") {
+                      return (
+                        <th key={colId} className={meta.thClass} title={meta.title}>
+                          {renderRegionColumnFilter()}
+                        </th>
+                      );
+                    }
+                    if (colId === "status") {
+                      return (
+                        <th key={colId} className={meta.thClass} title={meta.title}>
+                          {renderStatusColumnFilter("right")}
+                        </th>
+                      );
+                    }
                     return (
                       <th key={colId} className={meta.thClass} title={meta.title}>
                         {meta.label}
@@ -1992,7 +2159,9 @@ export default function LeadList({
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div
-                                  className="crm-memo-preview"
+                                  className={`crm-memo-preview${
+                                    showAdmin && row.memo_admin_unread ? " has-unread" : ""
+                                  }`}
                                   role="button"
                                   tabIndex={0}
                                   onClick={() => void openMemo(row)}
@@ -2001,9 +2170,11 @@ export default function LeadList({
                                     if (e.key === "Enter" || e.key === " ") void openMemo(row);
                                   }}
                                   title={
-                                    isMemoEditable(row.status)
-                                      ? "클릭하여 메모 편집"
-                                      : "배정전·대기 상태에서는 메모를 편집할 수 없습니다"
+                                    showAdmin && row.memo_admin_unread
+                                      ? "영업자가 메모를 수정했습니다. 확인하세요."
+                                      : isMemoEditable(row.status)
+                                        ? "클릭하여 메모 편집"
+                                        : "배정전·대기 상태에서는 메모를 편집할 수 없습니다"
                                   }
                                 >
                                   {row.memo?.trim() || "메모 없음"}
@@ -2060,10 +2231,10 @@ export default function LeadList({
                     <th>이름</th>
                     <th>연락처</th>
                     <th>날짜</th>
-                    <th>담당자</th>
+                    <th>{renderAssigneeColumnFilter()}</th>
                     <th>배정일</th>
                     {showAdmin && <th>관리자상태</th>}
-                    <th>상담상태</th>
+                    <th>{renderStatusColumnFilter("right")}</th>
                     <th>메모</th>
                   </tr>
                 </thead>
@@ -2152,7 +2323,18 @@ export default function LeadList({
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                            <button type="button" className="crm-btn crm-lead-mobile-memo" onClick={() => void openMemo(row)}>
+                            <button
+                              type="button"
+                              className={`crm-btn crm-lead-mobile-memo${
+                                showAdmin && row.memo_admin_unread ? " has-memo-unread" : ""
+                              }`}
+                              onClick={() => void openMemo(row)}
+                              title={
+                                showAdmin && row.memo_admin_unread
+                                  ? "영업자가 메모를 수정했습니다. 확인하세요."
+                                  : undefined
+                              }
+                            >
                               메모
                             </button>
                             <button type="button" className="crm-btn crm-lead-mobile-memo" onClick={() => void openComment(row)}>

@@ -14,6 +14,7 @@ export const LEAD_STATUSES = [
   "대기",
   "1차컨택",
   "부재(메신저완료)",
+  "이관요청",
   "상담완료",
   "통화약속",
   "대면확정",
@@ -103,6 +104,8 @@ export type LeadRow = {
   } | null;
   status: LeadStatus;
   memo: string;
+  /** 영업자 수동 메모 수정 후 관리자 미열람 */
+  memo_admin_unread: boolean;
   /** 관리자·매니저 코멘트 (영업자 조회 전용) */
   admin_comment: string;
   assignee_id: string | null;

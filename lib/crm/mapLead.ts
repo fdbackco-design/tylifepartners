@@ -52,6 +52,7 @@ export function mapLeadRow(
     consent: null,
     status,
     memo: String(row.memo ?? ""),
+    memo_admin_unread: Boolean(row.memo_admin_unread),
     admin_comment: String(row.admin_comment ?? ""),
     assignee_id: assigneeId,
     assignee_name: staff?.name ?? "",
@@ -70,10 +71,10 @@ export function mapLeadRow(
 }
 
 export const CONSUMER_SELECT =
-  "id, name, phone, created_at, status, memo, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, location, desired_time, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, normalized_phone, analytics_session_id, max_scroll_depth, last_section_name";
+  "id, name, phone, created_at, status, memo, memo_admin_unread, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, location, desired_time, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, normalized_phone, analytics_session_id, max_scroll_depth, last_section_name";
 
 export const CANDIDATE_SELECT =
-  "id, name, phone, created_at, status, memo, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, normalized_phone, analytics_session_id, max_scroll_depth, last_section_name";
+  "id, name, phone, created_at, status, memo, memo_admin_unread, admin_comment, entry_page, utm_source, utm_medium, utm_campaign, utm_content, utm_term, meta_ad_id, marketing_consent, region, region_zone, available_time, age_group, job, job_rank, assignee_id, assigned_at, status_changed_at, meeting_at, merge_status, normalized_phone, analytics_session_id, max_scroll_depth, last_section_name";
 
 const STAFF_MAPS_CACHE_KEY = "crm:staff-maps";
 const STAFF_MAPS_TTL_MS = 30_000;

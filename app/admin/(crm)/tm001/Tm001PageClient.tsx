@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
+import ColumnFilterSearchableList from "@/app/admin/_components/crm/ColumnFilterSearchableList";
 import { CrmCheckupToolbarBanner } from "@/app/admin/_components/CrmCheckupReminder";
 import { CrmAlert, CrmButton, CrmDialog } from "@/app/admin/_components/crm/ui";
 import { fromKstMinuteLocalInput, toKstMinuteLocalInput } from "@/lib/crm/kst";
@@ -257,7 +258,7 @@ export default function Tm001PageClient() {
       if (!(target instanceof Element)) return false;
       return Boolean(
         target.closest(
-          "a, button, input, select, textarea, label, .crm-popover, .tm001-col-filter, [contenteditable='true']"
+          "a, button, input, select, textarea, label, .crm-popover, .crm-col-filter, [contenteditable='true']"
         )
       );
     };
@@ -491,7 +492,12 @@ export default function Tm001PageClient() {
         : !isTm001ScheduledStatus(nextStatus)
           ? { meeting_at: null }
           : {}),
-      ...(body.memo !== undefined && body.status === undefined ? { memo: String(body.memo ?? "") } : {}),
+      ...(body.memo !== undefined && body.status === undefined
+        ? {
+            memo: String(body.memo ?? ""),
+            ...(session?.rank === "sales" ? { memo_admin_unread: true } : {}),
+          }
+        : {}),
       ...(body.assignee_id !== undefined
         ? {
             assignee_id: body.assignee_id ? String(body.assignee_id) : null,
@@ -600,6 +606,16 @@ export default function Tm001PageClient() {
     setMemoCustomer(c);
     memoSavedRef.current = c.memo ?? "";
     setMemoSaveStatus("idle");
+    const canClearUnread = session?.rank === "admin" || session?.rank === "manager";
+    if (canClearUnread && c.memo_admin_unread) {
+      setItems((list) => list.map((row) => (row.id === c.id ? { ...row, memo_admin_unread: false } : row)));
+      setMemoCustomer((prev) => (prev?.id === c.id ? { ...prev, memo_admin_unread: false } : prev));
+      void fetch(`/api/admin/tm001/${encodeURIComponent(c.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memo_seen: true }),
+      });
+    }
   };
 
   useEffect(() => {
@@ -1019,50 +1035,20 @@ export default function Tm001PageClient() {
                           activeLabel={assigneeFilterLabel}
                         >
                           {(close) => (
-                            <div className="tm001-col-filter-list" role="listbox" aria-label="담당자 필터">
-                              <button
-                                type="button"
-                                role="option"
-                                className={!assigneeFilter ? "is-selected" : undefined}
-                                aria-selected={!assigneeFilter}
-                                onClick={() => {
-                                  setAssigneeFilter("");
-                                  setPage(0);
-                                  close();
-                                }}
-                              >
-                                전체
-                              </button>
-                              <button
-                                type="button"
-                                role="option"
-                                className={assigneeFilter === UNASSIGNED_FILTER ? "is-selected" : undefined}
-                                aria-selected={assigneeFilter === UNASSIGNED_FILTER}
-                                onClick={() => {
-                                  setAssigneeFilter(UNASSIGNED_FILTER);
-                                  setPage(0);
-                                  close();
-                                }}
-                              >
-                                미배정
-                              </button>
-                              {staff.map((s) => (
-                                <button
-                                  key={s.id}
-                                  type="button"
-                                  role="option"
-                                  className={assigneeFilter === s.id ? "is-selected" : undefined}
-                                  aria-selected={assigneeFilter === s.id}
-                                  onClick={() => {
-                                    setAssigneeFilter(s.id);
-                                    setPage(0);
-                                    close();
-                                  }}
-                                >
-                                  {s.name}
-                                </button>
-                              ))}
-                            </div>
+                            <ColumnFilterSearchableList
+                              ariaLabel="담당자 필터"
+                              searchPlaceholder="이름 검색"
+                              selected={assigneeFilter || null}
+                              options={[
+                                { value: UNASSIGNED_FILTER, label: "미배정" },
+                                ...staff.map((s) => ({ value: s.id, label: s.name })),
+                              ]}
+                              onSelect={(value) => {
+                                setAssigneeFilter(value ?? "");
+                                setPage(0);
+                                close();
+                              }}
+                            />
                           )}
                         </Tm001ColumnFilter>
                       </th>
@@ -1309,9 +1295,18 @@ export default function Tm001PageClient() {
                           <td className="memo-cell">
                             <button
                               type="button"
-                              className={`note-button${c.memo?.trim() ? " has-text" : ""}`}
+                              className={`note-button${c.memo?.trim() ? " has-text" : ""}${
+                                (session?.rank === "admin" || session?.rank === "manager") && c.memo_admin_unread
+                                  ? " has-unread"
+                                  : ""
+                              }`}
                               onClick={() => openMemo(c)}
                               aria-label={`${c.name} 메모 ${c.memo?.trim() ? "수정" : "작성"}`}
+                              title={
+                                (session?.rank === "admin" || session?.rank === "manager") && c.memo_admin_unread
+                                  ? "영업자가 메모를 수정했습니다. 확인하세요."
+                                  : undefined
+                              }
                             >
                               <span className="note-content">{c.memo?.trim() ? c.memo : "메모 없음"}</span>
                               <span className="note-action">{c.memo?.trim() ? "메모 수정" : "메모 작성"}</span>

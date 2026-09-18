@@ -15,7 +15,7 @@ import {
 import { buildAssigneeNameChain } from "@/lib/crm/assigneeHistoryFormat";
 import { addDaysYmd, parseKstYmd } from "@/lib/crm/kst";
 import { appendStatusMemo } from "@/lib/crm/memo";
-import { canAssignTm001To, canChangeTm001Assignee, tm001VisibleAssigneeIds } from "@/lib/crm/scope";
+import { canAssignTm001To, canChangeTm001Assignee, canEditAdminComment, tm001VisibleAssigneeIds } from "@/lib/crm/scope";
 import type { SessionUser } from "@/lib/crm/types";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -100,6 +100,7 @@ function mapCustomerRow(
     product: r.product != null ? String(r.product) : null,
     meeting_at: r.meeting_at ? String(r.meeting_at) : null,
     memo: String(r.memo ?? ""),
+    memo_admin_unread: Boolean(r.memo_admin_unread),
     comments: mapComments(r.comments),
     created_at: String(r.created_at ?? ""),
     updated_at: String(r.updated_at ?? ""),
@@ -289,7 +290,7 @@ export async function listTm001Customers(opts?: {
     let listQ = supabase
       .from("tm001_customers")
       .select(
-        "id, partner_code, partner_name, batch_code, name, phone, normalized_phone, raw_phone, visit_count, assignee_id, assigned_at, status, product, meeting_at, memo, comments, created_at, updated_at"
+        "id, partner_code, partner_name, batch_code, name, phone, normalized_phone, raw_phone, visit_count, assignee_id, assigned_at, status, product, meeting_at, memo, memo_admin_unread, comments, created_at, updated_at"
       )
       .eq("partner_code", TM001_PARTNER_CODE)
       .in("id", ids)
@@ -490,7 +491,7 @@ async function listTm001CustomersFallback(opts: {
   const supabase = getSupabaseAdmin();
   const { q, region, status, scoped, unassignedOnly, assignedDate, limit, offset } = opts;
   const CUSTOMER_COLS =
-    "id, partner_code, partner_name, batch_code, name, phone, normalized_phone, raw_phone, visit_count, assignee_id, assigned_at, status, product, meeting_at, memo, comments, created_at, updated_at";
+    "id, partner_code, partner_name, batch_code, name, phone, normalized_phone, raw_phone, visit_count, assignee_id, assigned_at, status, product, meeting_at, memo, memo_admin_unread, comments, created_at, updated_at";
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const applyAssigneeStatus = (query: any) => {
@@ -925,6 +926,8 @@ export async function patchTm001Customer(
     product?: string | null;
     meeting_at?: string | null;
     memo?: string;
+    /** 관리자·매니저 메모 열람 시 미확인 해제 */
+    memo_seen?: boolean;
     comment_append?: string;
     comment_by?: string;
     assignee_id?: string | null;
@@ -973,7 +976,14 @@ export async function patchTm001Customer(
   }
   // 상담상태와 함께 온 메모는 후보자 DB와 같이 상태 자동기록을 유지 (명시 memo만 별도 저장)
   if (patch.memo !== undefined && patch.status == null) {
-    next.memo = String(patch.memo ?? "");
+    const nextMemoText = String(patch.memo ?? "");
+    next.memo = nextMemoText;
+    if (session.rank === "sales" && nextMemoText !== String(current.memo ?? "")) {
+      next.memo_admin_unread = true;
+    }
+  }
+  if (patch.memo_seen && canEditAdminComment(session) && current.memo_admin_unread) {
+    next.memo_admin_unread = false;
   }
   if (patch.comment_append != null && String(patch.comment_append).trim()) {
     const comments = mapComments(current.comments);
