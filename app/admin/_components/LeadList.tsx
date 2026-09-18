@@ -1143,6 +1143,14 @@ export default function LeadList({
     return `상담상태 ${statuses.length}`;
   }, [statuses]);
 
+  const adminStatusHeaderLabel = useMemo(() => {
+    if (adminStatuses.length === 0) return null;
+    if (adminStatuses.length === 1) {
+      return ADMIN_STATUS_FILTER_OPTIONS.find((o) => o.value === adminStatuses[0])?.label ?? adminStatuses[0];
+    }
+    return `관리자상태 ${adminStatuses.length}`;
+  }, [adminStatuses]);
+
   const renderAssigneeColumnFilter = (align?: "left" | "right") => (
     <ColumnFilter
       label="담당자"
@@ -1243,6 +1251,49 @@ export default function LeadList({
               }}
             >
               {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </ColumnFilter>
+  );
+
+  const renderAdminStatusColumnFilter = (align?: "left" | "right") => (
+    <ColumnFilter
+      label="관리자상태"
+      active={adminStatuses.length > 0}
+      activeLabel={adminStatusHeaderLabel}
+      align={align}
+    >
+      {(close) => (
+        <div className="crm-col-filter-list" role="listbox" aria-label="관리자상태 필터">
+          <button
+            type="button"
+            role="option"
+            className={adminStatuses.length === 0 ? "is-selected" : undefined}
+            aria-selected={adminStatuses.length === 0}
+            onClick={() => {
+              setAdminStatuses([]);
+              setPage(0);
+              close();
+            }}
+          >
+            전체
+          </button>
+          {ADMIN_STATUS_FILTER_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              role="option"
+              className={adminStatuses.length === 1 && adminStatuses[0] === o.value ? "is-selected" : undefined}
+              aria-selected={adminStatuses.length === 1 && adminStatuses[0] === o.value}
+              onClick={() => {
+                setAdminStatuses([o.value]);
+                setPage(0);
+                close();
+              }}
+            >
+              {o.label}
             </button>
           ))}
         </div>
@@ -1996,6 +2047,13 @@ export default function LeadList({
                         </th>
                       );
                     }
+                    if (colId === "admin_status") {
+                      return (
+                        <th key={colId} className={meta.thClass} title={meta.title}>
+                          {renderAdminStatusColumnFilter()}
+                        </th>
+                      );
+                    }
                     return (
                       <th key={colId} className={meta.thClass} title={meta.title}>
                         {meta.label}
@@ -2308,7 +2366,7 @@ export default function LeadList({
                     <th>날짜</th>
                     <th>{renderAssigneeColumnFilter()}</th>
                     <th>배정일</th>
-                    {showAdmin && <th>관리자상태</th>}
+                    {showAdmin && <th>{renderAdminStatusColumnFilter()}</th>}
                     <th>{renderStatusColumnFilter("right")}</th>
                     <th>메모</th>
                   </tr>
