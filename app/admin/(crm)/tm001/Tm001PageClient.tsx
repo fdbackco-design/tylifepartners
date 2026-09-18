@@ -392,6 +392,80 @@ export default function Tm001PageClient() {
     memoCustomerRef.current = memoCustomer;
   }, [memoCustomer]);
 
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  // 관리자·매니저: 메모 미확인 빨간 점만 짧게 폴링
+  useEffect(() => {
+    if (session?.rank !== "admin" && session?.rank !== "manager") return;
+    const POLL_MS = 10_000;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let inFlight = false;
+
+    const syncUnread = async () => {
+      if (document.hidden || inFlight) return;
+      const ids = itemsRef.current.map((i) => i.id);
+      if (ids.length === 0) return;
+      inFlight = true;
+      try {
+        const sp = new URLSearchParams();
+        sp.set("ids", ids.join(","));
+        const res = await fetch(`/api/admin/tm001/memo-unread?${sp.toString()}`);
+        const data = await res.json();
+        if (!data.ok || !data.unread || typeof data.unread !== "object") return;
+        const unread = data.unread as Record<string, boolean>;
+        setItems((prev) => {
+          let changed = false;
+          const next = prev.map((row) => {
+            if (!(row.id in unread)) return row;
+            const flag = Boolean(unread[row.id]);
+            if (flag === row.memo_admin_unread) return row;
+            changed = true;
+            return { ...row, memo_admin_unread: flag };
+          });
+          return changed ? next : prev;
+        });
+      } catch {
+        // ignore
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const clear = () => {
+      if (timer != null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const schedule = () => {
+      clear();
+      timer = setInterval(() => {
+        void syncUnread();
+      }, POLL_MS);
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        clear();
+        return;
+      }
+      void syncUnread();
+      schedule();
+    };
+
+    void syncUnread();
+    if (!document.hidden) schedule();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clear();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [session?.rank]);
+
   const pages = Math.max(1, Math.ceil(total / pageSize) || 1);
   const pageItems = items;
 
