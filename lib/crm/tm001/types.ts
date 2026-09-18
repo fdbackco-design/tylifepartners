@@ -65,6 +65,8 @@ export type Tm001Customer = {
   /** 재콜 예약 시각 (ISO) */
   meeting_at: string | null;
   memo: string;
+  /** 영업자 수동 메모 수정 후 관리자 미열람 */
+  memo_admin_unread: boolean;
   comments: Tm001Comment[];
   created_at: string;
   updated_at: string;

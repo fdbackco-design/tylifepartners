@@ -66,7 +66,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   const { staffById, parentNameById } = await loadStaffMaps();
-  const item = mapLeadRow(data as Record<string, unknown>, category, staffById, parentNameById);
+  let item = mapLeadRow(data as Record<string, unknown>, category, staffById, parentNameById);
+
+  // 관리자·매니저가 메모를 열면 미확인 표시 해제 (목록 조인 없이 단건 UPDATE만)
+  if (canEditAdminComment(session) && item.memo_admin_unread) {
+    const { error: clearErr } = await supabase
+      .from(table)
+      .update({ memo_admin_unread: false })
+      .eq("id", id)
+      .eq("memo_admin_unread", true);
+    if (!clearErr) item = { ...item, memo_admin_unread: false };
+  }
+
   const withHistory = await enrichLeadItem(item, session);
 
   const [{ data: assignLogs }, { data: memoLogs }, { data: statusLogs }] = await Promise.all([
@@ -241,7 +252,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!isMemoEditable(nextStatus)) {
       return NextResponse.json({ ok: false, message: "배정전·대기 상태에서는 메모를 수정할 수 없습니다." }, { status: 400 });
     }
-    patch.memo = String(body.memo);
+    const nextMemoText = String(body.memo);
+    patch.memo = nextMemoText;
+    // 영업자가 직접 타이핑한 메모만 관리자 미확인 표시 (상태 자동기록은 status 분기에서 처리)
+    if (
+      session.rank === "sales" &&
+      nextMemoText !== String((current as { memo?: string | null }).memo ?? "")
+    ) {
+      patch.memo_admin_unread = true;
+    }
   }
 
   if (body.admin_comment != null && body.status == null) {

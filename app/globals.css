@@ -1555,6 +1555,115 @@ main.crm-admin-login {
   border-bottom: 1px solid var(--crm-border);
 }
 
+/* LeadList 헤더 컬럼 필터 (TM001과 동일 UX) */
+.crm-table .crm-col-filter,
+.crm-lead-mobile-table .crm-col-filter {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.crm-table .crm-col-filter-btn,
+.crm-lead-mobile-table .crm-col-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  margin: 0;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.3;
+}
+.crm-table .crm-col-filter-btn:hover,
+.crm-table .crm-col-filter.is-open .crm-col-filter-btn,
+.crm-table .crm-col-filter.is-active .crm-col-filter-btn,
+.crm-lead-mobile-table .crm-col-filter-btn:hover,
+.crm-lead-mobile-table .crm-col-filter.is-open .crm-col-filter-btn,
+.crm-lead-mobile-table .crm-col-filter.is-active .crm-col-filter-btn {
+  background: #efe8f8;
+  color: #5b3d8a;
+}
+.crm-table .crm-col-filter-label,
+.crm-lead-mobile-table .crm-col-filter-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 7.5em;
+}
+.crm-table .crm-col-filter-caret,
+.crm-lead-mobile-table .crm-col-filter-caret {
+  font-size: 9px;
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+.crm-col-filter-menu-portal {
+  position: fixed;
+  z-index: 1200;
+  max-width: min(240px, calc(100vw - 16px));
+  max-height: min(320px, 70vh);
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #e4e0ec;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(40, 28, 64, 0.14);
+}
+.crm-col-filter-menu-portal .crm-col-filter-list {
+  display: grid;
+  gap: 2px;
+}
+.crm-col-filter-menu-portal .crm-col-filter-list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2f3545;
+  cursor: pointer;
+}
+.crm-col-filter-menu-portal .crm-col-filter-list button:hover {
+  background: #f5f2fa;
+}
+.crm-col-filter-menu-portal .crm-col-filter-list button.is-selected {
+  background: #efe8f8;
+  color: #5b3d8a;
+}
+.crm-col-filter-menu-portal .crm-col-filter-searchable {
+  display: grid;
+  gap: 8px;
+  min-width: 180px;
+}
+.crm-col-filter-menu-portal .crm-col-filter-search {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid #dfe3ed;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: #2f3545;
+  background: #fff;
+  box-sizing: border-box;
+}
+.crm-col-filter-menu-portal .crm-col-filter-search:focus {
+  outline: 2px solid #c4b5e0;
+  outline-offset: 1px;
+}
+.crm-col-filter-menu-portal .crm-col-filter-empty {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #727d91;
+}
+
 .crm-table td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--crm-border);
@@ -1667,6 +1776,7 @@ main.crm-admin-login {
 .crm-status-대기 { background: #fffde7; color: #9a6700; border-color: #f5e6a8; }
 .crm-status-부재메신저완료 { background: #fffde7; color: #9a6700; border-color: #f5e6a8; }
 .crm-status-1차컨택 { background: #eef2ff; color: #3730a3; border-color: #c7d2fe; }
+.crm-status-이관요청 { background: #ffebee; color: #b91c1c; border-color: #fecaca; }
 .crm-status-상담완료 { background: #f3f4f6; color: #374151; border-color: #e5e7eb; }
 .crm-status-통화약속 { background: #fffbeb; color: #a16207; border-color: #fde68a; }
 .crm-status-대면확정 { background: #e8f5e9; color: #166534; border-color: #bbf7d0; }
@@ -1977,6 +2087,7 @@ main.crm-admin-login {
 }
 
 .crm-memo-preview {
+  position: relative;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -1990,6 +2101,38 @@ main.crm-admin-login {
   word-break: keep-all;
   overflow-wrap: anywhere;
   text-align: left;
+}
+
+.crm-memo-preview.has-unread {
+  padding-left: 10px;
+}
+
+.crm-memo-preview.has-unread::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e11d48;
+  box-shadow: 0 0 0 1px #fff;
+  z-index: 1;
+}
+
+.crm-lead-mobile-memo.has-memo-unread {
+  position: relative;
+}
+
+.crm-lead-mobile-memo.has-memo-unread::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e11d48;
 }
 
 .crm-memo-preview:hover {

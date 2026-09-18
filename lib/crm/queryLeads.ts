@@ -277,6 +277,8 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
     const table = kind === "candidates" ? "tylife_b2b" : "leads";
     const selectFull = kind === "candidates" ? CANDIDATE_SELECT : CONSUMER_SELECT;
     const selectLegacy = selectFull
+      .replace(", memo_admin_unread", "")
+      .replace("memo_admin_unread, ", "")
       .replace(", meta_ad_id", "")
       .replace("meta_ad_id, ", "")
       .replace(", admin_comment", "")
@@ -307,7 +309,7 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
       }
       query = applyRegionFilter(query, q.regions, kind === "consumers");
       if (q.needReassign) {
-        query = query.in("status", ["대기", "1차컨택", "부재(메신저완료)"]);
+        query = query.in("status", ["대기", "1차컨택", "부재(메신저완료)", "이관요청"]);
       }
       if (!needsMemoryPaging) {
         query = query.range(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50) - 1);
@@ -318,7 +320,7 @@ export async function queryLeads(session: SessionUser, q: LeadQueryInput): Promi
     };
 
     let { data, error, count } = await run(selectFull);
-    if (error && /meta_ad|admin_comment|schema cache|column/i.test(error.message)) {
+    if (error && /memo_admin_unread|meta_ad|admin_comment|schema cache|column/i.test(error.message)) {
       console.warn(`[queryLeads] column missing on ${table}, falling back:`, error.message);
       ({ data, error, count } = await run(selectLegacy));
     }

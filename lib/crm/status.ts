@@ -49,6 +49,9 @@ export function getAdminStatus(
     if (days >= 3) return { key: "need_reassign", label: "담당자 변경 필요", tone: "danger" };
     return { key: "absent_day", label: `부재 ${days}일차`, tone: "danger" };
   }
+  if (st === "이관요청") {
+    return { key: "need_reassign", label: "담당자 변경 필요", tone: "danger" };
+  }
   if (st === "상담완료") {
     const days = calendarDaysElapsed(since);
     if (days > 7) return { key: "need_recontact", label: "재컨택 필요", tone: "danger" };
@@ -81,13 +84,13 @@ export function matchesAdminStatusFilter(
 /**
  * 상담상태 선택지:
  * - 배정전: 배정전만
- * - 대기: 대기, 1차컨택만
- * - 1차컨택 이후: 1차컨택, 부재(메신저완료), 상담완료, 통화약속, 대면확정, 가입완료
+ * - 대기: 대기, 1차컨택, 이관요청
+ * - 1차컨택 이후: 1차컨택, 부재(메신저완료), 이관요청, 상담완료, 통화약속, 대면확정, 가입완료
  */
 export function allowedStatusesFor(_session: SessionUser, current: LeadStatus): LeadStatus[] {
   if (current === "배정전") return ["배정전"];
-  if (current === "대기") return ["대기", "1차컨택"];
-  return ["1차컨택", "부재(메신저완료)", "상담완료", "통화약속", "대면확정", "가입완료"];
+  if (current === "대기") return ["대기", "1차컨택", "이관요청"];
+  return ["1차컨택", "부재(메신저완료)", "이관요청", "상담완료", "통화약속", "대면확정", "가입완료"];
 }
 
 export function isMemoEditable(status: LeadStatus): boolean {
@@ -106,6 +109,7 @@ export function rowBackground(
   if (adminStatusKey === "need_assign") return "#ffebee";
   if (status === "배정전") return "#fff4e6";
   if (status === "대기" || status === "부재(메신저완료)") return "#fffde7";
+  if (status === "이관요청") return "#ffebee";
   if (status === "통화약속") return "#fffbeb";
   if (status === "대면확정") return "#e8f5e9";
   return undefined;
