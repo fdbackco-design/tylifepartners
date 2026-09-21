@@ -19,6 +19,7 @@ import {
 import { addDaysYmd, kstYmd, startOfKstDayIso } from "@/lib/crm/kst";
 import { visibleAssigneeIds } from "@/lib/crm/scope";
 import { getSession } from "@/lib/adminSession";
+import { listGoogleCalendarEvents } from "@/lib/googleCalendar";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { notifyCalendarEventCreated } from "@/lib/webPush";
 
@@ -258,6 +259,16 @@ export async function GET(request: NextRequest) {
   ).filter((ev) => canViewLeadMeeting(session, ev, scoped));
 
   let items = [...calendarItems, ...leadItems].filter((ev) => typeFilter.includes(ev.event_type));
+
+  if (session.rank === "admin" && typeFilter.includes("google")) {
+    try {
+      const googleItems = await listGoogleCalendarEvents(month);
+      items.push(...googleItems);
+    } catch (e) {
+      console.error("GET calendar google:", e instanceof Error ? e.message : e);
+    }
+  }
+
   items.sort((a, b) => {
     const d = a.event_date.localeCompare(b.event_date);
     if (d !== 0) return d;
@@ -313,7 +324,7 @@ export async function POST(request: NextRequest) {
     if (!eventDate) {
       return NextResponse.json({ ok: false, message: "날짜가 올바르지 않습니다." }, { status: 400 });
     }
-    if (!isCalendarEventType(body.event_type)) {
+    if (!isCalendarEventType(body.event_type) || body.event_type === "google") {
       return NextResponse.json({ ok: false, message: "일정 종류가 올바르지 않습니다." }, { status: 400 });
     }
     if (!isCalendarVisibility(body.visibility)) {

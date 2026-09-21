@@ -262,7 +262,12 @@ function CalendarPageInner() {
   };
 
   const openEdit = (ev: CalendarEventRow) => {
-    if (ev.read_only || ev.source === "lead_meeting") {
+    if (ev.read_only || ev.source === "lead_meeting" || ev.source === "google_calendar") {
+      if (ev.source === "google_calendar") {
+        setModal({ mode: "day", date: ev.event_date });
+        showToast("구글 캘린더 일정은 여기서 수정할 수 없습니다.");
+        return;
+      }
       const parts = String(ev.id || "").split(":");
       if (parts[0] === "lead" && parts.length >= 3) {
         const kind = ev.lead_category || parts[1];
@@ -529,10 +534,11 @@ function CalendarPageInner() {
   const visibilityChoices: CalendarVisibility[] =
     rank === "manager" ? ["all", "sales"] : ["all", "admin_plus", "managers", "sales"];
 
-  const availableTypes = useMemo(
-    () => (tmOnly ? (["call"] as CalendarEventType[]) : [...CALENDAR_EVENT_TYPES]),
-    [tmOnly]
-  );
+  const availableTypes = useMemo(() => {
+    const base = tmOnly ? (["call"] as CalendarEventType[]) : [...CALENDAR_EVENT_TYPES];
+    if (rank !== "admin") return base.filter((t) => t !== "google");
+    return base;
+  }, [tmOnly, rank]);
 
   const typeLabel = useCallback(
     (t: CalendarEventType) => (tmOnly && t === "call" ? "TM001 재콜" : CALENDAR_EVENT_TYPE_LABELS[t]),
@@ -828,7 +834,7 @@ function CalendarPageInner() {
 
                 <div className="wc-ed__lab">일정 종류</div>
                 <div className="wc-ed__types">
-                  {CALENDAR_EVENT_TYPES.map((t) => {
+                  {CALENDAR_EVENT_TYPES.filter((t) => t !== "google").map((t) => {
                     const col = CALENDAR_EVENT_TYPE_COLORS[t];
                     const on = formType === t;
                     return (
