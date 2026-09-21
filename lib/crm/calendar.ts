@@ -22,7 +22,7 @@ export const CALENDAR_EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
   holiday: "휴무",
   meeting: "대면일",
   call: "통화약속",
-  google: "구글",
+  google: "안성준 일정 공유",
 };
 
 /** HTML 디자인 토큰에 맞춘 색상 */
@@ -37,7 +37,7 @@ export const CALENDAR_EVENT_TYPE_COLORS: Record<
   holiday: { accent: "#CFC7E0", bg: "#FAF9FC", text: "#867A9C" },
   meeting: { accent: "#5A13BF", bg: "rgba(90,19,191,.08)", text: "#5A13BF" },
   call: { accent: "#EAB308", bg: "rgba(234,179,8,.18)", text: "#A16207" },
-  google: { accent: "#1A73E8", bg: "rgba(26,115,232,.10)", text: "#174EA6" },
+  google: { accent: "#EA580C", bg: "rgba(234,88,12,.14)", text: "#C2410C" },
 };
 
 export const CALENDAR_VISIBILITIES = ["all", "admin_plus", "managers", "sales"] as const;
