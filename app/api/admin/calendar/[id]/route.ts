@@ -98,7 +98,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       patch.event_date = d;
     }
     if (body.event_type != null) {
-      if (!isCalendarEventType(body.event_type)) {
+      if (!isCalendarEventType(body.event_type) || body.event_type === "google") {
         return NextResponse.json({ ok: false, message: "일정 종류가 올바르지 않습니다." }, { status: 400 });
       }
       patch.event_type = body.event_type;
