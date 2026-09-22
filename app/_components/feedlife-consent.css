@@ -31,7 +31,8 @@
 .fl-consent .fl-channels {margin-top:18px;background:#faf8fc;border-radius:10px;padding:14px;display:flex;flex-wrap:wrap;gap:16px}
 .fl-channels legend {font-size:13px!important}.fl-channels p {font-size:12px;margin:0;flex-basis:100%;color:#786a83}.fl-channels .fl-check {font-size:13px}
 .fl-privacy-link {font-size:12px;margin:22px 0 15px}.fl-privacy-link a {color:#673394;text-underline-offset:3px}
-.fl-consent .fl-submit {width:100%;min-height:52px;background:#6330a6;color:#fff;border:0;border-radius:12px;cursor:pointer;font-size:16px;font-weight:800;letter-spacing:-.3px;padding:12px;}
+.fl-consent .fl-submit,.fl-host-sticky .fl-submit {width:100%;min-height:52px;background:#6330a6;color:#fff;border:0;border-radius:12px;cursor:pointer;font-family:inherit;font-size:16px;font-weight:800;letter-spacing:-.3px;padding:12px;}
+.fl-host-sticky .fl-submit:focus-visible {outline:3px solid #aa85e6;outline-offset:3px}
 .fl-consent button:disabled {opacity:.6;cursor:wait}
 .fl-footnote {font-size:11px;text-align:center;color:#87788e;margin:12px 0 0}
 .fl-errors {color:#a32436;background:#fff1f3;border:1px solid #edb6bf;border-radius:9px;padding:10px 15px;margin-bottom:16px;font-size:13px}.fl-errors p {margin:3px 0}
