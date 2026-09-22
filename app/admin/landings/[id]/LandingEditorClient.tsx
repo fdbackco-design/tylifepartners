@@ -636,7 +636,14 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
           </div>
         ) : null}
 
-        <div
+        {item.code_meta.form_profile === "feedlife-v5" ? (
+          <div style={{ marginTop: 24, maxWidth: 560 }}>
+            <strong>FEED LIFE 파트너 상담 신청폼</strong>
+            <p>이름·휴대전화번호·지역은 필수이며 상담가능시간은 선택입니다.</p>
+            <p>연령대·현재 역할은 맞춤 상담 동의 시에만 선택적으로 입력합니다. 직급·상세지역·마케팅 동의는 받지 않습니다.</p>
+            <p className="crm-ui-hint">전달된 HTML의 전용 양식이 적용되어 공통 신청폼 설정은 사용하지 않습니다.</p>
+          </div>
+        ) : <div
           style={{
             marginTop: 24,
             padding: 16,
@@ -719,7 +726,7 @@ export default function AdminLandingEditor({ landingId }: { landingId: string })
               <span style={{ fontSize: 13, color: "var(--crm-muted)" }}>저장되지 않은 변경이 있습니다.</span>
             ) : null}
           </div>
-        </div>
+        </div>}
       </div>
     );
   }

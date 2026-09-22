@@ -14,6 +14,8 @@ export type ManagedLandingSection = {
 };
 
 export type ManagedLandingCodeMeta = {
+  format?: "html";
+  form_profile?: "feedlife-v5";
   source_zip?: string;
   page_file?: string;
   css_file?: string;

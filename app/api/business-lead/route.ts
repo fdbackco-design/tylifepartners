@@ -22,14 +22,16 @@ import {
   resolveAllowedRegions,
   type ManagedFormConfig,
 } from "@/lib/managedLandings/formConfig";
-import { getManagedLandingById } from "@/lib/managedLandings/store";
+import { getManagedLandingById, getManagedLandingByPath } from "@/lib/managedLandings/store";
 import { verifyAdminSession } from "@/lib/adminSession";
 import { parseBaseRegion } from "@/lib/regions";
 import { parseMetaIdsFromBody, parseUTMFromHref } from "@/lib/utm";
 import { notifyAdminsNewLead } from "@/lib/webPush";
+import { validateSubmission, ValidationError } from "@/lib/feedlife/validateSubmission";
 import {
   clientMetaFromRequest,
   insertLeadConsentSafe,
+  insertLeadConsent,
   legacyMarketingConsentFlag,
   parseConsentFromBody,
 } from "@/lib/crm/leadConsents";
@@ -54,6 +56,9 @@ function formatKstYmd(date: Date): string {
  * [환경변수] SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 export async function POST(request: NextRequest) {
+  if (process.env.LOCAL_REVIEW_MODE === "1") {
+    return NextResponse.json({ ok: false, message: "로컬 검수 모드입니다. 신청 정보는 저장되지 않았습니다." }, { status: 409 });
+  }
   try {
     const body = await request.json();
     const name = String(body.name ?? "").trim();
@@ -110,8 +115,8 @@ export async function POST(request: NextRequest) {
         : body.desired_time != null
           ? String(body.desired_time).trim()
           : "";
-    const ageGroup = body.age_group != null ? String(body.age_group).trim() : "";
-    const job = body.job != null ? String(body.job).trim() : "";
+    let ageGroup = body.age_group != null ? String(body.age_group).trim() : "";
+    let job = body.job != null ? String(body.job).trim() : "";
     const jobRankRaw = body.job_rank != null ? String(body.job_rank).trim() : "";
 
     if (!name) {
@@ -142,13 +147,13 @@ export async function POST(request: NextRequest) {
 
     const analytics = parseSubmissionAnalytics(body as Record<string, unknown>);
     const landingIdRaw = body.landing_id != null ? String(body.landing_id).trim() : "";
-    const landingId =
+    let landingId =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
         landingIdRaw
       )
         ? landingIdRaw
         : null;
-    const landingPath =
+    let landingPath =
       body.landing_path != null
         ? String(body.landing_path).trim() || null
         : landingId
@@ -158,19 +163,52 @@ export async function POST(request: NextRequest) {
     // 관리형 랜딩: DB에 저장된 신청폼 양식 기준으로 필수 필드 판정
     // (관리자 미리보기에서는 저장 전 로컬 설정을 body.form_config로 보낼 수 있음)
     let formConfig: ManagedFormConfig = DEFAULT_FORM_CONFIG;
-    if (landingId) {
+    let feedlifeV5 = false;
+    if (landingId || entryPage.startsWith("/")) {
       try {
-        const managed = await getManagedLandingById(landingId);
-        if (managed) formConfig = managed.form_config;
+        const managed = landingId ? await getManagedLandingById(landingId) : await getManagedLandingByPath(entryPage);
+        if (managed) {
+          formConfig = managed.form_config;
+          feedlifeV5 = managed.code_meta.form_profile === "feedlife-v5";
+          if (feedlifeV5) {
+            landingId = managed.id;
+            landingPath = managed.path;
+          }
+        }
       } catch (e) {
-        console.error("business-lead form_config lookup:", e);
+        console.error("business-lead form_config lookup failed");
+        return NextResponse.json({ ok: false, message: "신청폼 설정을 확인하지 못했습니다. 다시 시도해 주세요." }, { status: 503 });
       }
+    }
+    if (body.consent_version === "2026-09-22.v5" && !feedlifeV5) {
+      return NextResponse.json({ ok: false, message: "신청폼이 변경되었습니다. 새로고침해 주세요." }, { status: 409 });
     }
     if (body.form_config != null && (await verifyAdminSession())) {
       formConfig = normalizeFormConfig(body.form_config);
     }
 
-    if (!is0623Landing) {
+    if (feedlifeV5) {
+      try {
+        const validated = validateSubmission({
+          name: body.name, phone: body.phone, region: body.region,
+          consultationTime: body.available_time, ageBand: body.age_group, currentRole: body.job,
+          consentVersion: body.consent_version,
+          consent: { requiredPrivacy: body.privacy_required, optionalConsultation: body.custom_info_consent,
+            marketingUse: body.marketing_consent ?? false,
+            channels: { phone: body.ad_phone_consent ?? false, sms: body.ad_sms_consent ?? false, kakao: body.ad_kakao_consent ?? false } },
+        });
+        if (body.ad_email_consent !== undefined && body.ad_email_consent !== false) {
+          return NextResponse.json({ ok: false, message: "현재 마케팅 동의는 운영하지 않습니다." }, { status: 400 });
+        }
+        ageGroup = validated.data.ageBand || "";
+        job = validated.data.currentRole || "";
+      } catch (e) {
+        if (e instanceof ValidationError) return NextResponse.json({ ok: false, message: e.message, errors: e.errors }, { status: 400 });
+        throw e;
+      }
+    }
+
+    if (!is0623Landing && !feedlifeV5) {
       if (formConfig.includeRegion && !region) {
         return NextResponse.json(
           { ok: false, message: "지역을 선택해주세요." },
@@ -205,6 +243,7 @@ export async function POST(request: NextRequest) {
       job === INSURANCE_DESIGNER_JOB && jobRankRaw && ALLOWED_JOB_RANKS.has(jobRankRaw) ? jobRankRaw : null;
     if (
       !is0623Landing &&
+      !feedlifeV5 &&
       formConfig.includeJob &&
       job === INSURANCE_DESIGNER_JOB &&
       !jobRankForDb
@@ -217,15 +256,16 @@ export async function POST(request: NextRequest) {
 
     // formConfig.includeJob 은 필수 검증·UI 노출용.
     // 클라이언트가 보낸 직업/직급 값은 항상 DB·시트에 남긴다(설정 불일치로 유실 방지).
-    const regionForDb = formConfig.includeRegion ? region || null : null;
-    const availableTimeForDb = formConfig.includeAvailableTime ? availableTime || null : null;
-    const ageGroupForDb = formConfig.includeAgeGroup ? ageGroup || null : null;
+    const regionForDb = feedlifeV5 || formConfig.includeRegion ? region || null : null;
+    const availableTimeForDb = feedlifeV5 || formConfig.includeAvailableTime ? availableTime || null : null;
+    const ageGroupForDb = feedlifeV5 || formConfig.includeAgeGroup ? ageGroup || null : null;
     const jobForDb = job || null;
-    const jobRankStored = jobRankForDb;
+    const jobRankStored = feedlifeV5 ? null : jobRankForDb;
 
     const supabase = getSupabaseAdmin();
     const nowIso = new Date().toISOString();
 
+    const saveConsent = feedlifeV5 ? insertLeadConsent : insertLeadConsentSafe;
     const existingHits = await findActiveLeadsByPhone("tylife_b2b", phone);
     const samePerson = pickSamePersonLead(existingHits, name);
     if (samePerson) {
@@ -246,9 +286,10 @@ export async function POST(request: NextRequest) {
         meta_campaign_id: metaIds.meta_campaign_id,
         receivedAtIso: nowIso,
       });
-      await supabase
+      const { error: updateError } = await supabase
         .from("tylife_b2b")
         .update({
+          ...(feedlifeV5 ? { region: regionForDb, available_time: availableTimeForDb, age_group: ageGroupForDb, job: jobForDb, job_rank: null } : {}),
           marketing_consent: marketingConsent,
           analytics_session_id: analytics.analytics_session_id,
           analytics_visitor_id: analytics.analytics_visitor_id,
@@ -257,7 +298,8 @@ export async function POST(request: NextRequest) {
           last_section_label: analytics.last_section_label,
         })
         .eq("id", samePerson.id);
-      await insertLeadConsentSafe({
+      if (updateError) throw updateError;
+      await saveConsent({
         leadId: samePerson.id,
         leadType: "tylife_b2b",
         consent: consentInput,
@@ -311,12 +353,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, reinquiry: true, lead_id: samePerson.id });
     }
 
-    const { data: insertedLead, error } = await supabase.from("tylife_b2b").insert({
+    const leadPayload = {
       name,
       phone,
       normalized_phone: phone,
       source: utmSource || source,
-      entry_page: entryPage,
+      entry_page: feedlifeV5 ? landingPath : entryPage,
       landing_id: landingId,
       landing_path: landingPath,
       utm_source: utmSource || null,
@@ -342,10 +384,8 @@ export async function POST(request: NextRequest) {
       status_changed_at: nowIso,
       region_zone: resolveRegionZone(regionForDb),
       merge_status: "active",
-    })
-      // 저장되는 값·컬럼은 그대로. CRM 동기화용 submission_id/실제 접수 시각만 돌려받는다.
-      .select("id, created_at")
-      .single();
+    };
+    const { data: insertedLead, error } = await supabase.from("tylife_b2b").insert(leadPayload).select("id, created_at").single();
 
     if (error) {
       console.error("Supabase tylife_b2b insert error:", error);
@@ -363,7 +403,7 @@ export async function POST(request: NextRequest) {
 
     let assigned: { assigneeName: string } | null = null;
     if (insertedLead?.id) {
-      await insertLeadConsentSafe({
+      await saveConsent({
         leadId: insertedLead.id,
         leadType: "tylife_b2b",
         consent: consentInput,
@@ -447,7 +487,7 @@ export async function POST(request: NextRequest) {
       })()
     );
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, lead_id: insertedLead.id });
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
     console.error("POST /api/business-lead error:", err);

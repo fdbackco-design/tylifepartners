@@ -7,6 +7,7 @@ import * as ReactDOMClient from "react-dom/client";
 import * as ReactJSXRuntime from "react/jsx-runtime";
 import * as LucideReact from "lucide-react";
 import CodeLandingConsultOverlay from "@/app/_components/CodeLandingConsultOverlay";
+import FeedlifeConsultForm from "@/app/_components/FeedlifeConsultForm";
 import LandingAnalyticsTracker from "@/app/_components/LandingAnalyticsTracker";
 import { useMeasuredLandingSections } from "@/app/_components/useMeasuredLandingSections";
 import { trackLeadSubmitEvent } from "@/lib/landing-analytics/client";
@@ -24,6 +25,8 @@ type Props = {
   cssUrl: string | null;
   sections?: ManagedLandingSection[] | null;
   formConfig?: ManagedFormConfig | null;
+  formProfile?: string;
+  disableAnalytics?: boolean;
 };
 
 declare global {
@@ -70,6 +73,8 @@ export default function CodeLandingRuntime({
   cssUrl,
   sections: sectionsFallback,
   formConfig,
+  formProfile,
+  disableAnalytics = false,
 }: Props) {
   const landingKey = landingKeyForManaged(slug);
   const measured = useMeasuredLandingSections(".landing-code");
@@ -84,13 +89,13 @@ export default function CodeLandingRuntime({
   useEffect(() => {
     window.__landingId = id;
     window.__landingGetSubmissionAnalytics = () => getSubmissionAnalyticsPayload();
-    window.__landingTrackLeadSubmit = () => trackLeadSubmitEvent(landingKey);
+    window.__landingTrackLeadSubmit = () => { if (!disableAnalytics) trackLeadSubmitEvent(landingKey); };
     return () => {
       delete window.__landingId;
       delete window.__landingGetSubmissionAnalytics;
       delete window.__landingTrackLeadSubmit;
     };
-  }, [id, landingKey]);
+  }, [id, landingKey, disableAnalytics]);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,10 +140,10 @@ export default function CodeLandingRuntime({
         /* 호스트 하단 CTA와 중복 방지 */
         .landing-code .mobile-sticky-cta { display: none !important; }
       `}</style>
-      {Page ? <LandingAnalyticsTracker landingKey={landingKey} sections={sections} /> : null}
+      {Page && !disableAnalytics ? <LandingAnalyticsTracker landingKey={landingKey} sections={sections} /> : null}
       {error ? <div className="landing-code-error">{error}</div> : null}
       {Page ? <Page /> : null}
-      {Page ? <CodeLandingConsultOverlay id={id} path={path} formConfig={formConfig} /> : null}
+      {Page ? formProfile === "feedlife-v5" ? <FeedlifeConsultForm id={id} path={path} /> : <CodeLandingConsultOverlay id={id} path={path} formConfig={formConfig} /> : null}
     </div>
   );
 }

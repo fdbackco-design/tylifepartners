@@ -167,7 +167,7 @@ export default function AdminLandingsListPage() {
 
     if (createMode === "code") {
       if (!zipFile) {
-        setFormError("React/Next 소스 ZIP 파일을 선택해 주세요.");
+        setFormError("React/Next 또는 FEED LIFE HTML 소스 ZIP 파일을 선택해 주세요.");
         return;
       }
       setCreating(true);
@@ -513,7 +513,7 @@ export default function AdminLandingsListPage() {
       >
         {createMode === "code" ? (
           <CrmAlert tone="info">
-            React/Next 소스 ZIP (`app/page.tsx`, CSS, `public/assets`, lead-form)을 올리면 경로에 배포되고
+            React/Next 소스 ZIP 또는 FEED LIFE v5 HTML ZIP을 올리면 경로에 배포되고
             스크롤 히트맵·상담 CRM이 자동 연결됩니다.
           </CrmAlert>
         ) : null}
@@ -540,7 +540,7 @@ export default function AdminLandingsListPage() {
           </CrmAlert>
         ) : null}
         {createMode === "code" ? (
-          <CrmField label="소스 ZIP" htmlFor="lp-zip" hint="최대 40MB · app/page.tsx 포함">
+          <CrmField label="소스 ZIP" htmlFor="lp-zip" hint="최대 40MB · React 소스 또는 FEED LIFE v5 HTML 전달본">
             <input
               id="lp-zip"
               type="file"

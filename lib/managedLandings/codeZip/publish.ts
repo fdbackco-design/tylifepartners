@@ -1,4 +1,5 @@
 import { detectCodeZipEntries } from "@/lib/managedLandings/codeZip/detect";
+import { prepareHtmlLanding } from "@/lib/managedLandings/codeZip/html";
 import {
   decodeText,
   extractZipToMap,
@@ -90,23 +91,27 @@ export async function publishCodeZip(input: PublishCodeZipInput): Promise<Publis
   }
 
   let files = stripSingleRootFolder(await extractZipToMap(input.zipBytes));
+  const htmlLanding = prepareHtmlLanding(files);
+  if (htmlLanding) files = htmlLanding.files;
   const entries = detectCodeZipEntries(files);
 
   const stamp = Date.now();
   const assetBasePath = `code/${slug}/${stamp}/assets`;
   const uploadedNames = new Set<string>();
 
-  for (const assetKey of entries.assetFiles) {
+  for (let offset = 0; offset < entries.assetFiles.length; offset += 8) {
+   await Promise.all(entries.assetFiles.slice(offset, offset + 8).map(async assetKey => {
     const data = files.get(assetKey);
-    if (!data) continue;
+    if (!data) return;
     // public/assets/foo.webp → foo.webp ; assets/foo → foo ; public/x → x
     let name = assetKey;
     if (name.startsWith("public/assets/")) name = name.slice("public/assets/".length);
     else if (name.startsWith("assets/")) name = name.slice("assets/".length);
     else if (name.startsWith("public/")) name = name.slice("public/".length);
-    if (!name || name.endsWith(".css") || name.endsWith(".tsx") || name.endsWith(".ts")) continue;
+    if (!name || name.endsWith(".css") || name.endsWith(".tsx") || name.endsWith(".ts")) return;
     uploadedNames.add(name);
     await uploadBytes(`${assetBasePath}/${name}`, data, contentTypeFor(name));
+   }));
   }
 
   const supabase = getSupabaseAdmin();
@@ -123,7 +128,7 @@ export async function publishCodeZip(input: PublishCodeZipInput): Promise<Publis
   });
   pageCode = rewriteNextImports(pageCode);
   pageCode = rewriteAssetPaths(pageCode, assetBaseUrl, uploadedNames);
-  const injected = injectAnalyticsSectionAttrs(pageCode);
+  const injected = htmlLanding ? { code: pageCode, markers: htmlLanding.markers } : injectAnalyticsSectionAttrs(pageCode);
   pageCode = injected.code;
 
   const sourceFiles: Record<string, string> = {};
@@ -173,8 +178,9 @@ export async function publishCodeZip(input: PublishCodeZipInput): Promise<Publis
 
   const sections = sectionsFromMarkers(injected.markers);
   const codeMeta = {
+    ...(htmlLanding ? { format: "html" as const, form_profile: htmlLanding.profile } : {}),
     source_zip: input.sourceZipName || "upload.zip",
-    page_file: entries.pageFile,
+    page_file: htmlLanding?.entry ?? entries.pageFile,
     css_file: entries.cssFile,
     lead_form_file: entries.leadFormFile,
     asset_count: uploadedNames.size,
