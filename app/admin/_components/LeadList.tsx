@@ -12,6 +12,7 @@ import type { LeadCategory, LeadRow, LeadStatus, SessionUser } from "@/lib/crm/t
 import { LEAD_STATUSES } from "@/lib/crm/types";
 import type { TodayDbCost } from "@/lib/meta/insights";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
+import ExportOptionsDialog, { downloadExport } from "@/app/admin/_components/crm/ExportOptionsDialog";
 import ColumnFilter from "@/app/admin/_components/crm/ColumnFilter";
 import ColumnFilterSearchableList from "@/app/admin/_components/crm/ColumnFilterSearchableList";
 import DateRangePicker from "@/app/admin/_components/crm/DateRangePicker";
@@ -1107,12 +1108,19 @@ export default function LeadList({
     commentNotifyOnCloseRef.current = false;
   };
 
-  const downloadExcel = () => {
+  const [exportOpen, setExportOpen] = useState(false);
+
+  const downloadExcel = async (input: { excludeClosed: boolean; phonesText: string; file: File | null }) => {
     const sp = new URLSearchParams(query);
     sp.set("format", "xls");
     sp.set("limit", "5000");
     sp.set("offset", "0");
-    window.location.href = `/api/admin/leads/export?${sp.toString()}`;
+    const body = new FormData();
+    body.set("query", sp.toString());
+    if (input.excludeClosed) body.set("exclude_closed_status", "1");
+    body.set("exclude_phones", input.phonesText);
+    if (input.file) body.set("file", input.file);
+    await downloadExport("/api/admin/leads/export", body, "leads.xls");
   };
 
   const managers = staff.filter((s, _, arr) => arr.some((o) => o.parent_id === s.id) || s.parent_id == null);
@@ -1978,7 +1986,7 @@ export default function LeadList({
             </select>
           </label>
           {canExport && (
-            <button type="button" className="crm-btn crm-btn-primary" onClick={downloadExcel}>
+            <button type="button" className="crm-btn crm-btn-primary" onClick={() => setExportOpen(true)}>
               내보내기
             </button>
           )}
@@ -2856,6 +2864,11 @@ export default function LeadList({
           선택한 <strong>{selectedIds.size}</strong>건을 삭제할까요?
         </p>
       </CrmDialog>
+      <ExportOptionsDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        onExport={downloadExcel}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
+import ExportOptionsDialog, { downloadExport } from "@/app/admin/_components/crm/ExportOptionsDialog";
 import ColumnFilterSearchableList from "@/app/admin/_components/crm/ColumnFilterSearchableList";
 import { CrmCheckupToolbarBanner } from "@/app/admin/_components/CrmCheckupReminder";
 import { CrmAlert, CrmButton, CrmDialog } from "@/app/admin/_components/crm/ui";
@@ -844,12 +845,31 @@ export default function Tm001PageClient() {
   };
 
 
+  const [exportOpen, setExportOpen] = useState(false);
   const canAssign = session ? canChangeTm001Assignee(session as SessionUser) : false;
   const canClearAssignee = session?.rank === "admin" || session?.rank === "tm_admin";
   const canUpload = session?.rank === "admin";
   const canDelete = session?.rank === "admin";
   const showAssigneeHistory = session?.rank === "admin" || session?.rank === "tm_admin";
   const showBulkBar = selected.size > 0 && (canAssign || canDelete);
+  const canExport = session?.rank === "admin" || session?.rank === "tm_admin";
+
+  const downloadExcel = async (input: { excludeClosed: boolean; phonesText: string; file: File | null }) => {
+    const sp = new URLSearchParams();
+    if (qDebounced) sp.set("q", qDebounced);
+    if (region) sp.set("region", region);
+    if (status) sp.set("status", status);
+    if (checkupIds.length) sp.set("ids", checkupIds.join(","));
+    if (assigneeFilter === UNASSIGNED_FILTER) sp.set("unassigned", "1");
+    else if (assigneeFilter) sp.set("assignee_id", assigneeFilter);
+    if (assignedDate) sp.set("assigned_date", assignedDate);
+    const body = new FormData();
+    body.set("query", sp.toString());
+    if (input.excludeClosed) body.set("exclude_closed_status", "1");
+    body.set("exclude_phones", input.phonesText);
+    if (input.file) body.set("file", input.file);
+    await downloadExport("/api/admin/tm001/export", body, "tm001.xls");
+  };
 
   return (
     <div>
@@ -884,6 +904,11 @@ export default function Tm001PageClient() {
           <button type="button" className="crm-btn" onClick={() => void load()} disabled={loading}>
             새로고침
           </button>
+          {canExport ? (
+            <button type="button" className="crm-btn crm-btn-primary" onClick={() => setExportOpen(true)}>
+              내보내기
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -1650,6 +1675,12 @@ export default function Tm001PageClient() {
           선택한 <strong>{selected.size}</strong>건을 삭제할까요? 숙박 내역과 배정 이력도 함께 삭제됩니다.
         </p>
       </CrmDialog>
+      <ExportOptionsDialog
+        open={exportOpen}
+        title="TM001 내보내기"
+        onClose={() => setExportOpen(false)}
+        onExport={downloadExcel}
+      />
     </div>
   );
 }
