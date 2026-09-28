@@ -49,7 +49,7 @@ export function phonesFromWorkbook(buffer: Buffer): Set<string> {
 export function mergePhoneSets(...sets: Set<string>[]): Set<string> {
   const out = new Set<string>();
   for (const set of sets) {
-    for (const v of set) out.add(v);
+    set.forEach((v) => out.add(v));
   }
   return out;
 }
