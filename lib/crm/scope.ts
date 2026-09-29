@@ -102,6 +102,19 @@ export function canAccessTm001(session: Pick<SessionUser, "rank">): boolean {
   );
 }
 
+/** TM002 — TM001과 같되 일반 영업자(sales)는 제외 */
+export function canAccessTm002(session: Pick<SessionUser, "rank">): boolean {
+  return session.rank === "admin" || session.rank === "manager" || session.rank === "tm_admin";
+}
+
+// TM002 가시 범위·배정 규칙은 TM001과 동일
+export const tm002VisibleAssigneeIdsFromStaff = tm001VisibleAssigneeIdsFromStaff;
+export const tm002VisibleAssigneeIds = tm001VisibleAssigneeIds;
+export const canAssignTm002To = canAssignTm001To;
+export function canChangeTm002Assignee(session: SessionUser): boolean {
+  return canAccessTm002(session);
+}
+
 export function canEditAdminComment(session: SessionUser): boolean {
   return session.rank === "admin" || session.rank === "manager";
 }
@@ -128,7 +141,7 @@ export function canAccessAdminPath(rank: SessionUser["rank"], pathname: string):
   if (rank === "admin") return true;
 
   if (rank === "tm_admin") {
-    const allowed = ["/admin/tm001", "/admin/calendar", "/admin/password"];
+    const allowed = ["/admin/tm001", "/admin/tm002", "/admin/calendar", "/admin/password"];
     return allowed.some((p) => path === p || path.startsWith(`${p}/`));
   }
 
@@ -139,6 +152,7 @@ export function canAccessAdminPath(rank: SessionUser["rank"], pathname: string):
           "/admin/consumers",
           "/admin/candidates",
           "/admin/tm001",
+          "/admin/tm002",
           "/admin/reassign",
           "/admin/calendar",
           "/admin/resources",

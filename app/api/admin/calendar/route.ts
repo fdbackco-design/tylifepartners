@@ -17,7 +17,7 @@ import {
   type CalendarVisibility,
 } from "@/lib/crm/calendar";
 import { addDaysYmd, kstYmd, startOfKstDayIso } from "@/lib/crm/kst";
-import { visibleAssigneeIds } from "@/lib/crm/scope";
+import { canAccessTm002, visibleAssigneeIds } from "@/lib/crm/scope";
 import { getSession } from "@/lib/adminSession";
 import { listGoogleCalendarEvents } from "@/lib/googleCalendar";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -73,7 +73,8 @@ async function loadStaff(): Promise<StaffLite[]> {
 
 async function fetchLeadMeetings(
   month: string,
-  staffById: Map<string, StaffLite>
+  staffById: Map<string, StaffLite>,
+  includeTm002: boolean
 ): Promise<CalendarEventRow[]> {
   const start = `${month}-01`;
   const nextMonth = `${addDaysYmd(start, 32).slice(0, 7)}-01`;
@@ -131,22 +132,26 @@ async function fetchLeadMeetings(
     });
   };
 
-  const [a, b, c] = await Promise.all([
+  const [a, b, c, d] = await Promise.all([
     fetchTable("leads", "consumers"),
     fetchTable("tylife_b2b", "candidates"),
-    fetchTm001Meetings(staffById, start, nextMonth),
+    fetchTmMeetings("tm001", staffById, start, nextMonth),
+    // TM002는 일반 영업자(sales)에게 노출하지 않는다
+    includeTm002 ? fetchTmMeetings("tm002", staffById, start, nextMonth) : Promise.resolve([]),
   ]);
-  return [...a, ...b, ...c];
+  return [...a, ...b, ...c, ...d];
 }
 
-async function fetchTm001Meetings(
+/** TM001·TM002 재콜 일정 (두 테이블 구조가 같다) */
+async function fetchTmMeetings(
+  kind: "tm001" | "tm002",
   staffById: Map<string, StaffLite>,
   start: string,
   nextMonth: string
 ): Promise<CalendarEventRow[]> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
-    .from("tm001_customers")
+    .from(`${kind}_customers`)
     .select("id, name, phone, status, assignee_id, meeting_at")
     .eq("status", "재콜")
     .gte("meeting_at", startOfKstDayIso(start))
@@ -156,16 +161,16 @@ async function fetchTm001Meetings(
   if (error) {
     // 마이그레이션 전이면 무시
     if (/meeting_at|schema cache|does not exist/i.test(error.message)) return [];
-    console.error("calendar tm001 meetings", error);
+    console.error(`calendar ${kind} meetings`, error);
     return [];
   }
   return (data ?? []).map((r) => {
     const date = r.meeting_at ? kstYmd(new Date(r.meeting_at)) : "";
     const assignee = r.assignee_id ? staffById.get(String(r.assignee_id)) : null;
     return {
-      id: `lead:tm001:${r.id}`,
+      id: `lead:${kind}:${r.id}`,
       title: String(r.name ?? ""),
-      body: `${r.name}\n${r.phone || ""}\n담당: ${assignee?.name || "미배정"}\nTM001 재콜`,
+      body: `${r.name}\n${r.phone || ""}\n담당: ${assignee?.name || "미배정"}\n${kind.toUpperCase()} 재콜`,
       event_date: date,
       event_type: "call" as const,
       all_day: false,
@@ -180,7 +185,7 @@ async function fetchTm001Meetings(
       created_at: "",
       updated_at: "",
       source: "lead_meeting" as const,
-      lead_category: "tm001" as const,
+      lead_category: kind,
       lead_name: String(r.name ?? ""),
       lead_phone: String(r.phone ?? ""),
       assignee_id: r.assignee_id ? String(r.assignee_id) : null,
@@ -250,12 +255,15 @@ export async function GET(request: NextRequest) {
       .filter((ev) => canViewCalendarEvent(session, ev, staff));
   }
 
-  // 대면·통화(리드) / TM001 재콜 — meeting_at 호환. TM 관리자는 TM001만
+  // 대면·통화(리드) / TM001·TM002 재콜 — meeting_at 호환. TM 관리자는 TM 재콜만
   const scoped = tmOnly ? ("all" as const) : await visibleAssigneeIds(session);
   const leadItems = (
     tmOnly
-      ? await fetchTm001Meetings(staffById, start, nextMonth)
-      : await fetchLeadMeetings(month, staffById)
+      ? [
+          ...(await fetchTmMeetings("tm001", staffById, start, nextMonth)),
+          ...(await fetchTmMeetings("tm002", staffById, start, nextMonth)),
+        ]
+      : await fetchLeadMeetings(month, staffById, canAccessTm002(session))
   ).filter((ev) => canViewLeadMeeting(session, ev, scoped));
 
   let items = [...calendarItems, ...leadItems].filter((ev) => typeFilter.includes(ev.event_type));

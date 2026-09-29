@@ -277,8 +277,8 @@ function CalendarPageInner() {
         const phone = String(ev.lead_phone || "").trim();
         if (phone) qs.set("search", phone);
         const href =
-          kind === "tm001"
-            ? `/admin/tm001?${qs.toString()}`
+          kind === "tm001" || kind === "tm002"
+            ? `/admin/${kind}?${qs.toString()}`
             : kind === "candidates"
               ? `/admin/candidates?${qs.toString()}`
               : `/admin/consumers?${qs.toString()}`;
@@ -541,7 +541,7 @@ function CalendarPageInner() {
   }, [tmOnly, rank]);
 
   const typeLabel = useCallback(
-    (t: CalendarEventType) => (tmOnly && t === "call" ? "TM001 재콜" : CALENDAR_EVENT_TYPE_LABELS[t]),
+    (t: CalendarEventType) => (tmOnly && t === "call" ? "TM 재콜" : CALENDAR_EVENT_TYPE_LABELS[t]),
     [tmOnly]
   );
 
@@ -798,8 +798,8 @@ function CalendarPageInner() {
                           <span>
                             {typeLabel(ev.event_type)}
                             {ev.source === "lead_meeting"
-                              ? ev.lead_category === "tm001"
-                                ? " · TM001"
+                              ? ev.lead_category === "tm001" || ev.lead_category === "tm002"
+                                ? ` · ${ev.lead_category.toUpperCase()}`
                                 : " · 고객 DB"
                               : ""}
                             {ev.body ? `\n${ev.body}` : ""}
