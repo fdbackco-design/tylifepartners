@@ -4,6 +4,7 @@ import {
   canAccessAdminPath,
   canAccessCrmLeads,
   canAccessTm001,
+  canAccessTm002,
   canAssignTm001To,
   canChangeTm001Assignee,
   canExportLeads,
@@ -149,5 +150,20 @@ describe("tm001 manager/sales scope", () => {
     assert.equal(canChangeTm001Assignee(sales), true);
     assert.equal(canAssignTm001To(sales, "s1", scoped), true);
     assert.equal(canAssignTm001To(sales, "s2", scoped), false);
+  });
+});
+
+describe("TM002 access", () => {
+  it("allows admin, manager, tm_admin but not sales", () => {
+    assert.equal(canAccessTm002({ rank: "admin" }), true);
+    assert.equal(canAccessTm002({ rank: "manager" }), true);
+    assert.equal(canAccessTm002({ rank: "tm_admin" }), true);
+    assert.equal(canAccessTm002({ rank: "sales" }), false);
+  });
+
+  it("gates the /admin/tm002 path by rank", () => {
+    assert.equal(canAccessAdminPath("tm_admin", "/admin/tm002"), true);
+    assert.equal(canAccessAdminPath("manager", "/admin/tm002"), true);
+    assert.equal(canAccessAdminPath("sales", "/admin/tm002"), false);
   });
 });

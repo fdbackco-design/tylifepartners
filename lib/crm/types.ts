@@ -19,6 +19,7 @@ export const LEAD_STATUSES = [
   "통화약속",
   "대면확정",
   "가입완료",
+  "번호오류",
 ] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 

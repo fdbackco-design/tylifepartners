@@ -1,0 +1,702 @@
+/* TM002 scoped styles — generated from FEED_LIFE_CRM_TM002 demo CSS.
+ * Mount under an element with class `tm002-root`.
+ * Table class is `.tm002-table` (was `.crm-table`) to avoid global CRM conflicts.
+ */
+
+.tm002-root{--ink:#263147;--muted:#778196;--line:#e6e9f1;--bg:#f6f7fb;--purple:#7041bf;--purple-dark:#583098;--lavender:#f2ecfb;--lavender-line:#e1d3f5;--green:#167662;--green-soft:#e9f6f0;--amber:#a36a17;--amber-soft:#fff6e6;--red:#bc4053;--red-soft:#fff0f2;--radius:14px;--shadow:0 4px 18px rgba(38,49,71,.035)}
+.tm002-root, .tm002-root *{box-sizing:border-box}
+.tm002-root{margin:0;background:transparent;color:var(--ink);font:14px/1.55 "Pretendard","Noto Sans CJK KR","Malgun Gothic","Apple SD Gothic Neo",Arial,sans-serif;letter-spacing:-.025em}
+.tm002-root button,.tm002-root input,.tm002-root select,.tm002-root textarea{font:inherit;letter-spacing:inherit}
+.tm002-root button,.tm002-root a,.tm002-root input,.tm002-root select,.tm002-root textarea{-webkit-tap-highlight-color:transparent}
+.tm002-root button{cursor:pointer}
+.tm002-root button:disabled{cursor:not-allowed;opacity:.45}
+.tm002-root button{color:inherit}
+.tm002-root button,.tm002-root a{touch-action:manipulation}
+.tm002-root a{color:var(--purple)}
+.tm002-root button:focus-visible,.tm002-root a:focus-visible,.tm002-root input:focus-visible,.tm002-root select:focus-visible,.tm002-root textarea:focus-visible,.tm002-root summary:focus-visible{outline:3px solid #bda0eb;outline-offset:3px}
+.tm002-root a:hover{text-decoration:underline}
+.tm002-root button{border:0;background:none}
+.tm002-root svg{display:inline-block;vertical-align:middle;flex-shrink:0}
+.tm002-root .icon{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tm002-root .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.tm002-root [hidden]{display:none!important}
+.tm002-root .topbar{height:68px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 32px;gap:26px}
+.tm002-root .brand{display:flex;align-items:center;gap:10px;white-space:nowrap}
+.tm002-root .brand-mark{width:31px;height:31px;display:grid;place-items:center;background:var(--purple);color:#fff;border-radius:9px;font-size:18px;font-weight:900;letter-spacing:-.1em}
+.tm002-root .brand-name{font-weight:850;font-size:17px;letter-spacing:.02em}
+.tm002-root .brand-name span{font-weight:500;color:var(--muted);font-size:12px;letter-spacing:.02em;margin-left:9px}
+.tm002-root .top-divider{height:23px;width:1px;background:var(--line)}
+.tm002-root .breadcrumb{color:var(--muted);font-size:12px;display:flex;gap:12px;align-items:center}
+.tm002-root .breadcrumb b{font-weight:650;color:var(--ink)}
+.tm002-root .demo-label{margin-left:auto;display:flex;align-items:center;gap:7px;border:1px solid var(--lavender-line);border-radius:30px;padding:5px 11px;color:var(--purple);background:#fcfaff;font-size:11px;font-weight:700}
+.tm002-root .dot{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block;flex-shrink:0}
+.tm002-root main{max-width:2100px;margin:0 auto;padding:28px 32px 30px}
+.tm002-root .heading{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:22px}
+.tm002-root .eyebrow{font-size:10px;letter-spacing:.14em;color:var(--purple);font-weight:800;margin:0 0 5px}
+.tm002-root .heading h1{font-size:27px;line-height:1.4;margin:0;font-weight:800;letter-spacing:-.055em}
+.tm002-root .heading .sub{font-size:13px;color:var(--muted);margin:7px 0 0;word-break:keep-all}
+.tm002-root .heading-buttons{display:flex;gap:8px;align-items:center}
+.tm002-root .btn{border:1px solid var(--line);border-radius:8px;background:#fff;padding:9px 13px;font-size:12px;font-weight:650;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;min-height:37px;text-decoration:none}
+.tm002-root .btn:hover{background:#f8f6fd;border-color:#d4c6e9;text-decoration:none}
+.tm002-root .btn.primary{background:var(--purple);color:#fff;border-color:var(--purple)}
+.tm002-root .btn.primary:hover{background:var(--purple-dark)}
+.tm002-root .btn.ghost{background:transparent}
+.tm002-root .btn.small{font-size:11px;padding:6px 9px;min-height:31px}
+.tm002-root .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.tm002-root .kpi{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:17px 20px;box-shadow:var(--shadow);display:flex;gap:18px;align-items:flex-start;min-height:107px}
+.tm002-root .kpi-icon{border-radius:11px;background:#f7f4fc;color:var(--purple);display:grid;place-items:center;width:39px;height:39px;margin-top:4px;flex-shrink:0}
+.tm002-root .kpi-icon .icon{width:21px;height:21px}
+.tm002-root .kpi small{font-size:11px;color:var(--muted);font-weight:600;display:block}
+.tm002-root .kpi .metric{font-size:27px;line-height:1.35;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.05em}
+.tm002-root .kpi .metric .unit{font-size:12px;font-weight:600;color:var(--muted);margin-left:5px}
+.tm002-root .kpi .kpi-note{font-size:11px;color:var(--muted);margin-top:2px}
+.tm002-root .kpi:first-child .metric{color:var(--purple);letter-spacing:.035em}
+.tm002-root .kpi:last-child .kpi-icon{background:var(--green-soft);color:var(--green)}
+.tm002-root .panel{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.tm002-root .panel-tabs{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:0 20px;gap:10px;min-height:56px}
+.tm002-root .tabs{display:flex;gap:24px;align-items:stretch;align-self:stretch}
+.tm002-root .tab{border-bottom:3px solid transparent;margin-bottom:-1px;padding:16px 0 13px;color:var(--muted);font-size:13px;font-weight:700;white-space:nowrap}
+.tm002-root .tab.active{color:var(--purple);border-bottom-color:var(--purple)}
+.tm002-root .tiny-count{background:var(--lavender);color:var(--purple);padding:1px 7px;border-radius:5px;font-size:10px;margin-left:5px}
+.tm002-root .table-hint{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.tm002-root .filters{display:flex;align-items:center;padding:17px 20px;gap:10px;flex-wrap:wrap}
+.tm002-root .search-field{display:flex;align-items:center;gap:9px;border:1px solid #dfe3ed;border-radius:8px;padding:0 12px;width:315px;min-height:38px;color:var(--muted)}
+.tm002-root .search-field input{background:none;border:0;outline:none;width:100%;font-size:12px;min-width:0;padding:9px 0;color:var(--ink)}
+.tm002-root .search-field:focus-within{border-color:#ab8bd7;box-shadow:0 0 0 3px #f2ecfb}
+.tm002-root .search-field input:focus-visible{outline:none}
+.tm002-root .filter-select{background:#fff;border:1px solid #dfe3ed;border-radius:8px;font-size:12px;padding:8px 30px 8px 10px;min-height:38px;color:var(--ink);max-width:180px}
+.tm002-root .filter-reset{font-size:11px;color:var(--muted);padding:7px 5px;text-decoration:underline;text-underline-offset:3px}
+.tm002-root .filter-meta{margin-left:auto;display:flex;align-items:center;gap:10px}
+.tm002-root .filter-meta span{font-size:11px;color:var(--muted)}
+.tm002-root .filter-meta b{color:var(--purple)}
+.tm002-root .selection-button{border-color:#ded1f0;color:var(--purple);background:#fcfaff}
+.tm002-root .region-message{font-size:11px;color:var(--purple);background:#f8f5fc;border-top:1px solid #f0eaf8;padding:8px 20px}
+.tm002-root .table-scroll{overflow-x:auto;scrollbar-width:thin;scrollbar-color:#cfc9dc #f5f4f8;width:100%;position:relative;overscroll-behavior-x:contain}
+.tm002-root .table-scroll.is-scrollable-x{cursor:grab}
+.tm002-root .table-scroll.is-grab-scrolling{cursor:grabbing;user-select:none}
+.tm002-root .table-scroll.is-grab-scrolling *{cursor:grabbing!important;user-select:none!important}
+.tm002-root .tm002-table{border-collapse:separate;border-spacing:0;width:100%;min-width:1817px;table-layout:fixed;font-size:12px}
+.tm002-root .tm002-table th{background:#f8f9fc;color:#727d91;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 12px;text-align:left;line-height:1.3;font-weight:650;font-size:11px;white-space:nowrap}
+.tm002-root .crm-col-filter{position:relative;display:inline-flex;max-width:100%;vertical-align:middle}
+.tm002-root .crm-col-filter-btn{
+  display:inline-flex;align-items:center;gap:4px;max-width:100%;
+  margin:0;padding:2px 4px;border:0;border-radius:6px;background:transparent;
+  color:inherit;font:inherit;font-weight:650;cursor:pointer;line-height:1.3;
+}
+.tm002-root .crm-col-filter-btn:hover,
+.tm002-root .crm-col-filter.is-open .crm-col-filter-btn{background:#efe8f8;color:#5b3d8a}
+.tm002-root .crm-col-filter.is-active .crm-col-filter-btn{background:#efe8f8;color:#5b3d8a}
+.tm002-root .crm-col-filter-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:7.5em}
+.tm002-root .crm-col-filter-caret{font-size:9px;opacity:.75;flex-shrink:0}
+.tm002-root .crm-col-filter-menu{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:40;
+  min-width:168px;max-width:240px;max-height:min(320px,70vh);overflow:auto;
+  padding:8px;border:1px solid #e4e0ec;border-radius:10px;background:#fff;
+  box-shadow:0 10px 28px rgba(40,28,64,.14);
+}
+.tm002-root .crm-col-filter-menu.align-right{left:auto;right:0}
+/* 테이블 overflow에 잘리지 않도록 body 포털 */
+.crm-col-filter-menu-portal{
+  position:fixed;z-index:1200;
+  max-width:min(240px,calc(100vw - 16px));
+  max-height:min(320px,70vh);overflow:auto;
+  padding:8px;border:1px solid #e4e0ec;border-radius:10px;background:#fff;
+  box-shadow:0 10px 28px rgba(40,28,64,.14);
+}
+.crm-col-filter-menu-portal .crm-col-filter-list,
+.crm-col-filter-menu-portal .tm002-col-filter-list{display:grid;gap:2px}
+.crm-col-filter-menu-portal .crm-col-filter-list button,
+.crm-col-filter-menu-portal .tm002-col-filter-list button{
+  display:block;width:100%;text-align:left;border:0;border-radius:7px;
+  background:transparent;padding:8px 10px;font-size:12px;font-weight:600;color:#2f3545;cursor:pointer;
+}
+.crm-col-filter-menu-portal .crm-col-filter-list button:hover,
+.crm-col-filter-menu-portal .tm002-col-filter-list button:hover{background:#f5f2fa}
+.crm-col-filter-menu-portal .crm-col-filter-list button.is-selected,
+.crm-col-filter-menu-portal .tm002-col-filter-list button.is-selected{background:#efe8f8;color:#5b3d8a}
+.crm-col-filter-menu-portal .crm-col-filter-searchable{display:grid;gap:8px;min-width:180px}
+.crm-col-filter-menu-portal .crm-col-filter-search{
+  width:100%;min-height:34px;border:1px solid #dfe3ed;border-radius:8px;
+  padding:6px 8px;font-size:12px;color:#2f3545;background:#fff;box-sizing:border-box;
+}
+.crm-col-filter-menu-portal .crm-col-filter-search:focus{outline:2px solid #c4b5e0;outline-offset:1px}
+.crm-col-filter-menu-portal .crm-col-filter-empty{padding:8px 10px;font-size:12px;color:#727d91}
+.crm-col-filter-menu-portal .crm-col-filter-date,
+.crm-col-filter-menu-portal .tm002-col-filter-date{display:grid;gap:8px;min-width:180px}
+.crm-col-filter-menu-portal .crm-col-filter-date-label,
+.crm-col-filter-menu-portal .tm002-col-filter-date-label{display:grid;gap:6px;font-size:11px;font-weight:650;color:#727d91}
+.crm-col-filter-menu-portal .crm-col-filter-date-input,
+.crm-col-filter-menu-portal .tm002-col-filter-date-input{
+  width:100%;min-height:34px;border:1px solid #dfe3ed;border-radius:8px;
+  padding:6px 8px;font-size:12px;color:#2f3545;background:#fff;box-sizing:border-box;
+}
+.crm-col-filter-menu-portal .crm-col-filter-clear,
+.crm-col-filter-menu-portal .tm002-col-filter-clear{
+  border:0;background:transparent;padding:6px 4px;text-align:left;
+  font-size:11px;font-weight:650;color:#5b3d8a;text-decoration:underline;text-underline-offset:3px;cursor:pointer;
+}
+.tm002-root .crm-col-filter-list,
+.tm002-root .tm002-col-filter-list{display:grid;gap:2px}
+.tm002-root .crm-col-filter-list button,
+.tm002-root .tm002-col-filter-list button{
+  display:block;width:100%;text-align:left;border:0;border-radius:7px;
+  background:transparent;padding:8px 10px;font-size:12px;font-weight:600;color:#2f3545;cursor:pointer;
+}
+.tm002-root .crm-col-filter-list button:hover,
+.tm002-root .tm002-col-filter-list button:hover{background:#f5f2fa}
+.tm002-root .crm-col-filter-list button.is-selected,
+.tm002-root .tm002-col-filter-list button.is-selected{background:#efe8f8;color:#5b3d8a}
+.tm002-root .crm-col-filter-date,
+.tm002-root .tm002-col-filter-date{display:grid;gap:8px;min-width:180px}
+.tm002-root .crm-col-filter-date-label,
+.tm002-root .tm002-col-filter-date-label{display:grid;gap:6px;font-size:11px;font-weight:650;color:#727d91}
+.tm002-root .crm-col-filter-date-input,
+.tm002-root .tm002-col-filter-date-input{
+  width:100%;min-height:34px;border:1px solid #dfe3ed;border-radius:8px;
+  padding:6px 8px;font-size:12px;color:#2f3545;background:#fff;box-sizing:border-box;
+}
+.tm002-root .crm-col-filter-clear,
+.tm002-root .tm002-col-filter-clear{
+  border:0;background:transparent;padding:6px 4px;text-align:left;
+  font-size:11px;font-weight:650;color:#5b3d8a;text-decoration:underline;text-underline-offset:3px;cursor:pointer;
+}
+.tm002-root .tm002-table tr.tm002-empty-row td{
+  padding:36px 16px;
+  text-align:center;
+  color:var(--muted);
+  background:#fff;
+  font-size:13px;
+  line-height:1.6;
+}
+.tm002-root .tm002-table tr.tm002-empty-row td strong{
+  display:block;
+  margin-bottom:4px;
+  color:var(--ink);
+  font-size:14px;
+}
+.tm002-root .tm002-table th.group-head{text-align:center;color:#60547a;background:#f5f1fa;padding:9px 10px;border-left:1px solid #e8e0f1;border-right:1px solid #e8e0f1;letter-spacing:.005em}
+.tm002-root .tm002-table .sub-head th{background:#faf8fd;border-top:0;padding:7px 12px;font-size:10px;color:#81758e}
+.tm002-root .tm002-table td{border-bottom:1px solid var(--line);padding:20px 12px;vertical-align:top;background:#fff}
+.tm002-root .tm002-table tr.contact-row[data-row-status="관심"] td{background:#fff0f5}
+.tm002-root .tm002-table tr.contact-row[data-row-status="재콜"] td{background:#fff8e1}
+.tm002-root .tm002-table tr.contact-row[data-row-status="유효통화"] td{background:#eaf7ef}
+.tm002-root .tm002-table tr.contact-row[data-row-status="거절"] td,
+.tm002-root .tm002-table tr.contact-row[data-row-status="수신거부"] td,
+.tm002-root .tm002-table tr.contact-row[data-row-status="번호오류"] td{background:#f3f4f6}
+.tm002-root .tm002-table tr.contact-row.unassigned td{background:#fffafb}
+.tm002-root .tm002-table tr.contact-row.unassigned[data-row-status="관심"] td{background:#fff0f5}
+.tm002-root .tm002-table tr.contact-row.unassigned[data-row-status="재콜"] td{background:#fff8e1}
+.tm002-root .tm002-table tr.contact-row.unassigned[data-row-status="유효통화"] td{background:#eaf7ef}
+.tm002-root .tm002-table tr.contact-row.unassigned[data-row-status="거절"] td,
+.tm002-root .tm002-table tr.contact-row.unassigned[data-row-status="수신거부"] td,
+.tm002-root .tm002-table tr.contact-row.unassigned[data-row-status="번호오류"] td{background:#f3f4f6}
+.tm002-root .tm002-table tr.contact-row.is-complete td{background:#fbfefd}
+.tm002-root .tm002-table tr.contact-row.selected td{background:#f9f5ff}
+.tm002-root .tm002-table tr:last-child td{border-bottom:0}
+.tm002-root .tm002-table .check-cell{padding-left:14px;padding-right:8px;text-align:center}
+.tm002-root .tm002-table .classification{padding:0;border-left:1px solid var(--line);border-right:1px solid var(--line)}
+.tm002-root .tm002-table .pin-check{position:sticky;left:0;z-index:2}
+.tm002-root .tm002-table .pin-partner{position:sticky;left:var(--pin-partner-left,39px);z-index:2}
+.tm002-root .tm002-table .pin-batch{position:sticky;left:var(--pin-batch-left,170px);z-index:2}
+.tm002-root .tm002-table .pin-customer{position:sticky;left:var(--pin-customer-left,240px);z-index:2;border-right:1px solid var(--line)}
+.tm002-root .tm002-table th.pin-check,.tm002-root .tm002-table th.pin-partner,.tm002-root .tm002-table th.pin-batch,.tm002-root .tm002-table th.pin-customer{z-index:3}
+.tm002-root .tm002-table .memo-cell,
+.tm002-root .tm002-table .comment-cell{overflow:hidden;max-width:160px;width:160px}
+.tm002-root .tm002-table .memo-col,
+.tm002-root .tm002-table .comment-col{width:160px}
+.tm002-root input[type=checkbox]{appearance:none;width:14px;height:14px;border:1px solid #bec5d2;border-radius:3px;background:#fff;vertical-align:middle;margin:1px 0 0;cursor:pointer;display:inline-grid;place-content:center}
+.tm002-root input[type=checkbox]:checked{background:var(--purple);border-color:var(--purple)}
+.tm002-root input[type=checkbox]:checked:after{content:"";width:7px;height:4px;border-left:1.5px solid white;border-bottom:1.5px solid white;transform:rotate(-45deg);margin-top:-2px}
+.tm002-root input[type=checkbox]:indeterminate{background:var(--purple);border-color:var(--purple)}
+.tm002-root input[type=checkbox]:indeterminate:after{content:"";width:7px;height:1.5px;background:white}
+.tm002-root .partner-name{font-size:12px;font-weight:750;white-space:nowrap;display:block;margin:0 0 5px}
+.tm002-root .code-badge{color:#8a799d;background:#f3eef8;border:1px solid #e8dff1;border-radius:5px;padding:2px 6px;font-size:10px;display:inline-flex}
+.tm002-root .batch-badge{font-variant-numeric:tabular-nums;font-size:12px;font-weight:800;letter-spacing:.065em;display:inline-flex;border-radius:6px;background:var(--lavender);color:var(--purple);padding:4px 9px}
+.tm002-root .customer-name{font-size:14px;font-weight:800;display:block;color:var(--ink);padding:0;margin:-2px 0 4px;text-align:left;line-height:1.35;overflow-wrap:anywhere}
+.tm002-root .customer-name:hover{color:var(--purple)}
+.tm002-root .customer-name-alt{font-weight:600;font-size:11px;color:#7a8699}
+.tm002-root .phone-wrap{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.tm002-root .phone{font-size:11px;color:#63718b;letter-spacing:.005em;font-variant-numeric:tabular-nums}
+.tm002-root .copy-btn{color:#95a0b2;padding:3px;border-radius:4px;line-height:1}
+.tm002-root .copy-btn:hover{color:var(--purple);background:var(--lavender)}
+.tm002-root .copy-btn .icon{width:12px;height:12px}
+.tm002-root .merge-badge{font-size:10px;background:var(--lavender);color:var(--purple);display:inline-flex;align-items:center;gap:4px;border-radius:5px;padding:3px 6px;margin-top:12px;line-height:1.4}
+.tm002-root .merge-badge.simple{background:#f0f3f7;color:#778499}
+.tm002-root .raw-link{display:block;color:#9098a8;font-size:10px;padding:0;text-align:left;margin-top:9px;text-decoration:underline;text-underline-offset:3px}
+.tm002-root .stays-list{width:100%}
+.tm002-root .stay-row{display:grid;grid-template-columns:var(--stay-region-width,65px) var(--stay-detail-width,118px) minmax(0,1fr);min-height:63px;border-bottom:1px solid #edf0f5;align-items:center;background:#fff}
+.tm002-root .stay-row:last-child{border-bottom:0}
+.tm002-root .stay-row.region-match{background:#faf6ff}
+.tm002-root .stay-cell{padding:11px 12px;min-width:0;font-size:11px}
+.tm002-root .stay-region{font-weight:750;color:#646881}
+.tm002-root .stay-detail{line-height:1.55;color:#626e81;word-break:keep-all}
+.tm002-root .hotel-title{display:inline-flex;align-items:center;gap:5px;font-weight:750;color:var(--purple);font-size:12px;text-decoration:none;line-height:1.45;text-align:left;padding:0}
+.tm002-root .hotel-title .icon{width:12px;height:12px;opacity:.7}
+.tm002-root .hotel-title:hover{text-decoration:underline;text-underline-offset:3px}
+.tm002-root .hotel-meta{font-size:10px;color:#8c95a4;margin-top:3px;display:flex;gap:4px;flex-wrap:wrap;line-height:1.45}
+.tm002-root .review-badge{display:inline-flex;align-items:center;gap:3px;border-radius:4px;color:var(--amber);font-size:9px;background:var(--amber-soft);padding:2px 4px;margin-top:5px;font-weight:650}
+.tm002-root .review-badge .icon{width:11px;height:11px}
+.tm002-root .single-stay .stay-row{min-height:142px}
+.tm002-root .state-pill{display:inline-flex;align-items:center;gap:5px;border-radius:5px;font-weight:700;font-size:10px;padding:4px 6px;line-height:1.5;white-space:nowrap}
+.tm002-root .state-pill.warn{color:var(--red);background:#ffeef1}
+.tm002-root .state-pill.done{color:var(--green);background:var(--green-soft)}
+.tm002-root .assignee{width:100%;border:1px solid #e0e4ed;display:flex;justify-content:space-between;align-items:center;gap:6px;padding:8px 10px;border-radius:7px;background:white;min-height:35px;font-size:11px;font-weight:600;text-align:left}
+.tm002-root .assignee span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tm002-root .assignee .icon{width:12px;height:12px;color:#9aa4b4}
+.tm002-root .assignee:hover{border-color:#b89bdb}
+.tm002-root .date-value{font-size:10px;color:#7b879a;line-height:1.8;font-variant-numeric:tabular-nums;letter-spacing:0}
+.tm002-root .date-value small{font-size:10px;display:block;color:#a0a8b6}
+.tm002-root .muted-value{font-size:11px;color:#a0a8b6;line-height:1.6}
+.tm002-root .status-select{width:100%;min-height:35px;border:1px solid #dee3ed;border-radius:7px;background:#fff;font-size:11px;padding:7px 25px 7px 8px;appearance:auto;color:#63718b;font-weight:650;box-sizing:border-box;max-width:100%}
+.tm002-root .status-select[data-status="관심"],.tm002-root .status-select[data-status="유효통화"]{background:#f7f4fc;border-color:#e0d6ef;color:var(--purple)}
+.tm002-root .status-select[data-status="재콜"]{background:var(--amber-soft);border-color:#f0ddb7;color:var(--amber)}
+.tm002-root .status-select[data-status="계약완료"]{background:var(--green-soft);border-color:#bedfd0;color:var(--green)}
+.tm002-root .status-select[data-status="수신거부"],.tm002-root .status-select[data-status="번호오류"]{background:var(--red-soft);border-color:#eec9d0;color:var(--red)}
+.tm002-root .status-cell{position:relative;min-width:0;max-width:100%;overflow:hidden;display:flex;flex-direction:column;gap:6px}
+.tm002-root .status-cell.is-saving .status-select{opacity:.65}
+.tm002-root .status-meeting{width:100%;max-width:100%;min-width:0;min-height:35px;border:1px solid #f0ddb7;border-radius:7px;background:var(--amber-soft);font-size:10px;padding:6px 6px;appearance:auto;color:var(--amber);font-weight:650;box-sizing:border-box;display:block}
+.tm002-root .tm002-table td.status-col{overflow:hidden}
+.tm002-root .tm002-table th.status-col{overflow:visible}
+.tm002-root .row-saving{display:block;margin-top:6px;font-size:10px;font-weight:700;color:var(--purple)}
+.tm002-root .tm002-table tr.contact-row.is-saving td{background:#faf8ff}
+.tm002-root .tm002-table tr.contact-row.is-saving[data-row-status="관심"] td{background:#fff0f5}
+.tm002-root .tm002-table tr.contact-row.is-saving[data-row-status="재콜"] td{background:#fff8e1}
+.tm002-root .tm002-table tr.contact-row.is-saving[data-row-status="유효통화"] td{background:#eaf7ef}
+.tm002-root .tm002-table tr.contact-row.is-saving[data-row-status="거절"] td,
+.tm002-root .tm002-table tr.contact-row.is-saving[data-row-status="수신거부"] td,
+.tm002-root .tm002-table tr.contact-row.is-saving[data-row-status="번호오류"] td{background:#f3f4f6}
+.tm002-root .mobile-card.is-saving{outline:2px solid #e4d7f5;outline-offset:-2px}
+.tm002-root .mobile-card[data-row-status="관심"]{background:#fff0f5}
+.tm002-root .mobile-card[data-row-status="재콜"]{background:#fff8e1}
+.tm002-root .mobile-card[data-row-status="유효통화"]{background:#eaf7ef}
+.tm002-root .mobile-card[data-row-status="거절"],
+.tm002-root .mobile-card[data-row-status="수신거부"],
+.tm002-root .mobile-card[data-row-status="번호오류"]{background:#f3f4f6}
+.tm002-root .mobile-card[data-row-status="관심"] .m-head,
+.tm002-root .mobile-card[data-row-status="재콜"] .m-head,
+.tm002-root .mobile-card[data-row-status="유효통화"] .m-head,
+.tm002-root .mobile-card[data-row-status="거절"] .m-head,
+.tm002-root .mobile-card[data-row-status="수신거부"] .m-head,
+.tm002-root .mobile-card[data-row-status="번호오류"] .m-head{background:transparent}
+.tm002-root .tm002-table tr.contact-row[data-row-status="관심"] .stay-toggle,
+.tm002-root .tm002-table tr.contact-row[data-row-status="재콜"] .stay-toggle,
+.tm002-root .tm002-table tr.contact-row[data-row-status="유효통화"] .stay-toggle,
+.tm002-root .tm002-table tr.contact-row[data-row-status="거절"] .stay-toggle,
+.tm002-root .tm002-table tr.contact-row[data-row-status="수신거부"] .stay-toggle,
+.tm002-root .tm002-table tr.contact-row[data-row-status="번호오류"] .stay-toggle,
+.tm002-root .tm002-table tr.contact-row[data-row-status="관심"] .stay-row,
+.tm002-root .tm002-table tr.contact-row[data-row-status="재콜"] .stay-row,
+.tm002-root .tm002-table tr.contact-row[data-row-status="유효통화"] .stay-row,
+.tm002-root .tm002-table tr.contact-row[data-row-status="거절"] .stay-row,
+.tm002-root .tm002-table tr.contact-row[data-row-status="수신거부"] .stay-row,
+.tm002-root .tm002-table tr.contact-row[data-row-status="번호오류"] .stay-row,
+.tm002-root .mobile-card[data-row-status="관심"] .stay-toggle,
+.tm002-root .mobile-card[data-row-status="재콜"] .stay-toggle,
+.tm002-root .mobile-card[data-row-status="유효통화"] .stay-toggle,
+.tm002-root .mobile-card[data-row-status="거절"] .stay-toggle,
+.tm002-root .mobile-card[data-row-status="수신거부"] .stay-toggle,
+.tm002-root .mobile-card[data-row-status="번호오류"] .stay-toggle,
+.tm002-root .mobile-card[data-row-status="관심"] .stay-row,
+.tm002-root .mobile-card[data-row-status="재콜"] .stay-row,
+.tm002-root .mobile-card[data-row-status="유효통화"] .stay-row,
+.tm002-root .mobile-card[data-row-status="거절"] .stay-row,
+.tm002-root .mobile-card[data-row-status="수신거부"] .stay-row,
+.tm002-root .mobile-card[data-row-status="번호오류"] .stay-row{background:transparent}
+.tm002-root .product-field{margin-top:9px;border-top:1px dashed #d5e5dc;padding-top:9px}
+.tm002-root .product-field label{font-size:10px;font-weight:650;display:block;margin-bottom:4px;color:#457566}
+.tm002-root .product-field label span{color:var(--red)}
+.tm002-root .product-select{width:100%;font-size:11px;padding:7px 5px;background:#fff;border:1px solid #c9dfd3;border-radius:6px;min-height:33px;max-width:100%}
+.tm002-root .product-note{font-size:9px;color:var(--amber);margin-top:5px;line-height:1.5}
+.tm002-root .product-note.complete{color:var(--green)}
+.tm002-root .status-warning{color:var(--red);font-size:10px;display:block;margin-top:7px}
+.tm002-root .note-button{position:relative;padding:0;text-align:left;display:block;width:100%;max-width:100%;font-size:11px;color:#98a1b1;line-height:1.6;overflow:hidden;min-width:0}
+.tm002-root .note-button:hover{color:var(--purple)}
+.tm002-root .note-button.has-text{color:#59677f}
+.tm002-root .note-button.has-unread{padding-left:10px}
+.tm002-root .note-button.has-unread::before{
+  content:"";position:absolute;top:2px;left:0;width:6px;height:6px;border-radius:50%;
+  background:#e11d48;box-shadow:0 0 0 1px #fff;z-index:1;
+}
+.tm002-root .note-content{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%}
+.tm002-root .note-action{display:flex;align-items:center;gap:3px;font-size:10px;color:#a2a8b6;margin-top:6px}
+.tm002-root .note-action .icon{width:11px;height:11px}
+.tm002-root .comment-time{display:block;color:#a2a8b6;font-size:9px;margin-bottom:4px;line-height:1.5}
+.tm002-root .comment-more{display:inline-block;margin-top:5px;font-size:9px;padding:1px 5px;background:#f2edf9;color:var(--purple);border-radius:4px}
+.tm002-root .table-footer{border-top:1px solid var(--line);padding:13px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted)}
+.tm002-root .table-footer b{color:var(--ink)}
+.tm002-root .legend{display:flex;align-items:center;gap:6px;font-size:10px}
+.tm002-root .legend-dot{height:7px;width:7px;border-radius:50%;background:#edb9c2}
+.tm002-root .flow-note{display:flex;gap:12px;align-items:center;margin-top:16px;padding:14px 17px;background:#f0ebf8;border:1px solid #e4daf1;border-radius:10px;color:#6d6080;font-size:12px}
+.tm002-root .flow-note>.icon{color:var(--purple);width:19px;height:19px}
+.tm002-root .flow-note b{color:#5d3c88}
+.tm002-root .flow-note .flow-steps{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tm002-root .inline-tag{display:inline-block;background:white;color:#6b518f;padding:3px 8px;border-radius:5px;border:1px solid #e1d6ef;font-size:10px}
+.tm002-root .flow-note .detail{margin-left:auto;font-size:10px;white-space:nowrap;color:#897a9b}
+.tm002-root .bottom-note{font-size:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:#929aad;margin-top:16px}
+.tm002-root .bottom-note b{font-weight:650;color:#798396}
+.tm002-root .empty-cell{background:#fff!important;padding:42px 15px!important;text-align:center!important}
+.tm002-root .empty-title{font-size:14px;font-weight:700;color:#59677f}
+.tm002-root .empty-message{font-size:12px;color:var(--muted);margin:6px 0 15px}
+.tm002-root .guide{padding:26px 28px 30px;max-width:1200px}
+.tm002-root .guide h2{margin:0 0 6px;font-size:21px;letter-spacing:-.045em}
+.tm002-root .guide>.lead{margin:0 0 23px;color:var(--muted);font-size:12px}
+.tm002-root .guide-section{margin-top:26px}
+.tm002-root .guide h3{font-size:14px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.tm002-root .guide h3 .n{width:22px;height:22px;display:grid;place-items:center;border-radius:6px;background:var(--lavender);color:var(--purple);font-size:10px}
+.tm002-root .field-flow{display:flex;gap:7px;align-items:center;flex-wrap:wrap;font-size:11px;color:#adabb6;line-height:2.4}
+.tm002-root .field-flow span{border:1px solid var(--line);border-radius:6px;padding:1px 9px;color:#5a657b;background:#fafbfd}
+.tm002-root .field-flow .new{border-color:#e0d2ef;color:var(--purple);background:#f8f4fc}
+.tm002-root .guide-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tm002-root .guide-box{background:#fafbfe;border:1px solid var(--line);border-radius:9px;padding:16px}
+.tm002-root .guide-box h4{font-size:12px;margin:0 0 7px;color:#4f5d76}
+.tm002-root .guide-box p{font-size:12px;margin:5px 0;color:#798397;line-height:1.8}
+.tm002-root .guide-box b{color:#576580}
+.tm002-root .guide-statuses{display:flex;gap:6px;flex-wrap:wrap}
+.tm002-root .guide-statuses span{border:1px solid var(--line);background:#fff;border-radius:6px;font-size:11px;padding:5px 9px}
+.tm002-root .guide-statuses .end{background:var(--green-soft);color:var(--green);border-color:#c9e4d7}
+.tm002-root .rule-table{border-collapse:collapse;width:100%;font-size:12px}
+.tm002-root .rule-table th,.tm002-root .rule-table td{padding:12px 13px;border:1px solid var(--line);text-align:left;vertical-align:top}
+.tm002-root .rule-table th{width:160px;background:#f8f9fc;font-weight:650;color:#6a7487}
+.tm002-root .rule-table td{color:#65718a;line-height:1.8}
+.tm002-root .sources{font-size:11px;color:#8290a2;line-height:2}
+.tm002-root .sources a{margin-right:14px;color:#706285}
+.tm002-root .warning-box{border:1px solid #efdcb9;background:#fffbf3;padding:15px 17px;border-radius:9px;font-size:12px;color:#947037;line-height:1.9}
+.tm002-root .warning-box b{color:#826025}
+.tm002-root .mobile-list{display:none}
+.tm002-root .modal{padding:0;border:1px solid var(--line);border-radius:16px;width:560px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 48px);box-shadow:0 24px 85px rgba(29,20,48,.19);color:var(--ink);background:#fff}
+.tm002-root .modal.wide{width:1020px}
+.tm002-root .modal::backdrop{background:rgba(28,25,43,.33);backdrop-filter:blur(3px)}
+.tm002-root .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:22px 24px 17px;border-bottom:1px solid var(--line)}
+.tm002-root .modal-head h2{font-size:19px;margin:2px 0 4px}
+.tm002-root .modal-head p{font-size:12px;color:var(--muted);margin:0}
+.tm002-root .close-button{padding:6px;border-radius:6px;color:#8792a5;line-height:1;flex-shrink:0}
+.tm002-root .close-button:hover{background:#f4f1f8}
+.tm002-root .modal-body{padding:21px 24px 24px}
+.tm002-root .modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+.tm002-root .field-label{font-weight:650;font-size:12px;display:block;margin-bottom:7px}
+.tm002-root .form-input,.tm002-root .form-textarea{border:1px solid #d9deea;border-radius:8px;padding:11px 12px;background:white;color:var(--ink);width:100%;font-size:13px}
+.tm002-root .form-textarea{resize:vertical;min-height:125px;line-height:1.8}
+.tm002-root .helper{font-size:11px;color:var(--muted);margin:8px 0 0;line-height:1.7}
+.tm002-root .helper.important{color:var(--amber)}
+.tm002-root .modal-customer{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f7f5fc;border:1px solid #e8e0f4;border-radius:8px;padding:11px 12px;margin-bottom:17px;font-size:12px}
+.tm002-root .modal-customer b{color:#62448c}
+.tm002-root .count-label{text-align:right;color:#a0a8b6;font-size:10px}
+.tm002-root .comment-history{display:flex;flex-direction:column;gap:11px;max-height:220px;overflow-y:auto;margin-bottom:20px;padding-right:3px}
+.tm002-root .comment-item{padding:12px 13px;background:#f9fafc;border:1px solid #e9ecf3;border-radius:8px}
+.tm002-root .comment-item small{display:block;color:#919bad;font-size:10px;margin-bottom:5px}
+.tm002-root .comment-item p{font-size:12px;margin:0;color:#606d84;white-space:pre-wrap;overflow-wrap:anywhere}
+.tm002-root .empty-comments{font-size:12px;color:#a0a8b6;background:#fafbfc;border:1px dashed #e0e4eb;padding:17px;text-align:center;border-radius:8px}
+.tm002-root .raw-table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;margin-top:16px}
+.tm002-root .raw-table{width:100%;min-width:880px;border-collapse:collapse;font-size:11px}
+.tm002-root .raw-table th{padding:10px;background:#f6f7fb;white-space:nowrap;text-align:left;color:#6d778c;border-bottom:1px solid var(--line)}
+.tm002-root .raw-table td{padding:12px 10px;border-bottom:1px solid #edf0f5;color:#627189;vertical-align:top}
+.tm002-root .raw-table tr:last-child td{border-bottom:0}
+.tm002-root .raw-table td:first-child{min-width:175px}
+.tm002-root .raw-table td:nth-child(3){white-space:nowrap;letter-spacing:0}
+.tm002-root .link-card{display:block;text-decoration:none;border:1px solid #e3dbed;border-radius:9px;padding:14px 15px;margin-top:11px;background:#fcfaff}
+.tm002-root .link-card b{font-size:12px;color:#684789;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.tm002-root .link-card span{font-size:11px;color:#90829d;display:block;margin-top:5px}
+.tm002-root .link-card:hover{background:#f6f0fc;text-decoration:none}
+.tm002-root .toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,12px);background:#30253f;color:#fff;padding:12px 18px;border-radius:9px;font-size:12px;box-shadow:0 8px 30px #281c4133;opacity:0;transition:.18s;pointer-events:none;max-width:calc(100vw - 30px);z-index:100;text-align:center;white-space:normal}
+.tm002-root .toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(min-width:1850px){
+.tm002-root .tm002-table col.customer-col{width:166px!important}
+.tm002-root .tm002-table col.hotel-col{width:230px!important}
+.tm002-root .stay-row{grid-template-columns:var(--stay-region-width,65px) var(--stay-detail-width,118px) minmax(0,1fr)}
+}
+
+@media(max-width:1450px){
+.tm002-root .topbar{padding:0 24px}
+.tm002-root main{padding:24px}
+.tm002-root .kpi{padding:15px 16px;gap:13px}
+.tm002-root .filters{gap:8px}
+.tm002-root .filter-meta{gap:8px}
+.tm002-root .search-field{width:285px}
+.tm002-root .flow-note .detail{display:none}
+}
+
+@media(max-width:1050px){
+.tm002-root .filter-meta{margin-left:0}
+.tm002-root .filters{gap:8px}
+.tm002-root .table-hint{display:none}
+.tm002-root .guide-grid{grid-template-columns:1fr}
+.tm002-root .kpi{gap:10px}
+.tm002-root .kpi-icon{display:none}
+.tm002-root .heading .sub{font-size:12px}
+.tm002-root .heading h1{font-size:24px}
+.tm002-root .top-divider,.tm002-root .breadcrumb{display:none}
+.tm002-root .flow-note{align-items:flex-start}
+.tm002-root .guide{padding:22px}
+}
+
+@media(max-width:760px){
+.tm002-root .topbar{height:59px;padding:0 17px;gap:8px}
+.tm002-root .brand-name{font-size:15px}
+.tm002-root .brand-name span{display:none}
+.tm002-root .brand-mark{width:28px;height:28px;border-radius:8px;font-size:16px}
+.tm002-root .demo-label{font-size:9px;padding:4px 7px;gap:4px}
+.tm002-root .demo-label .demo-extra{display:none}
+.tm002-root main{padding:20px 14px 26px}
+.tm002-root .heading{display:block;margin-bottom:18px}
+.tm002-root .heading h1{font-size:25px}
+.tm002-root .heading .sub{font-size:12px;max-width:320px;line-height:1.8;margin-top:5px}
+.tm002-root .heading-buttons{margin-top:13px}
+.tm002-root .heading-buttons .btn{font-size:11px;min-height:34px;padding:7px 10px}
+.tm002-root .eyebrow{font-size:9px}
+.tm002-root .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:17px}
+.tm002-root .kpi{padding:13px 14px;min-height:104px}
+.tm002-root .kpi .metric{font-size:24px}
+.tm002-root .kpi small{font-size:10px}
+.tm002-root .kpi .kpi-note{font-size:9px}
+.tm002-root .panel-tabs{padding:0 14px;min-height:50px}
+.tm002-root .tabs{gap:22px}
+.tm002-root .tab{font-size:12px;padding:14px 0 12px}
+.tm002-root .filters{padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tm002-root .search-field{grid-column:1/-1;width:100%}
+.tm002-root .filter-select{width:100%;max-width:100%;font-size:11px}
+.tm002-root .filter-reset{justify-self:start}
+.tm002-root .filter-meta{justify-self:end;gap:6px}
+.tm002-root .filter-meta>span{display:none}
+.tm002-root .filter-meta .btn{min-height:32px;font-size:10px}
+.tm002-root .region-message{font-size:10px;padding:8px 14px}
+.tm002-root .table-scroll{display:none}
+.tm002-root .mobile-list{display:flex;flex-direction:column;gap:12px;padding:0 12px 14px;background:#fff}
+.tm002-root .mobile-card{border:1px solid #e4e3ec;border-radius:10px;overflow:hidden}
+.tm002-root .mobile-card.selected{border-color:#b99bdf;box-shadow:0 0 0 2px #f0e8fa}
+.tm002-root .m-head{display:flex;align-items:flex-start;justify-content:space-between;gap:9px;padding:15px 13px;background:#fcf9fe;border-bottom:1px solid #ebe5f3}
+.tm002-root .m-head-left{display:flex;gap:10px;align-items:flex-start}
+.tm002-root .m-head input{margin-top:5px}
+.tm002-root .m-head .customer-name{font-size:14px}
+.tm002-root .m-head .phone{font-size:11px}
+.tm002-root .m-head .merge-badge{margin-top:7px}
+.tm002-root .m-code{font-size:9px;color:#9682ae;margin-top:5px;text-align:right}
+.tm002-root .m-partner{font-size:10px;font-weight:650;color:#756484;margin-top:5px;text-align:right}
+.tm002-root .m-stay-head{display:grid;grid-template-columns:49px 96px minmax(0,1fr);background:#fafbfe;border-bottom:1px solid var(--line);font-size:9px;color:#929aac}
+.tm002-root .m-stay-head span{padding:8px 10px}
+.tm002-root .mobile-card .stay-row{grid-template-columns:49px 96px minmax(0,1fr);min-height:67px}
+.tm002-root .mobile-card .stay-cell{padding:10px; font-size:10px}
+.tm002-root .mobile-card .hotel-title{font-size:11px;gap:3px}
+.tm002-root .mobile-card .hotel-title .icon{width:10px;height:10px}
+.tm002-root .mobile-card .hotel-meta{font-size:9px;gap:2px}
+.tm002-root .mobile-card .review-badge{font-size:8px;padding:2px 3px}
+.tm002-root .m-control-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;padding:14px 13px;border-top:1px solid var(--line)}
+.tm002-root .m-label{font-size:9px;color:#929aaa;display:block;margin-bottom:6px}
+.tm002-root .m-admin{padding:0 13px 13px;font-size:10px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tm002-root .m-admin .date-value{font-size:9px;line-height:1.5}
+.tm002-root .m-admin .date-value small{font-size:9px}
+.tm002-root .m-notes{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:13px;border-top:1px solid var(--line);background:#fcfcfe}
+.tm002-root .m-notes .note-button{font-size:10px}
+.tm002-root .m-notes .note-content{-webkit-line-clamp:3}
+.tm002-root .table-footer{font-size:10px;padding:12px 14px;align-items:flex-start}
+.tm002-root .legend{font-size:9px;max-width:130px;line-height:1.6}
+.tm002-root .flow-note{padding:13px 12px;font-size:11px;margin-top:13px;gap:8px}
+.tm002-root .flow-note>.icon{width:17px;height:17px;margin-top:2px}
+.tm002-root .inline-tag{font-size:9px;padding:2px 5px}
+.tm002-root .bottom-note{display:block;line-height:1.9;font-size:9px}
+.tm002-root .bottom-note span{display:block}
+.tm002-root .guide{padding:21px 15px}
+.tm002-root .guide h2{font-size:20px}
+.tm002-root .guide h3{font-size:13px}
+.tm002-root .guide>.lead{font-size:11px}
+.tm002-root .guide-box{padding:13px}
+.tm002-root .guide-box p{font-size:11px}
+.tm002-root .rule-table th{width:87px;font-size:10px;padding:9px}
+.tm002-root .rule-table td{font-size:11px;padding:9px}
+.tm002-root .warning-box{font-size:11px;padding:13px}
+.tm002-root .field-flow{gap:4px;font-size:10px}
+.tm002-root .field-flow span{padding:0 5px}
+.tm002-root .sources a{display:block}
+.tm002-root .modal-head{padding:19px 18px 15px}
+.tm002-root .modal-body{padding:19px 18px 20px}
+.tm002-root .modal-head h2{font-size:18px}
+.tm002-root .modal-head p{font-size:11px}
+.tm002-root .modal-customer{font-size:11px;display:block}
+.tm002-root .modal-customer span{display:block;margin-top:3px}
+.tm002-root .form-input,.tm002-root .form-textarea{font-size:14px}
+.tm002-root .mobile-empty{padding:28px 10px;text-align:center}
+.tm002-root .toast{font-size:11px;bottom:16px;width:max-content}
+.tm002-root .single-stay .stay-row{min-height:95px}
+}
+
+@media(prefers-reduced-motion:reduce){
+.tm002-root, .tm002-root *{scroll-behavior:auto!important;transition:none!important}
+}
+
+@media print{
+.tm002-root .topbar,.tm002-root .heading-buttons,.tm002-root .filters,.tm002-root .tabs,.tm002-root .table-hint,.tm002-root .selection-button,.tm002-root .flow-note,.tm002-root .bottom-note,.tm002-root dialog,.tm002-root .toast,.tm002-root .copy-btn,.tm002-root .raw-link{display:none!important}
+.tm002-root main{padding:0}
+.tm002-root .kpis{margin-bottom:10px}
+.tm002-root .panel-tabs{display:none}
+.tm002-root .table-scroll{display:block;overflow:visible}
+.tm002-root .mobile-list{display:none!important}
+.tm002-root .tm002-table{min-width:0;font-size:8px}
+.tm002-root .tm002-table td,.tm002-root .tm002-table th{padding:5px;font-size:8px}
+.tm002-root .tm002-table [class*=pin-]{position:static}
+.tm002-root .stay-row{grid-template-columns:35px 58px minmax(0,1fr);min-height:50px}
+.tm002-root .stay-cell{padding:5px;font-size:8px}
+.tm002-root .hotel-title{font-size:8px}
+.tm002-root .hotel-meta{font-size:7px}
+.tm002-root .status-select,.tm002-root .status-meeting,.tm002-root .assignee{padding:4px;font-size:8px}
+.tm002-root .partner-name,.tm002-root .customer-name{font-size:9px}
+.tm002-root .phone{font-size:8px}
+.tm002-root .state-pill{font-size:7px;white-space:normal}
+.tm002-root .kpi{box-shadow:none}
+.tm002-root .heading h1{font-size:23px}
+.tm002-root .panel{box-shadow:none;border-radius:0}
+.tm002-root .note-action{display:none}
+.tm002-root .tm002-table col{width:auto!important}
+@page{size:A3 landscape;margin:12mm}
+}
+
+/* Customer-level disclosure controls. Existing lodging columns retain their alignment. */
+.tm002-root .tm002-table th.stays-group-head{padding:0}
+.tm002-root .stay-group-toggle{display:flex;align-items:center;justify-content:center;gap:13px;width:100%;padding:9px 10px;font-size:11px;font-weight:650;color:#60547a;min-height:34px;white-space:nowrap}
+.tm002-root .stay-group-toggle:hover{background:#ece4f6}
+.tm002-root .stay-group-toggle:focus-visible{outline-offset:-3px;border-radius:4px}
+.tm002-root .stay-group-control{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:650;color:var(--purple)}
+.tm002-root .stay-group-chevron{display:inline-flex;transition:transform .18s ease}
+.tm002-root .stay-group-chevron .icon{width:13px;height:13px}
+.tm002-root .stay-group-toggle[aria-expanded="true"] .stay-group-chevron{transform:rotate(180deg)}
+.tm002-root .stay-accordion{width:100%}
+.tm002-root .stay-toggle{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:96px;padding:16px 14px;text-align:left;background:#fff;transition:background .16s ease;line-height:1.55}
+.tm002-root .stay-toggle:hover{background:#f8f4fd}
+.tm002-root .stay-toggle:focus-visible{outline-offset:-4px;border-radius:4px}
+.tm002-root .stay-toggle-copy{display:block;min-width:0;flex:1}
+.tm002-root .stay-toggle-heading{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:750;color:var(--purple)}
+.tm002-root .stay-toggle-heading>.icon{width:16px;height:16px;opacity:.8}
+.tm002-root .stay-count{display:inline-flex;align-items:center;justify-content:center;min-width:31px;padding:1px 6px;font-size:10px;background:var(--lavender);color:var(--purple);border-radius:5px;font-weight:750}
+.tm002-root .stay-summary-meta{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;margin-top:7px}
+.tm002-root .stay-toggle-regions{font-size:10px;color:#858a9c;font-weight:500;line-height:1.6;overflow-wrap:anywhere}
+.tm002-root .stay-summary-warning{display:inline-flex;align-items:center;gap:3px;padding:2px 5px;border-radius:4px;background:var(--amber-soft);color:var(--amber);font-size:9px;white-space:nowrap}
+.tm002-root .stay-summary-warning .icon{width:11px;height:11px}
+.tm002-root .stay-toggle-action{display:flex;align-items:center;gap:6px;flex-shrink:0;font-size:10px;font-weight:650;color:var(--purple)}
+.tm002-root .stay-toggle-chevron{display:flex;align-items:center;justify-content:center;background:#f5f0fb;border:1px solid #e9def6;border-radius:7px;width:26px;height:26px;transition:transform .18s ease}
+.tm002-root .stay-toggle-chevron .icon{width:14px;height:14px}
+.tm002-root .stay-toggle[aria-expanded="true"] .stay-toggle-chevron{transform:rotate(180deg)}
+.tm002-root .stay-accordion.is-open>.stay-toggle{background:#faf7fe;border-bottom:1px solid #e9e0f4}
+.tm002-root .stays-panel{overflow:hidden}
+.tm002-root .stays-panel .single-stay .stay-row{min-height:86px}
+.tm002-root .m-stay-actions{display:none}
+
+@media(max-width:760px){
+
+ .tm002-root .m-stay-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 14px 10px;font-size:10px;color:var(--muted)}
+.tm002-root .m-stay-actions .stay-group-toggle{width:auto;border:1px solid var(--lavender-line);border-radius:6px;padding:4px 8px;min-height:29px;background:#fcfaff}
+.tm002-root .stay-toggle{min-height:90px;padding:15px 12px;gap:8px}
+.tm002-root .stay-toggle-heading{font-size:12px;gap:6px}
+.tm002-root .stay-summary-meta{margin-top:6px;gap:5px}
+.tm002-root .stay-toggle-regions{font-size:10px}
+.tm002-root .stay-toggle-action{font-size:10px;gap:5px}
+.tm002-root .stay-toggle-chevron{width:25px;height:25px}
+.tm002-root .stay-accordion.is-open>.stay-toggle{min-height:90px;padding:15px 12px}
+.tm002-root .stays-panel .single-stay .stay-row{min-height:82px}
+}
+
+@media(prefers-reduced-motion:reduce){
+.tm002-root .stay-toggle,.tm002-root .stay-group-chevron,.tm002-root .stay-toggle-chevron{transition:none}
+}
+
+/* modal / toast (app overlays) */
+.tm002-root .modal-backdrop{position:fixed;inset:0;background:rgba(17,24,39,.4);z-index:90;display:grid;place-items:center;padding:16px}
+.tm002-root .modal{background:#fff;border-radius:14px;padding:20px;width:min(640px,100%);max-height:min(80vh,720px);overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.15)}
+.tm002-root .toast{position:fixed;right:20px;bottom:20px;z-index:100;background:#263147;color:#fff;padding:12px 16px;border-radius:10px;font-size:13px;max-width:min(420px,calc(100vw - 32px))}
+.tm002-root .stay-row.is-highlight{outline:2px solid #c4a8ef;background:#faf7ff}
+
+/* 목록 가독성: 텍스트 검정 + 고객명 제외 글자 +3px */
+.tm002-root .tm002-table{
+  font-size:15px;
+  color:#000;
+}
+.tm002-root .tm002-table th{
+  font-size:14px;
+  color:#000;
+}
+.tm002-root .crm-col-filter-btn,
+.tm002-root .crm-col-filter-label{font-size:14px;color:#000}
+.tm002-root .crm-col-filter.is-active .crm-col-filter-btn,
+.tm002-root .crm-col-filter.is-active .crm-col-filter-label,
+.tm002-root .crm-col-filter.is-open .crm-col-filter-btn{color:#5b3d8a}
+.tm002-root .tm002-table th.group-head,
+.tm002-root .tm002-table .sub-head th{
+  font-size:13px;
+  color:#000;
+}
+.tm002-root .tm002-table td,
+.tm002-root .tm002-table td *{
+  color:#000;
+}
+.tm002-root .partner-name{font-size:15px;color:#000}
+.tm002-root .batch-badge{font-size:15px;color:#000}
+.tm002-root .phone{font-size:14px;color:#000}
+.tm002-root .copy-btn{color:#000}
+.tm002-root .merge-badge,
+.tm002-root .merge-badge.simple{font-size:13px;color:#000}
+.tm002-root .stay-cell{font-size:14px;color:#000}
+.tm002-root .stay-region,
+.tm002-root .stay-detail{color:#000}
+.tm002-root .hotel-title{font-size:15px;color:#000}
+.tm002-root .hotel-meta{font-size:13px;color:#000}
+.tm002-root .review-badge{font-size:12px;color:#000}
+.tm002-root .state-pill{font-size:13px;color:#000}
+.tm002-root .state-pill.warn,
+.tm002-root .state-pill.done{color:#000}
+.tm002-root .assignee{font-size:14px;color:#000}
+.tm002-root .assignee .icon{color:#000}
+.tm002-root .date-value,
+.tm002-root .date-value small{font-size:13px;color:#000}
+.tm002-root .muted-value{font-size:14px;color:#000}
+.tm002-root .status-select,
+.tm002-root .status-select[data-status],
+.tm002-root .product-select{font-size:14px;color:#000}
+.tm002-root .status-meeting{font-size:13px;color:#000}
+.tm002-root .note-button,
+.tm002-root .note-button.has-text,
+.tm002-root .note-button:hover{font-size:14px;color:#000}
+.tm002-root .note-action{font-size:13px;color:#000}
+.tm002-root .comment-time,
+.tm002-root .comment-more{font-size:12px;color:#000}
+.tm002-root .row-saving{font-size:13px;color:#000}
+.tm002-root .stay-group-toggle{font-size:14px;color:#000}
+.tm002-root .stay-group-control{font-size:13px;color:#000}
+.tm002-root .stay-toggle-heading{font-size:15px;color:#000}
+.tm002-root .stay-count{font-size:13px;color:#000}
+.tm002-root .stay-toggle-regions{font-size:13px;color:#000}
+.tm002-root .stay-summary-warning{font-size:12px;color:#000}
+.tm002-root .stay-toggle-action{font-size:13px;color:#000}
+.tm002-root .crm-assignee-picker-btn,
+.tm002-root .crm-assignee-picker-label,
+.tm002-root .crm-assignee-picker-history{font-size:14px;color:#000}
+/* 고객명은 크기·강조 유지 */
+.tm002-root .customer-name{font-size:14px;color:#000}
+.tm002-root .customer-name-alt{font-size:11px;color:#000}
+.tm002-root .customer-name:hover{color:#000}
+
+/* 모바일 카드 목록도 동일 규칙 */
+.tm002-root .mobile-card,
+.tm002-root .mobile-card *{color:#000}
+.tm002-root .m-head .customer-name{font-size:14px}
+.tm002-root .m-head .phone{font-size:14px}
+.tm002-root .m-partner{font-size:13px;color:#000}
+.tm002-root .m-code{font-size:12px;color:#000}
+.tm002-root .m-stay-head{font-size:12px;color:#000}
+.tm002-root .mobile-card .stay-cell{font-size:13px}
+.tm002-root .mobile-card .hotel-title{font-size:14px}
+.tm002-root .mobile-card .hotel-meta{font-size:12px}
+.tm002-root .mobile-card .review-badge{font-size:11px}
+.tm002-root .m-label{font-size:12px;color:#000}
+.tm002-root .m-admin{font-size:13px}
+.tm002-root .m-admin .date-value,
+.tm002-root .m-admin .date-value small{font-size:12px;color:#000}
+.tm002-root .m-notes .note-button{font-size:13px;color:#000}
+.tm002-root .m-stay-actions{font-size:13px;color:#000}
+.tm002-root .mobile-card .stay-toggle-heading{font-size:15px;color:#000}
+.tm002-root .mobile-card .stay-toggle-regions,
+.tm002-root .mobile-card .stay-toggle-action{font-size:13px;color:#000}
+
+/* TM002 회원 정보 컬럼 */
+.tm002-root .tm002-table td.address-cell{white-space:normal;word-break:keep-all;line-height:1.45}
+.tm002-root .m-member-info{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin:10px 0;font-size:13px}
+.tm002-root .m-member-info div:last-child{grid-column:1 / -1}
+.tm002-root .m-member-info dt{font-size:11px;color:var(--crm-muted)}
+.tm002-root .m-member-info dd{margin:0;word-break:keep-all}

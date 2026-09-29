@@ -1,0 +1,1499 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import AssigneePicker from "@/app/admin/_components/crm/AssigneePicker";
+import ExportOptionsDialog, { downloadExport } from "@/app/admin/_components/crm/ExportOptionsDialog";
+import ColumnFilterSearchableList from "@/app/admin/_components/crm/ColumnFilterSearchableList";
+import { CrmAlert, CrmButton, CrmDialog } from "@/app/admin/_components/crm/ui";
+import { fromKstMinuteLocalInput, kstYmd, toKstMinuteLocalInput } from "@/lib/crm/kst";
+import { appendStatusMemo } from "@/lib/crm/memo";
+import { canChangeTm002Assignee } from "@/lib/crm/scope";
+import type { SessionUser } from "@/lib/crm/types";
+import {
+  TM002_PRODUCTS,
+  TM002_STATUSES,
+  isTm002ScheduledStatus,
+  type Tm002Customer,
+} from "@/lib/crm/tm002/types";
+import Tm002ColumnFilter from "./Tm002ColumnFilter";
+import "./tm002.css";
+
+const UNASSIGNED_FILTER = "__none__";
+
+type Staff = { id: string; name: string; parent_id: string | null };
+
+function Icon({ d, paths }: { d?: string; paths?: string[] }) {
+  return (
+    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+      {paths ? paths.map((p) => <path key={p} d={p} />) : <path d={d || ""} />}
+    </svg>
+  );
+}
+
+function formatJoinedDate(iso: string | null): string {
+  return iso ? kstYmd(new Date(iso)) : "-";
+}
+
+/** 주소 + 상세주소를 한 줄로 (엑셀 값 그대로) */
+function fullAddress(c: Pick<Tm002Customer, "address" | "address_detail">): string {
+  return [c.address, c.address_detail].filter(Boolean).join(" ") || "-";
+}
+
+function formatAssignedAt(iso: string | null): string {
+  if (!iso) return "미배정";
+  try {
+    return new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .format(new Date(iso))
+      .replace(" ", " ");
+  } catch {
+    return iso;
+  }
+}
+
+/** 홍조현 (고광남, 권영걸) → 본이름 + 괄호 다른 이름 */
+function CustomerNameLabel({ name }: { name: string }) {
+  const m = name.match(/^(.+?)\s*\((.+)\)\s*$/);
+  if (!m) return <span className="customer-name">{name}</span>;
+  return (
+    <span className="customer-name">
+      {m[1]}
+      <span className="customer-name-alt"> ({m[2]})</span>
+    </span>
+  );
+}
+
+export default function Tm002PageClient() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [items, setItems] = useState<Tm002Customer[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [session, setSession] = useState<Pick<SessionUser, "rank" | "userId" | "name"> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
+  const [q, setQ] = useState(() => searchParams.get("q") || searchParams.get("search") || "");
+  const [qDebounced, setQDebounced] = useState(() =>
+    (searchParams.get("q") || searchParams.get("search") || "").trim()
+  );
+  const [status, setStatus] = useState(() => searchParams.get("status") || "");
+  /** ""=전체, UNASSIGNED_FILTER=미배정, 그 외 staff id */
+  const [assigneeFilter, setAssigneeFilter] = useState("");
+  /** KST YYYY-MM-DD */
+  const [assignedDate, setAssignedDate] = useState(() => searchParams.get("assigned_date") || "");
+  const [checkupIds, setCheckupIds] = useState(() =>
+    (searchParams.get("ids") || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [pageSize, setPageSize] = useState(20);
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [uploading, setUploading] = useState(false);
+  const [savingIds, setSavingIds] = useState<Set<string>>(() => new Set());
+  const [drawerSaving, setDrawerSaving] = useState(false);
+  const [bulkAssigneeId, setBulkAssigneeId] = useState<string | null>(null);
+  const [bulkPicked, setBulkPicked] = useState(false);
+  const [memoCustomer, setMemoCustomer] = useState<Tm002Customer | null>(null);
+  const [memoSaveStatus, setMemoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteSaving, setDeleteSaving] = useState(false);
+  const [commentCustomer, setCommentCustomer] = useState<Tm002Customer | null>(null);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [desktopTableShellEl, setDesktopTableShellEl] = useState<HTMLDivElement | null>(null);
+  const setDesktopTableShellRef = useCallback((node: HTMLDivElement | null) => {
+    setDesktopTableShellEl(node);
+  }, []);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const memoCustomerRef = useRef<Tm002Customer | null>(null);
+  const memoSavedRef = useRef("");
+  const openIdHandledRef = useRef<string | null>(null);
+  const pendingOpenIdRef = useRef<string | null>(searchParams.get("open_id"));
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    window.setTimeout(() => setToast(""), 2800);
+  }, []);
+
+  // PC: 표 영역을 마우스로 끌어 가로 스크롤
+  useEffect(() => {
+    const el = desktopTableShellEl;
+    if (!el) return;
+
+    let dragging = false;
+    let moved = false;
+    let startX = 0;
+    let startScrollLeft = 0;
+
+    const syncScrollableClass = () => {
+      el.classList.toggle("is-scrollable-x", el.scrollWidth > el.clientWidth + 1);
+    };
+
+    const isInteractive = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      return Boolean(
+        target.closest(
+          "a, button, input, select, textarea, label, .crm-popover, .crm-col-filter, [contenteditable='true']"
+        )
+      );
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      if (isInteractive(e.target)) return;
+      if (el.scrollWidth <= el.clientWidth + 1) return;
+
+      dragging = true;
+      moved = false;
+      startX = e.clientX;
+      startScrollLeft = el.scrollLeft;
+      el.classList.add("is-grab-scrolling");
+      e.preventDefault();
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 3) moved = true;
+      el.scrollLeft = startScrollLeft - dx;
+      e.preventDefault();
+    };
+
+    const endDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove("is-grab-scrolling");
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", endDrag);
+    };
+
+    const onClickCapture = (e: MouseEvent) => {
+      if (!moved) return;
+      e.preventDefault();
+      e.stopPropagation();
+      moved = false;
+    };
+
+    const onMouseDownCapture = (e: MouseEvent) => {
+      onMouseDown(e);
+      if (!dragging) return;
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", endDrag);
+    };
+
+    syncScrollableClass();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncScrollableClass) : null;
+    ro?.observe(el);
+    const table = el.querySelector("table");
+    if (table) ro?.observe(table);
+
+    el.addEventListener("mousedown", onMouseDownCapture);
+    el.addEventListener("click", onClickCapture, true);
+    window.addEventListener("resize", syncScrollableClass);
+    return () => {
+      ro?.disconnect();
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", endDrag);
+      el.removeEventListener("mousedown", onMouseDownCapture);
+      el.removeEventListener("click", onClickCapture, true);
+      window.removeEventListener("resize", syncScrollableClass);
+      el.classList.remove("is-grab-scrolling", "is-scrollable-x");
+    };
+  }, [desktopTableShellEl, items.length, loading, pageSize]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setQDebounced(q.trim());
+      setPage(0);
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [q]);
+
+  useEffect(() => {
+    const nextIds = (searchParams.get("ids") || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    setCheckupIds((prev) =>
+      prev.length === nextIds.length && prev.every((v, i) => v === nextIds[i]) ? prev : nextIds
+    );
+    const nextStatus = searchParams.get("status") || "";
+    setStatus((prev) => (prev === nextStatus ? prev : nextStatus));
+  }, [searchParams]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const sp = new URLSearchParams();
+      if (qDebounced) sp.set("q", qDebounced);
+      if (status) sp.set("status", status);
+      if (checkupIds.length) sp.set("ids", checkupIds.join(","));
+      if (assigneeFilter === UNASSIGNED_FILTER) sp.set("unassigned", "1");
+      else if (assigneeFilter) sp.set("assignee_id", assigneeFilter);
+      if (assignedDate) sp.set("assigned_date", assignedDate);
+      sp.set("limit", String(pageSize));
+      sp.set("offset", String(page * pageSize));
+      const res = await fetch(`/api/admin/tm002?${sp.toString()}`);
+      const data = await res.json();
+      if (!data.ok) {
+        setError(data.message || "목록을 불러오지 못했습니다.");
+        setItems([]);
+        setTotal(0);
+        return;
+      }
+      setItems(data.items ?? []);
+      setTotal(Number(data.total ?? data.items?.length ?? 0));
+      setStaff(data.staff ?? []);
+      if (data.session) setSession(data.session);
+    } catch {
+      setError("네트워크 오류");
+    } finally {
+      setLoading(false);
+    }
+  }, [qDebounced, status, assigneeFilter, assignedDate, checkupIds, page, pageSize]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    memoCustomerRef.current = memoCustomer;
+  }, [memoCustomer]);
+
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  // 관리자·매니저: 메모 미확인 빨간 점만 짧게 폴링
+  useEffect(() => {
+    if (session?.rank !== "admin" && session?.rank !== "manager") return;
+    const POLL_MS = 10_000;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let inFlight = false;
+
+    const syncUnread = async () => {
+      if (document.hidden || inFlight) return;
+      const ids = itemsRef.current.map((i) => i.id);
+      if (ids.length === 0) return;
+      inFlight = true;
+      try {
+        const sp = new URLSearchParams();
+        sp.set("ids", ids.join(","));
+        const res = await fetch(`/api/admin/tm002/memo-unread?${sp.toString()}`);
+        const data = await res.json();
+        if (!data.ok || !data.unread || typeof data.unread !== "object") return;
+        const unread = data.unread as Record<string, boolean>;
+        setItems((prev) => {
+          let changed = false;
+          const next = prev.map((row) => {
+            if (!(row.id in unread)) return row;
+            const flag = Boolean(unread[row.id]);
+            if (flag === row.memo_admin_unread) return row;
+            changed = true;
+            return { ...row, memo_admin_unread: flag };
+          });
+          return changed ? next : prev;
+        });
+      } catch {
+        // ignore
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const clear = () => {
+      if (timer != null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const schedule = () => {
+      clear();
+      timer = setInterval(() => {
+        void syncUnread();
+      }, POLL_MS);
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        clear();
+        return;
+      }
+      void syncUnread();
+      schedule();
+    };
+
+    void syncUnread();
+    if (!document.hidden) schedule();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clear();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [session?.rank]);
+
+  const pages = Math.max(1, Math.ceil(total / pageSize) || 1);
+  const pageItems = items;
+
+  useEffect(() => {
+    if (total > 0 && page > pages - 1) setPage(Math.max(0, pages - 1));
+  }, [page, pages, total]);
+
+  const allPageSelected = pageItems.length > 0 && pageItems.every((c) => selected.has(c.id));
+
+  const assigneeFilterLabel =
+    assigneeFilter === UNASSIGNED_FILTER
+      ? "미배정"
+      : assigneeFilter
+        ? staff.find((s) => s.id === assigneeFilter)?.name || "담당자"
+        : null;
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        for (const c of pageItems) next.delete(c.id);
+      } else {
+        for (const c of pageItems) next.add(c.id);
+      }
+      return next;
+    });
+  };
+
+  const patchCustomer = async (id: string, body: Record<string, unknown>) => {
+    const prev = items.find((c) => c.id === id);
+    if (!prev) return false;
+
+    const isMemoOnly =
+      body.memo !== undefined &&
+      body.status === undefined &&
+      body.product === undefined &&
+      body.meeting_at === undefined &&
+      body.assignee_id === undefined &&
+      body.comment_append === undefined;
+
+    const nextStatus =
+      typeof body.status === "string" ? body.status : prev.status;
+    const meetingFromBody =
+      body.meeting_at !== undefined
+        ? body.meeting_at
+          ? String(body.meeting_at)
+          : null
+        : undefined;
+
+    // 낙관적 반영 — 서버는 해당 1건만 갱신
+    const optimistic: Tm002Customer = {
+      ...prev,
+      ...(typeof body.status === "string"
+        ? {
+            status: body.status as Tm002Customer["status"],
+            product: body.status === "계약완료" ? (body.product != null ? String(body.product) : prev.product) : null,
+            ...(body.status !== prev.status
+              ? { memo: appendStatusMemo(prev.memo, body.status) }
+              : {}),
+          }
+        : {}),
+      ...(body.product !== undefined && body.status === undefined
+        ? { product: body.product ? String(body.product) : null }
+        : {}),
+      ...(meetingFromBody !== undefined
+        ? { meeting_at: meetingFromBody }
+        : !isTm002ScheduledStatus(nextStatus)
+          ? { meeting_at: null }
+          : {}),
+      ...(body.memo !== undefined && body.status === undefined
+        ? {
+            memo: String(body.memo ?? ""),
+            ...(session?.rank === "sales" ? { memo_admin_unread: true } : {}),
+          }
+        : {}),
+      ...(body.assignee_id !== undefined
+        ? {
+            assignee_id: body.assignee_id ? String(body.assignee_id) : null,
+            assignee_name: body.assignee_id
+              ? staff.find((s) => s.id === body.assignee_id)?.name ?? prev.assignee_name
+              : null,
+            assigned_at: body.assignee_id ? new Date().toISOString() : null,
+            assignee_history: (() => {
+              const nextName = body.assignee_id
+                ? staff.find((s) => s.id === body.assignee_id)?.name
+                : null;
+              if (!nextName) return prev.assignee_history;
+              const base = prev.assignee_history?.length
+                ? [...prev.assignee_history]
+                : prev.assignee_name
+                  ? [prev.assignee_name]
+                  : [];
+              if (!base.length || base[base.length - 1] !== nextName) base.push(nextName);
+              return base;
+            })(),
+          }
+        : {}),
+    };
+    setItems((list) => list.map((c) => (c.id === id ? optimistic : c)));
+    if (!isMemoOnly) setSavingIds((s) => new Set(s).add(id));
+
+    try {
+      const res = await fetch(`/api/admin/tm002/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setItems((list) => list.map((c) => (c.id === id ? prev : c)));
+        if (!isMemoOnly) showToast(data.message || "저장 실패");
+        return false;
+      }
+      setItems((list) =>
+        list.map((c) => {
+          if (c.id !== id) return c;
+          const merged: Tm002Customer = data.item;
+          // 메모 편집 중이면 서버 응답으로 입력값 덮지 않음
+          if (memoCustomerRef.current?.id === id && isMemoOnly) {
+            return { ...merged, memo: memoCustomerRef.current.memo };
+          }
+          return merged;
+        })
+      );
+      if (memoCustomerRef.current?.id === id && !isMemoOnly) {
+        setMemoCustomer({ ...data.item, memo: memoCustomerRef.current.memo });
+      }
+      if (commentCustomer?.id === id) setCommentCustomer(data.item);
+      return true;
+    } catch {
+      setItems((list) => list.map((c) => (c.id === id ? prev : c)));
+      if (!isMemoOnly) showToast("네트워크 오류");
+      return false;
+    } finally {
+      if (!isMemoOnly) {
+        setSavingIds((s) => {
+          const next = new Set(s);
+          next.delete(id);
+          return next;
+        });
+      }
+    }
+  };
+
+  // 메모 자동 저장 (후보자 DB와 동일 — 디바운스)
+  useEffect(() => {
+    if (!memoCustomer) return;
+    const memo = memoCustomer.memo ?? "";
+    if (memo === memoSavedRef.current) {
+      setMemoSaveStatus((s) => (s === "saving" ? "idle" : s));
+      return;
+    }
+    const rowId = memoCustomer.id;
+    setMemoSaveStatus("saving");
+    const t = window.setTimeout(() => {
+      void (async () => {
+        if (memoCustomerRef.current?.id !== rowId || (memoCustomerRef.current.memo ?? "") !== memo) {
+          return;
+        }
+        const ok = await patchCustomer(rowId, { memo });
+        if (memoCustomerRef.current?.id !== rowId || (memoCustomerRef.current.memo ?? "") !== memo) {
+          return;
+        }
+        if (!ok) {
+          setMemoSaveStatus("error");
+          return;
+        }
+        memoSavedRef.current = memo;
+        setMemoSaveStatus("saved");
+      })();
+    }, 700);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memoCustomer?.id, memoCustomer?.memo]);
+
+  const openMemo = (c: Tm002Customer) => {
+    setMemoCustomer(c);
+    memoSavedRef.current = c.memo ?? "";
+    setMemoSaveStatus("idle");
+    const canClearUnread = session?.rank === "admin" || session?.rank === "manager";
+    if (canClearUnread && c.memo_admin_unread) {
+      setItems((list) => list.map((row) => (row.id === c.id ? { ...row, memo_admin_unread: false } : row)));
+      setMemoCustomer((prev) => (prev?.id === c.id ? { ...prev, memo_admin_unread: false } : prev));
+      void fetch(`/api/admin/tm002/${encodeURIComponent(c.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memo_seen: true }),
+      });
+    }
+  };
+
+  useEffect(() => {
+    const openId = pendingOpenIdRef.current ?? searchParams.get("open_id");
+    if (!openId || openIdHandledRef.current === openId || loading) return;
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/admin/tm002/${encodeURIComponent(openId)}`);
+        const data = await res.json();
+        if (!data.ok || !data.item) {
+          openIdHandledRef.current = openId;
+          pendingOpenIdRef.current = null;
+          showToast(data.message || "고객을 찾을 수 없습니다.");
+          return;
+        }
+        openIdHandledRef.current = openId;
+        pendingOpenIdRef.current = null;
+        const item = data.item as Tm002Customer;
+        const phone = String(item.phone || "").trim();
+        if (phone) {
+          setQ(phone);
+          setQDebounced(phone);
+          setPage(0);
+        }
+        setStatus("");
+        setItems((list) => {
+          if (list.some((c) => c.id === item.id)) {
+            return list.map((c) => (c.id === item.id ? item : c));
+          }
+          return [item, ...list];
+        });
+        setSelected(new Set([item.id]));
+        openMemo(item);
+
+        window.setTimeout(() => {
+          document
+            .querySelector(`[data-tm002-id="${CSS.escape(item.id)}"]`)
+            ?.scrollIntoView({ block: "center", behavior: "smooth" });
+        }, 120);
+
+        const sp = new URLSearchParams(window.location.search);
+        if (sp.has("open_id")) {
+          sp.delete("open_id");
+          if (phone && !sp.get("search") && !sp.get("q")) sp.set("q", phone);
+          const qs = sp.toString();
+          router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+        }
+      } catch {
+        openIdHandledRef.current = openId;
+        pendingOpenIdRef.current = null;
+        showToast("고객을 불러오지 못했습니다.");
+      }
+    })();
+  }, [loading, searchParams, pathname, router, showToast]);
+
+  const closeMemo = async () => {
+    const row = memoCustomerRef.current;
+    if (row && (row.memo ?? "") !== memoSavedRef.current) {
+      await patchCustomer(row.id, { memo: row.memo ?? "" });
+      memoSavedRef.current = row.memo ?? "";
+    }
+    setMemoCustomer(null);
+    setMemoSaveStatus("idle");
+  };
+
+  const confirmBulkDelete = async () => {
+    if (session?.rank !== "admin" || selected.size === 0) {
+      setDeleteConfirmOpen(false);
+      return;
+    }
+    setDeleteSaving(true);
+    try {
+      const ids = Array.from(selected);
+      const res = await fetch("/api/admin/tm002/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        showToast(data.message || "삭제 실패");
+        return;
+      }
+      const removed = new Set(ids);
+      setItems((prev) => prev.filter((c) => !removed.has(c.id)));
+      setSelected(new Set());
+      setDeleteConfirmOpen(false);
+      showToast(data.message || `${data.deleted ?? ids.length}건을 삭제했습니다.`);
+    } catch {
+      showToast("네트워크 오류");
+    } finally {
+      setDeleteSaving(false);
+    }
+  };
+
+  const onUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.set("file", file);
+      const res = await fetch("/api/admin/tm002/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!data.ok) {
+        showToast(data.message || "업로드 실패");
+        return;
+      }
+      const dup =
+        data.cross_batch_duplicates > 0 ? ` · 차수간 중복 ${data.cross_batch_duplicates}명` : "";
+      const merged = data.merged_rows > 0 ? ` · 같은 연락처 ${data.merged_rows}행 병합` : "";
+      const skipped = data.issue_count > 0 ? ` · 제외 ${data.issue_count}행` : "";
+      showToast(`반영 완료 · 차수 ${data.batch_code} · ${data.customers_created}명${merged}${skipped}${dup}`);
+      await load();
+    } catch {
+      showToast("네트워크 오류");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const onBulkAssign = async () => {
+    if (!bulkPicked || selected.size === 0) {
+      showToast("담당자와 대상을 선택해 주세요.");
+      return;
+    }
+    const res = await fetch("/api/admin/tm002/bulk-assign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: Array.from(selected), assignee_id: bulkAssigneeId }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(data.message || "일괄 배정 실패");
+      return;
+    }
+    showToast(`${data.updated ?? selected.size}건 배정 반영`);
+    setSelected(new Set());
+    setBulkPicked(false);
+    setBulkAssigneeId(null);
+    await load();
+  };
+
+  const copyPhone = async (c: Tm002Customer) => {
+    try {
+      await navigator.clipboard.writeText(c.phone.replace(/-/g, ""));
+      showToast("전화번호를 복사했습니다.");
+    } catch {
+      showToast("복사에 실패했습니다.");
+    }
+  };
+
+
+  const [exportOpen, setExportOpen] = useState(false);
+  const canAssign = session ? canChangeTm002Assignee(session as SessionUser) : false;
+  const canClearAssignee = session?.rank === "admin" || session?.rank === "tm_admin";
+  const canUpload = session?.rank === "admin";
+  const canDelete = session?.rank === "admin";
+  const showAssigneeHistory = session?.rank === "admin" || session?.rank === "tm_admin";
+  const showBulkBar = selected.size > 0 && (canAssign || canDelete);
+  const canExport = session?.rank === "admin" || session?.rank === "tm_admin";
+
+  const downloadExcel = async (input: { excludeClosed: boolean; phonesText: string; file: File | null }) => {
+    const sp = new URLSearchParams();
+    if (qDebounced) sp.set("q", qDebounced);
+    if (status) sp.set("status", status);
+    if (checkupIds.length) sp.set("ids", checkupIds.join(","));
+    if (assigneeFilter === UNASSIGNED_FILTER) sp.set("unassigned", "1");
+    else if (assigneeFilter) sp.set("assignee_id", assigneeFilter);
+    if (assignedDate) sp.set("assigned_date", assignedDate);
+    const body = new FormData();
+    body.set("query", sp.toString());
+    if (input.excludeClosed) body.set("exclude_closed_status", "1");
+    body.set("exclude_phones", input.phonesText);
+    if (input.file) body.set("file", input.file);
+    await downloadExport("/api/admin/tm002/export", body, "tm002.xls");
+  };
+
+  return (
+    <div>
+      {toast ? (
+        <div className="crm-lead-toast" role="status">
+          <CrmAlert tone="success">{toast}</CrmAlert>
+        </div>
+      ) : null}
+
+      <div className="crm-page-head">
+        <div className="crm-page-head__text">
+          <h1 className="crm-page-title">TM002</h1>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {canUpload ? (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void onUpload(f);
+                }}
+              />
+              <button type="button" className="crm-btn crm-btn-primary" disabled={uploading} onClick={() => fileRef.current?.click()}>
+                {uploading ? "업로드 중…" : "엑셀 업로드"}
+              </button>
+            </>
+          ) : null}
+          <button type="button" className="crm-btn" onClick={() => void load()} disabled={loading}>
+            새로고침
+          </button>
+          {canExport ? (
+            <button type="button" className="crm-btn crm-btn-primary" onClick={() => setExportOpen(true)}>
+              내보내기
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="crm-toolbar">
+        <div className="crm-search">
+          <span className="crm-search-icon" aria-hidden>
+            ⌕
+          </span>
+          <input
+            className="crm-input"
+            placeholder="이름, 연락처, 주소 검색"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            aria-label="검색"
+          />
+        </div>
+        <div className="crm-toolbar-actions">
+          <select
+            className="crm-select"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(0);
+            }}
+            aria-label="상담상태"
+          >
+            <option value="">상담상태 전체</option>
+            {TM002_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="crm-btn crm-btn-ghost"
+            onClick={() => {
+              setQ("");
+              setStatus("");
+              setAssigneeFilter("");
+              setAssignedDate("");
+              setCheckupIds([]);
+              setPage(0);
+            }}
+          >
+            필터 초기화
+          </button>
+        </div>
+      </div>
+
+      <div className="crm-meta-row">
+        <span>
+          {loading ? "불러오는 중…" : `결과 ${total.toLocaleString()}건`}
+        </span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {showBulkBar ? (
+            <div className="crm-bulk-bar">
+              <span>{selected.size}건 선택</span>
+              {canAssign ? (
+                <>
+                  <AssigneePicker
+                    value={bulkPicked ? bulkAssigneeId : null}
+                    staff={staff}
+                    placeholder={bulkPicked && bulkAssigneeId == null ? "미배정" : "담당자 선택"}
+                    clearLabel="미배정"
+                    clearIsSelected={bulkPicked && bulkAssigneeId == null}
+                    allowClear={canClearAssignee}
+                    onChange={(id) => {
+                      setBulkPicked(true);
+                      setBulkAssigneeId(id);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="crm-btn crm-btn-primary"
+                    disabled={!bulkPicked}
+                    onClick={() => void onBulkAssign()}
+                  >
+                    담당자 일괄 변경
+                  </button>
+                </>
+              ) : null}
+              {canDelete ? (
+                <button
+                  type="button"
+                  className="crm-btn"
+                  disabled={deleteSaving}
+                  onClick={() => setDeleteConfirmOpen(true)}
+                >
+                  {deleteSaving ? "삭제 중…" : "삭제"}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}>
+            표시
+            <select
+              className="crm-select"
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(0);
+              }}
+              aria-label="페이지당 표시 개수"
+            >
+              {[20, 30, 50, 100, 500, 1000].map((n) => (
+                <option key={n} value={n}>
+                  {n}개
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </div>
+
+      {error ? (
+        <div className="crm-empty" role="alert">
+          <strong>오류가 발생했습니다</strong>
+          {error}
+          <div style={{ marginTop: 12 }}>
+            <button type="button" className="crm-btn crm-btn-primary" onClick={() => void load()}>
+              다시 시도
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!error && (
+        <div className="tm002-root">
+          <>
+              <div
+                className="crm-table-shell crm-table-desktop table-scroll"
+                role="region"
+                aria-label="TM002 고객 DB"
+                ref={setDesktopTableShellRef}
+              >
+                <table className="tm002-table">
+                  <colgroup>
+                    <col style={{ width: 39 }} />
+                    <col style={{ width: 131 }} />
+                    <col style={{ width: 70 }} />
+                    <col className="customer-col" style={{ width: 158 }} />
+                    <col style={{ width: 96 }} />
+                    <col style={{ width: 150 }} />
+                    <col style={{ width: 60 }} />
+                    <col className="address-col" style={{ width: 300 }} />
+                    <col style={{ width: 127 }} />
+                    <col style={{ width: 103 }} />
+                    <col style={{ width: 139 }} />
+                    <col className="status-col" style={{ width: 188 }} />
+                    <col style={{ width: 160 }} />
+                    <col style={{ width: 160 }} />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th className="check-cell pin-check">
+                        <input
+                          type="checkbox"
+                          checked={allPageSelected}
+                          onChange={toggleSelectAll}
+                          aria-label="현재 페이지 전체 선택"
+                          disabled={total === 0}
+                        />
+                      </th>
+                      <th scope="col" className="pin-partner">
+                        제휴사
+                      </th>
+                      <th scope="col" className="pin-batch">
+                        DB 차수
+                      </th>
+                      <th scope="col" className="pin-customer">
+                        고객
+                      </th>
+                      <th scope="col">가입일</th>
+                      <th scope="col">flag</th>
+                      <th scope="col">레벨</th>
+                      <th scope="col">주소</th>
+                      <th scope="col">
+                        <Tm002ColumnFilter
+                          label="담당자"
+                          active={Boolean(assigneeFilter)}
+                          activeLabel={assigneeFilterLabel}
+                        >
+                          {(close) => (
+                            <ColumnFilterSearchableList
+                              ariaLabel="담당자 필터"
+                              searchPlaceholder="이름 검색"
+                              selected={assigneeFilter || null}
+                              options={[
+                                { value: UNASSIGNED_FILTER, label: "미배정" },
+                                ...staff.map((s) => ({ value: s.id, label: s.name })),
+                              ]}
+                              onSelect={(value) => {
+                                setAssigneeFilter(value ?? "");
+                                setPage(0);
+                                close();
+                              }}
+                            />
+                          )}
+                        </Tm002ColumnFilter>
+                      </th>
+                      <th scope="col">
+                        <Tm002ColumnFilter
+                          label="배정일"
+                          active={Boolean(assignedDate)}
+                          activeLabel={assignedDate ? assignedDate.replace(/-/g, ".") : null}
+                        >
+                          {(close) => (
+                            <div className="tm002-col-filter-date">
+                              <label className="tm002-col-filter-date-label">
+                                배정일 선택
+                                <input
+                                  type="date"
+                                  className="tm002-col-filter-date-input"
+                                  value={assignedDate}
+                                  onChange={(e) => {
+                                    setAssignedDate(e.target.value);
+                                    setPage(0);
+                                    if (e.target.value) close();
+                                  }}
+                                  aria-label="배정일"
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                className="tm002-col-filter-clear"
+                                onClick={() => {
+                                  setAssignedDate("");
+                                  setPage(0);
+                                  close();
+                                }}
+                              >
+                                전체 (날짜 해제)
+                              </button>
+                            </div>
+                          )}
+                        </Tm002ColumnFilter>
+                      </th>
+                      <th scope="col">
+                        관리자상태
+                      </th>
+                      <th scope="col" className="status-col">
+                        <Tm002ColumnFilter
+                          label="상담상태"
+                          active={Boolean(status)}
+                          activeLabel={status || null}
+                          align="right"
+                        >
+                          {(close) => (
+                            <div className="tm002-col-filter-list" role="listbox" aria-label="상담상태 필터">
+                              <button
+                                type="button"
+                                role="option"
+                                className={!status ? "is-selected" : undefined}
+                                aria-selected={!status}
+                                onClick={() => {
+                                  setStatus("");
+                                  setPage(0);
+                                  close();
+                                }}
+                              >
+                                전체
+                              </button>
+                              {TM002_STATUSES.map((s) => (
+                                <button
+                                  key={s}
+                                  type="button"
+                                  role="option"
+                                  className={status === s ? "is-selected" : undefined}
+                                  aria-selected={status === s}
+                                  onClick={() => {
+                                    setStatus(s);
+                                    setPage(0);
+                                    close();
+                                  }}
+                                >
+                                  {s}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </Tm002ColumnFilter>
+                      </th>
+                      <th scope="col" className="memo-col">
+                        메모
+                      </th>
+                      <th scope="col" className="comment-col">
+                        코멘트
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading && items.length === 0 ? (
+                      <tr className="tm002-empty-row">
+                        <td colSpan={14}>로딩 중…</td>
+                      </tr>
+                    ) : total === 0 ? (
+                      <tr className="tm002-empty-row">
+                        <td colSpan={14}>
+                          {qDebounced || status || assigneeFilter || assignedDate ? (
+                            <>
+                              <strong>검색 결과가 없습니다</strong>
+                              필터를 바꾸거나 초기화해 보세요.
+                            </>
+                          ) : (
+                            <>
+                              <strong>등록된 고객이 없습니다</strong>
+                              상단에서 회원 엑셀을 업로드해 주세요.
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ) : (
+                      pageItems.map((c) => {
+                      const unassigned = !c.assignee_id;
+                      const saving = savingIds.has(c.id);
+                      return (
+                        <tr
+                          key={c.id}
+                          data-tm002-id={c.id}
+                          data-row-status={c.status}
+                          className={`contact-row${unassigned ? " unassigned" : ""}${saving ? " is-saving" : ""}${selected.has(c.id) ? " selected" : ""}`}
+                        >
+                          <td className="check-cell pin-check">
+                            <input
+                              type="checkbox"
+                              checked={selected.has(c.id)}
+                              onChange={() => toggleSelect(c.id)}
+                              aria-label={`${c.name} 선택`}
+                              disabled={saving}
+                            />
+                          </td>
+                          <td className="pin-partner">
+                            <strong className="partner-name">{c.partner_name}</strong>
+                          </td>
+                          <td className="pin-batch">
+                            <span className="batch-badge">{c.batch_code}</span>
+                          </td>
+                          <td className="pin-customer">
+                            <CustomerNameLabel name={c.name} />
+                            <div className="phone-wrap">
+                              <span className="phone">{c.phone}</span>
+                              <button type="button" className="copy-btn" onClick={() => void copyPhone(c)} title="전화번호 복사">
+                                복사
+                              </button>
+                            </div>
+                            {c.memo?.startsWith("[중복]") ? (
+                              <span className="merge-badge" style={{ color: "var(--amber)", marginTop: 6 }}>
+                                다른 차수 중복
+                              </span>
+                            ) : null}
+                          </td>
+                          <td>
+                            <span className="muted-value">{formatJoinedDate(c.joined_at)}</span>
+                          </td>
+                          <td>{c.flag || "-"}</td>
+                          <td>{c.level || "-"}</td>
+                          <td className="address-cell">{fullAddress(c)}</td>
+                          <td>
+                            <AssigneePicker
+                              value={c.assignee_id}
+                              staff={staff}
+                              unresolvedLabel={c.assignee_name}
+                              history={showAssigneeHistory ? c.assignee_history : undefined}
+                              onChange={(id) => void patchCustomer(c.id, { assignee_id: id })}
+                              disabled={saving || !canAssign}
+                              allowClear={canClearAssignee}
+                            />
+                          </td>
+                          <td>
+                            <span className="muted-value">{formatAssignedAt(c.assigned_at)}</span>
+                          </td>
+                          <td>
+                            <span className={`state-pill${unassigned ? " warn" : ""}`}>
+                              <span className="dot" />
+                              {unassigned ? "담당자 지정 필요" : "배정완료"}
+                            </span>
+                          </td>
+                          <td className="status-col">
+                            <div className={`status-cell${saving ? " is-saving" : ""}`}>
+                              <select
+                                className="status-select"
+                                value={c.status}
+                                disabled={saving}
+                                aria-busy={saving}
+                                aria-label={`${c.name} 상담상태`}
+                                onChange={(e) =>
+                                  void patchCustomer(c.id, {
+                                    status: e.target.value,
+                                    product: e.target.value === "계약완료" ? c.product : null,
+                                  })
+                                }
+                              >
+                                {TM002_STATUSES.map((s) => (
+                                  <option key={s} value={s}>
+                                    {s}
+                                  </option>
+                                ))}
+                              </select>
+                              {isTm002ScheduledStatus(c.status) ? (
+                                <input
+                                  className="status-meeting"
+                                  type="datetime-local"
+                                  step={60}
+                                  value={toKstMinuteLocalInput(c.meeting_at)}
+                                  disabled={saving}
+                                  onChange={(e) =>
+                                    void patchCustomer(c.id, {
+                                      meeting_at: fromKstMinuteLocalInput(e.target.value),
+                                    })
+                                  }
+                                  aria-label={`${c.name} 재콜 일정`}
+                                />
+                              ) : null}
+                              {c.status === "계약완료" ? (
+                                <select
+                                  className="status-select"
+                                  value={c.product ?? ""}
+                                  disabled={saving}
+                                  onChange={(e) => void patchCustomer(c.id, { product: e.target.value || null })}
+                                  aria-label={`${c.name} 계약 상품`}
+                                >
+                                  <option value="">상품 선택</option>
+                                  {TM002_PRODUCTS.map((p) => (
+                                    <option key={p} value={p}>
+                                      {p}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : null}
+                              {saving ? <span className="row-saving">저장 중…</span> : null}
+                            </div>
+                          </td>
+                          <td className="memo-cell">
+                            <button
+                              type="button"
+                              className={`note-button${c.memo?.trim() ? " has-text" : ""}${
+                                (session?.rank === "admin" || session?.rank === "manager") && c.memo_admin_unread
+                                  ? " has-unread"
+                                  : ""
+                              }`}
+                              onClick={() => openMemo(c)}
+                              aria-label={`${c.name} 메모 ${c.memo?.trim() ? "수정" : "작성"}`}
+                              title={
+                                (session?.rank === "admin" || session?.rank === "manager") && c.memo_admin_unread
+                                  ? "영업자가 메모를 수정했습니다. 확인하세요."
+                                  : undefined
+                              }
+                            >
+                              <span className="note-content">{c.memo?.trim() ? c.memo : "메모 없음"}</span>
+                              <span className="note-action">{c.memo?.trim() ? "메모 수정" : "메모 작성"}</span>
+                            </button>
+                          </td>
+                          <td className="comment-cell">
+                            <button
+                              type="button"
+                              className={`note-button${c.comments?.length ? " has-text" : ""}`}
+                              onClick={() => {
+                                setCommentCustomer(c);
+                                setCommentDraft("");
+                              }}
+                              aria-label={`${c.name} 코멘트 ${c.comments?.length ? "보기 및 추가" : "추가"}`}
+                            >
+                              {c.comments?.length ? (
+                                <>
+                                  <span className="comment-time">{formatAssignedAt(c.comments[c.comments.length - 1]?.at ?? null)}</span>
+                                  <span className="note-content">{c.comments[c.comments.length - 1]?.text ?? ""}</span>
+                                  {c.comments.length > 1 ? (
+                                    <span className="comment-more">전체 {c.comments.length}개</span>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <span className="note-content">코멘트 없음</span>
+                              )}
+                              <span className="note-action">코멘트 추가</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mobile-list" aria-label="모바일 고객 목록">
+                {loading && items.length === 0 ? (
+                  <div className="crm-empty">로딩 중…</div>
+                ) : total === 0 ? (
+                  <div className="crm-empty">
+                    {qDebounced || status || assigneeFilter || assignedDate ? (
+                      <>
+                        <strong>검색 결과가 없습니다</strong>
+                        필터를 바꾸거나 초기화해 보세요.
+                      </>
+                    ) : (
+                      <>
+                        <strong>등록된 고객이 없습니다</strong>
+                        상단에서 회원 엑셀을 업로드해 주세요.
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  pageItems.map((c) => {
+                  const saving = savingIds.has(c.id);
+                  return (
+                  <article
+                    key={`m-${c.id}`}
+                    data-tm002-id={c.id}
+                    data-row-status={c.status}
+                    className={`mobile-card${saving ? " is-saving" : ""}${selected.has(c.id) ? " selected" : ""}`}
+                  >
+                    <div className="m-head">
+                      <div className="m-head-left">
+                        <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} aria-label={`${c.name} 선택`} disabled={saving} />
+                        <div>
+                          <CustomerNameLabel name={c.name} />
+                          <div className="phone-wrap">
+                            <span className="phone">{c.phone}</span>
+                            <button type="button" className="copy-btn" onClick={() => void copyPhone(c)}>
+                              복사
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <span className="batch-badge">{c.batch_code}</span>
+                        <div className="m-partner">{c.partner_name}</div>
+                      </div>
+                    </div>
+                    <dl className="m-member-info">
+                      <div>
+                        <dt>가입일</dt>
+                        <dd>{formatJoinedDate(c.joined_at)}</dd>
+                      </div>
+                      <div>
+                        <dt>flag</dt>
+                        <dd>{c.flag || "-"}</dd>
+                      </div>
+                      <div>
+                        <dt>레벨</dt>
+                        <dd>{c.level || "-"}</dd>
+                      </div>
+                      <div>
+                        <dt>주소</dt>
+                        <dd>{fullAddress(c)}</dd>
+                      </div>
+                    </dl>
+                    <div className="m-control-grid">
+                      <div>
+                        <span className="m-label">담당자</span>
+                        <AssigneePicker
+                          value={c.assignee_id}
+                          staff={staff}
+                          unresolvedLabel={c.assignee_name}
+                          history={showAssigneeHistory ? c.assignee_history : undefined}
+                          disabled={saving || !canAssign}
+                          allowClear={canClearAssignee}
+                          onChange={(id) => void patchCustomer(c.id, { assignee_id: id })}
+                        />
+                      </div>
+                      <div>
+                        <span className="m-label">상담상태{saving ? " · 저장 중…" : ""}</span>
+                        <select
+                          className="status-select"
+                          value={c.status}
+                          disabled={saving}
+                          onChange={(e) => void patchCustomer(c.id, { status: e.target.value })}
+                        >
+                          {TM002_STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                        {isTm002ScheduledStatus(c.status) ? (
+                          <input
+                            className="status-meeting"
+                            type="datetime-local"
+                            step={60}
+                            value={toKstMinuteLocalInput(c.meeting_at)}
+                            disabled={saving}
+                            onChange={(e) =>
+                              void patchCustomer(c.id, {
+                                meeting_at: fromKstMinuteLocalInput(e.target.value),
+                              })
+                            }
+                            aria-label={`${c.name} 재콜 일정`}
+                            style={{ marginTop: 6 }}
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                  </article>
+                  );
+                })
+                )}
+              </div>
+
+              <div className="crm-pagination">
+                <span style={{ fontSize: 13, color: "var(--crm-muted)" }}>
+                  {page + 1} / {pages} 페이지
+                </span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button type="button" className="crm-btn" disabled={page === 0 || total === 0} onClick={() => setPage((p) => p - 1)}>
+                    이전
+                  </button>
+                  <button
+                    type="button"
+                    className="crm-btn"
+                    disabled={page >= pages - 1 || total === 0}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    다음
+                  </button>
+                </div>
+              </div>
+            </>
+        </div>
+      )}
+
+      {memoCustomer ? (
+        <>
+          <button type="button" className="crm-drawer-backdrop" aria-label="닫기" onClick={() => void closeMemo()} />
+          <aside className="crm-drawer" role="dialog" aria-label="메모">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div>
+                <strong style={{ fontSize: 16 }}>{memoCustomer.name}</strong>
+                <div style={{ fontSize: 12, color: "var(--crm-muted)" }}>{memoCustomer.phone}</div>
+              </div>
+              <button type="button" className="crm-btn" onClick={() => void closeMemo()}>
+                닫기
+              </button>
+            </div>
+            <textarea
+              className="crm-drawer-memo-field"
+              value={memoCustomer.memo ?? ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                setMemoCustomer((prev) => (prev ? { ...prev, memo: value } : prev));
+              }}
+              aria-label="메모 내용"
+            />
+            <div style={{ marginTop: 8, fontSize: 12, color: "var(--crm-muted)", minHeight: 18 }}>
+              {memoSaveStatus === "saving"
+                ? "저장 중…"
+                : memoSaveStatus === "saved"
+                  ? "저장됨"
+                  : memoSaveStatus === "error"
+                    ? "저장 실패 — 다시 입력해 주세요"
+                    : "입력하면 자동 저장됩니다"}
+            </div>
+          </aside>
+        </>
+      ) : null}
+
+      {commentCustomer ? (
+        <>
+          <button type="button" className="crm-drawer-backdrop" aria-label="닫기" onClick={() => setCommentCustomer(null)} />
+          <aside className="crm-drawer" role="dialog" aria-label="코멘트">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div>
+                <strong style={{ fontSize: 16 }}>{commentCustomer.name}</strong>
+                <div style={{ fontSize: 12, color: "var(--crm-muted)" }}>{commentCustomer.phone}</div>
+              </div>
+              <button type="button" className="crm-btn" onClick={() => setCommentCustomer(null)}>
+                닫기
+              </button>
+            </div>
+            <div style={{ maxHeight: 220, overflow: "auto", marginBottom: 12 }}>
+              {(commentCustomer.comments ?? []).length === 0 ? (
+                <div style={{ fontSize: 13, color: "var(--crm-muted)" }}>아직 코멘트가 없습니다.</div>
+              ) : (
+                commentCustomer.comments.map((c) => (
+                  <div key={c.id} style={{ borderTop: "1px solid var(--crm-border)", padding: "8px 0", fontSize: 12 }}>
+                    <div style={{ color: "var(--crm-muted)" }}>
+                      {c.by || ""} · {formatAssignedAt(c.at)}
+                    </div>
+                    <div style={{ whiteSpace: "pre-wrap" }}>{c.text}</div>
+                  </div>
+                ))
+              )}
+            </div>
+            <textarea className="crm-input" value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} rows={4} style={{ width: "100%" }} />
+            <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="crm-btn crm-btn-primary"
+                disabled={!commentDraft.trim() || drawerSaving}
+                onClick={() => {
+                  setDrawerSaving(true);
+                  void patchCustomer(commentCustomer.id, { comment_append: commentDraft }).then((ok) => {
+                    setDrawerSaving(false);
+                    if (ok) {
+                      setCommentCustomer(null);
+                      setCommentDraft("");
+                    }
+                  });
+                }}
+              >
+                {drawerSaving ? "저장 중…" : "추가"}
+              </button>
+            </div>
+          </aside>
+        </>
+      ) : null}
+
+      <CrmDialog
+        open={deleteConfirmOpen}
+        onClose={() => {
+          if (!deleteSaving) setDeleteConfirmOpen(false);
+        }}
+        title="삭제 확인"
+        footer={
+          <>
+            <CrmButton variant="secondary" disabled={deleteSaving} onClick={() => setDeleteConfirmOpen(false)}>
+              취소
+            </CrmButton>
+            <CrmButton variant="danger" disabled={deleteSaving} onClick={() => void confirmBulkDelete()}>
+              {deleteSaving ? "삭제 중…" : "삭제"}
+            </CrmButton>
+          </>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
+          선택한 <strong>{selected.size}</strong>건을 삭제할까요? 배정 이력도 함께 삭제됩니다.
+        </p>
+      </CrmDialog>
+      <ExportOptionsDialog
+        open={exportOpen}
+        title="TM002 내보내기"
+        onClose={() => setExportOpen(false)}
+        onExport={downloadExcel}
+      />
+    </div>
+  );
+}

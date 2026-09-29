@@ -69,7 +69,7 @@ export type CalendarEventRow = {
   updated_at: string;
   /** lead 대면일·통화약속·구글 캘린더 가상 일정 */
   source?: "calendar" | "lead_meeting" | "google_calendar";
-  lead_category?: "consumers" | "candidates" | "tm001";
+  lead_category?: "consumers" | "candidates" | "tm001" | "tm002";
   lead_name?: string;
   lead_phone?: string;
   assignee_id?: string | null;
@@ -89,7 +89,7 @@ export function canEditCalendar(session: SessionUser): boolean {
   return session.rank === "admin" || session.rank === "manager";
 }
 
-/** 캘린더 페이지·API 열람 (TM 관리자는 TM001 일정만) */
+/** 캘린더 페이지·API 열람 (TM 관리자는 TM001·TM002 일정만) */
 export function canAccessCalendar(session: Pick<SessionUser, "rank">): boolean {
   return (
     session.rank === "admin" ||
@@ -99,7 +99,7 @@ export function canAccessCalendar(session: Pick<SessionUser, "rank">): boolean {
   );
 }
 
-/** TM 관리자: 일반 캘린더 일정 제외, TM001 재콜만 */
+/** TM 관리자: 일반 캘린더 일정 제외, TM001·TM002 재콜만 */
 export function isTmCalendarOnlyViewer(session: Pick<SessionUser, "rank">): boolean {
   return session.rank === "tm_admin";
 }

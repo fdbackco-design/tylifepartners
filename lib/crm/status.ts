@@ -86,11 +86,18 @@ export function matchesAdminStatusFilter(
  * - 배정전: 배정전만
  * - 대기: 대기, 1차컨택, 이관요청
  * - 1차컨택 이후: 1차컨택, 부재(메신저완료), 이관요청, 상담완료, 통화약속, 대면확정, 가입완료
+ * - 번호오류: 관리자(admin)만 설정·해제 가능 (그 외 직급은 현재 값 고정)
  */
-export function allowedStatusesFor(_session: SessionUser, current: LeadStatus): LeadStatus[] {
-  if (current === "배정전") return ["배정전"];
-  if (current === "대기") return ["대기", "1차컨택", "이관요청"];
-  return ["1차컨택", "부재(메신저완료)", "이관요청", "상담완료", "통화약속", "대면확정", "가입완료"];
+export function allowedStatusesFor(session: SessionUser, current: LeadStatus): LeadStatus[] {
+  const isAdmin = session.rank === "admin";
+  if (current === "번호오류" && !isAdmin) return ["번호오류"];
+  const base: LeadStatus[] =
+    current === "배정전"
+      ? ["배정전"]
+      : current === "대기"
+        ? ["대기", "1차컨택", "이관요청"]
+        : ["1차컨택", "부재(메신저완료)", "이관요청", "상담완료", "통화약속", "대면확정", "가입완료"];
+  return isAdmin ? [...base, "번호오류"] : base;
 }
 
 export function isMemoEditable(status: LeadStatus): boolean {
@@ -112,6 +119,7 @@ export function rowBackground(
   if (status === "이관요청") return "#ffebee";
   if (status === "통화약속") return "#fffbeb";
   if (status === "대면확정") return "#e8f5e9";
+  if (status === "번호오류") return "#f3f4f6";
   return undefined;
 }
 

@@ -584,7 +584,7 @@ export default function AccountsPage() {
                 : rank === "admin"
                   ? "관리자는 대시보드·설정·계정 관리 등 전체 메뉴에 접근할 수 있습니다."
                   : rank === "tm_admin"
-                    ? "TM관리자는 TM001 목록 전체 조회·수정만 가능합니다. 다른 메뉴는 보이지 않습니다."
+                    ? "TM관리자는 TM001·TM002 목록 전체 조회·수정만 가능합니다. 다른 메뉴는 보이지 않습니다."
                     : undefined
             }
           >
