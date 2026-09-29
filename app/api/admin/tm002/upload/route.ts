@@ -5,6 +5,9 @@ import { importTm002ExcelRows } from "@/lib/crm/tm002/store";
 
 const MAX_BYTES = 20 * 1024 * 1024;
 
+// 1만 건 이상 업로드는 청크 삽입이라 기본 함수 제한 시간을 넘길 수 있다 (leads/excel-import와 동일)
+export const maxDuration = 300;
+
 /** POST /api/admin/tm002/upload — multipart: file (차수는 자동 부여) */
 export async function POST(request: NextRequest) {
   const session = await getSession();

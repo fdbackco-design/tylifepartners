@@ -291,11 +291,6 @@ export function isTm002CustomerVisible(
   return Boolean(aid && scoped.includes(aid));
 }
 
-/** 같은 연락처의 여러 행 → 대표 행 (flag에 설명이 더 붙은 행 우선, 같으면 먼저 나온 행) */
-function pickRepresentative(rows: Tm002ExcelRow[]): Tm002ExcelRow {
-  return rows.reduce((best, r) => (r.flag.length > best.flag.length ? r : best), rows[0]);
-}
-
 const INSERT_CHUNK = 500;
 
 export async function importTm002ExcelRows(opts: {
@@ -342,7 +337,8 @@ export async function importTm002ExcelRows(opts: {
   }
 
   const records = Array.from(byPhone.entries()).map(([phone, group]) => {
-    const rep = pickRepresentative(group);
+    // 같은 연락처의 여러 행 → 엑셀에서 먼저 나온 행의 flag/레벨/주소를 그대로 쓴다
+    const rep = group[0];
     return {
       partner_code: TM002_PARTNER_CODE,
       partner_name: TM002_PARTNER_NAME,
@@ -368,24 +364,36 @@ export async function importTm002ExcelRows(opts: {
       if (error) throw new Error(error.message);
     }
   } catch (e) {
-    // 일부만 들어간 차수가 남지 않도록 되돌린다
-    await supabase.from("tm002_customers").delete().eq("partner_code", TM002_PARTNER_CODE).eq("batch_code", batchCode);
-    await supabase.from("tm002_batches").delete().eq("id", batch.id);
+    // 일부만 들어간 차수가 남지 않도록 되돌린다 (되돌리기 실패는 원래 오류를 가리지 않고 기록만 남긴다)
+    const undoCustomers = await supabase
+      .from("tm002_customers")
+      .delete()
+      .eq("partner_code", TM002_PARTNER_CODE)
+      .eq("batch_code", batchCode);
+    const undoBatch = await supabase.from("tm002_batches").delete().eq("id", batch.id);
+    if (undoCustomers.error || undoBatch.error) {
+      console.error(
+        `TM002 업로드 되돌리기 실패 (차수 ${batchCode}) — 수동 정리 필요:`,
+        undoCustomers.error?.message,
+        undoBatch.error?.message
+      );
+    }
     throw e;
   }
 
-  // 다른 차수에 이미 있는 연락처 수 (병합하지 않고 알려주기만 한다)
+  // 다른 차수에 이미 있는 연락처 수 (병합하지 않고 알려주기만 한다. TM001처럼 번호 수 기준)
   const phones = Array.from(byPhone.keys());
-  let crossBatchDuplicates = 0;
+  const seenElsewhere = new Set<string>();
   for (let i = 0; i < phones.length; i += 200) {
-    const { count } = await supabase
+    const { data } = await supabase
       .from("tm002_customers")
-      .select("id", { count: "exact", head: true })
+      .select("normalized_phone")
       .eq("partner_code", TM002_PARTNER_CODE)
       .neq("batch_code", batchCode)
       .in("normalized_phone", phones.slice(i, i + 200));
-    crossBatchDuplicates += count ?? 0;
+    for (const r of data ?? []) seenElsewhere.add(String(r.normalized_phone));
   }
+  const crossBatchDuplicates = seenElsewhere.size;
 
   return {
     batch_code: batchCode,
