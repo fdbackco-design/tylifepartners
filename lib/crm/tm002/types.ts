@@ -7,6 +7,7 @@ export const TM002_PARTNER_NAME = "TM002";
 export const TM002_STATUSES = [
   "미접촉",
   "부재",
+  "메신저완료",
   "유효통화",
   "관심",
   "재콜",
