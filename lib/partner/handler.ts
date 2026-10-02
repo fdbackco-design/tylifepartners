@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminReadApiKeyFormat, extractBearerToken } from "@/lib/adminRead/crypto";
 import { authenticatePartnerRequest } from "@/lib/partner/auth";
-import { partnerError } from "@/lib/partner/errors";
 import { logPartnerRequest } from "@/lib/partner/log";
 import { isPartnerRateLimited } from "@/lib/partner/rateLimit";
 import { assertResourceAllowed } from "@/lib/partner/scope";
@@ -41,6 +41,18 @@ export async function withPartnerReadApi(
     });
     return NextResponse.json(result.body, { status: result.status });
   };
+
+  const rawToken = extractBearerToken(request.headers.get("authorization"));
+  if (rawToken && isAdminReadApiKeyFormat(rawToken)) {
+    return finish({
+      status: 403,
+      body: {
+        code: "forbidden",
+        message: "관리자 읽기 API 키로는 파트너 API를 호출할 수 없습니다.",
+      },
+      errorCode: "forbidden",
+    });
+  }
 
   const auth = await authenticatePartnerRequest(request.headers.get("authorization"));
   if (!auth.ok) {
