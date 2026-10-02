@@ -16,7 +16,7 @@
 | 후보자 | `utm_source`, `entry_page`, `region` 중 **하나 이상** 필수. 설정된 조건은 **AND**로 적용됩니다. |
 | TM001 고객 | `batch_code` 목록 필수 |
 | TM002 회원 | `batch_code` 목록 필수 |
-| 캘린더 | 공개 업무 일정만 (`visibility=all`, 관리자 작성). 구글·상담 일정·개인 일정은 **제외** |
+| 캘린더 | 공개 업무 일정만 (`visibility=all`, 관리자 작성). 구글·상담 일정·개인 일정은 **제외**. **파트너별 행 구분 없음** — 키에 캘린더 권한이 있으면 동일한 공개 일정 집합을 봅니다. |
 
 ### 기본으로 제외되는 정보
 
@@ -40,9 +40,9 @@
 
 ## 엔드포인트
 
-베이스 URL은 배포 환경마다 다릅니다. 아래 `{BASE}`를 실제 호스트로 바꿉니다.
+**베이스 URL:** `https://www.feed-life.com`
 
-### GET `{BASE}/api/partner/v1/candidates`
+### GET `https://www.feed-life.com/api/partner/v1/candidates`
 
 | 쿼리 | 설명 |
 | --- | --- |
@@ -51,7 +51,7 @@
 | `region` | 지역 부분 일치 (키에 region 범위가 있을 때 교차) |
 | `limit`, `offset` | 페이지네이션 |
 
-### GET `{BASE}/api/partner/v1/tm001/customers`
+### GET `https://www.feed-life.com/api/partner/v1/tm001/customers`
 
 | 쿼리 | 설명 |
 | --- | --- |
@@ -60,11 +60,11 @@
 | `batch_code` | 쉼표 구분. 키에 허용된 batch만 |
 | `limit`, `offset` | 페이지네이션 |
 
-### GET `{BASE}/api/partner/v1/tm002/customers`
+### GET `https://www.feed-life.com/api/partner/v1/tm002/customers`
 
 TM001과 동일한 쿼리 규칙 (TM002 batch 범위).
 
-### GET `{BASE}/api/partner/v1/calendar/events`
+### GET `https://www.feed-life.com/api/partner/v1/calendar/events`
 
 | 쿼리 | 설명 |
 | --- | --- |
@@ -86,7 +86,7 @@ JSON `{ "code": "…", "message": "…" }` (`message`는 선택)
 ## curl 예시 (가상 키)
 
 ```bash
-export BASE="https://your-production-host.example"
+export BASE="https://www.feed-life.com"
 export PARTNER_KEY="pk_live_REPLACE_WITH_ISSUED_KEY"
 
 # 1) 인증 없음 → 401
@@ -111,6 +111,7 @@ curl -sS -w "\nHTTP %{http_code}\n" \
 ## 아직 결정이 필요한 항목
 
 - 이름·전화번호·주소·숙박·가입일 등 개인정보 필드의 단계적 제공 여부
-- 후보자 행 범위를 `utm_source` 외에 계약별로 어떻게 나눌지
-- 캘린더에 업무 일정 외 원천(예: 파트너 전용 일정 테이블) 추가 여부
+- 후보자·TM 행에 `partner_id` 컬럼이 없음 → 발급 시 `utm_source` / `entry_page` / `region`, TM `batch_code`로만 범위를 정해야 함
+- `region`만 넓게 열면 동일 지역 타 파트너 유입과 구분 불가 — 계약별 utm·entry 우선 권장
+- 캘린더는 파트너 소유 관계 없음 → 전 파트너 공통 공개 일정 또는 `partner_id`·일정 태그 도입 결정 필요
 - 파트너별 IP 허용 목록·키 로테이션 정책
