@@ -7,8 +7,8 @@ info:
     날짜·월 파라미터는 Asia/Seoul. 응답 시각은 ISO-8601입니다.
     limit 기본 50, 최대 200. 키마다 분당 호출 한도가 있습니다.
 servers:
-  - url: https://your-production-host.example
-    description: 배포 호스트로 교체
+  - url: https://www.feed-life.com
+    description: 파트너 API 운영 호스트
 security:
   - PartnerBearer: []
 tags:
